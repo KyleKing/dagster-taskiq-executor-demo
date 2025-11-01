@@ -6,20 +6,20 @@
   - Finish configuring the Pulumi Python project structure and initial code
   - _Requirements: 1.1, 1.3, 7.3_
 
-- [ ] 2. Implement LocalStack infrastructure with Pulum
-  - [ ] 2.1 Create RDS PostgreSQL instance for Dagster storage
+- [x] 2. Implement LocalStack infrastructure with Pulum
+  - [x] 2.1 Create RDS PostgreSQL instance for Dagster storage
     - Define RDS instance with appropriate configuration for Dagster workloads
     - Configure security groups and networking for database access
     - Set up database initialization scripts for Dagster schema
     - _Requirements: 1.1, 1.2, 7.1_
   
-  - [ ] 2.2 Create SQS FIFO queue for TaskIQ message broker
+  - [x] 2.2 Create SQS FIFO queue for TaskIQ message broker
     - Configure SQS queue with deduplication and proper visibility timeout
     - Set up dead letter queue for failed message handling
     - Configure IAM policies for queue access
     - _Requirements: 2.1, 2.2, 7.1_
   
-  - [ ] 2.3 Set up ECS cluster and task definitions
+  - [x] 2.3 Set up ECS cluster and task definitions
     - Create ECS cluster for running Dagster and TaskIQ services
     - Define task definitions for Dagster daemon, web UI, and TaskIQ workers
     - Configure service discovery and load balancing
@@ -40,6 +40,7 @@
 
 - [ ] 4. Develop TaskIQ executor for Dagster
   - [ ] 4.1 Implement TaskIQ SQS broker integration
+    - Refer to the Celery implementation: https://github.com/dagster-io/dagster/tree/master/python_modules/libraries/dagster-celery/dagster_celery
     - Create SQS broker class that interfaces with LocalStack SQS
     - Implement message serialization and deserialization for Dagster ops
     - Add connection management and error handling for SQS operations
