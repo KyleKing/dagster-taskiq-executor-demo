@@ -50,9 +50,18 @@ The project uses:
 
 ## Getting Started
 
-2. Set up LocalStack with Docker Compose (TBD)
-3. Deploy infrastructure with Pulumi (TBD, maybe: `cd deploy && uv sync && uv run pulumi preview`)
-4. Run Dagster jobs and monitor execution (TBD, maybe: `cd app && uv sync && uv run ..?`)
+1. Launch LocalStack and PostgreSQL: `docker compose up localstack postgres`
+2. Install Pulumi dependencies and preview the stack:
+   ```sh
+   cd deploy
+   uv sync --extra dev
+   uv run pulumi preview --stack dev
+   ```
+3. Apply the stack against LocalStack when ready:
+   ```sh
+   uv run pulumi up --stack dev
+   ```
+4. Run Dagster services as described in the application README once infrastructure is provisioned.
 
 See individual component READMEs for detailed setup instructions.
 
@@ -75,8 +84,10 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv 
 ## Pulumi Guidance
 
 - Follow above Python guidance and Pulumi best practices, additionally follow:
-  - Create reusable Pulumi "components" such as `components/rds_serverless.py` for reusability, which would implement all necessary infrastructure for a new RDS instance similar to how terragrunt recommends best practices for Terraform but adapted to Pulumi
-  - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially
+  - Implement reusable infrastructure helpers as functions that return dataclasses (e.g. `create_postgres_database`) instead of component subclasses. Functions live under `deploy/components/` and each module must remain independently importable (no re-exporting `__init__.py`).
+  - Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
+  - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
+  - When validating changes, run `uv run pulumi preview --stack <name>` followed by `uv run pulumi up --stack <name>` against the LocalStack instance.
 
 ---
 

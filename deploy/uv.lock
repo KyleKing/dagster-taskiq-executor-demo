@@ -30,7 +30,7 @@ dependencies = [
     { name = "pulumi-docker" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "mypy" },
     { name = "pyright" },
@@ -39,14 +39,17 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
     { name = "pulumi", specifier = ">=3.100.0" },
     { name = "pulumi-aws", specifier = ">=6.0.0" },
     { name = "pulumi-docker", specifier = ">=4.0.0" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.390" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "pyright", specifier = ">=1.1.407" },
+    { name = "ruff", specifier = ">=0.14.3" },
+]
 
 [[package]]
 name = "debugpy"
