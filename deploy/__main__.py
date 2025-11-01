@@ -49,8 +49,8 @@ def main() -> None:
         queue_name=f"{settings.project.name}-taskiq-{settings.project.environment}.fifo",
         dlq_name=f"{settings.project.name}-taskiq-dlq-{settings.project.environment}.fifo",
         message_retention_seconds=settings.queue.message_retention_seconds,
-        queue_visibility_timeout=settings.queue.visibility_timeout_seconds,
-        dlq_visibility_timeout=settings.queue.dlq_visibility_timeout_seconds,
+        queue_visibility_timeout=settings.queue.visibility_timeout,
+        dlq_visibility_timeout=settings.queue.dlq_visibility_timeout,
         redrive_max_receive_count=settings.queue.redrive_max_receive_count,
     )
 

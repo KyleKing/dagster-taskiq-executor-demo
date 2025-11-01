@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: localstack/localstack:3.8
+    image: localstack/localstack:4.10
     container_name: localstack
     ports:
       - "4566:4566" # edge port for AWS APIs
@@ -33,7 +33,7 @@ services:
       start_period: 30s
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: dagster-postgres
     environment:
       - POSTGRES_USER=dagster
@@ -46,7 +46,7 @@ services:
     networks:
       - dagster-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dagster"]
+      test: ["CMD-SHELL", "pg_isready", "-U", "dagster"]
       interval: 10s
       timeout: 5s
       retries: 5

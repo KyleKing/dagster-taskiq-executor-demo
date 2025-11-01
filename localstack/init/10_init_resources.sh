@@ -47,7 +47,7 @@ create_fifo_queue() {
                 "ContentBasedDeduplication": "true",
                 "DeduplicationScope": "messageGroup",
                 "FifoThroughputLimit": "perMessageGroupId",
-                "VisibilityTimeoutSeconds": "300",
+                "VisibilityTimeout": "300",
                 "MessageRetentionPeriod": "1209600"
             }'
     fi

@@ -32,8 +32,8 @@ class QueueSettings:
     """Settings applied to the TaskIQ FIFO queue."""
 
     message_retention_seconds: int
-    visibility_timeout_seconds: int
-    dlq_visibility_timeout_seconds: int
+    visibility_timeout: int
+    dlq_visibility_timeout: int
     redrive_max_receive_count: int
 
 
@@ -105,8 +105,8 @@ class StackSettings:
         queue_cfg = _get_mapping("queue")
         queue = QueueSettings(
             message_retention_seconds=int(queue_cfg.get("messageRetentionSeconds", 14 * 24 * 60 * 60)),
-            visibility_timeout_seconds=int(queue_cfg.get("visibilityTimeoutSeconds", 15 * 60)),
-            dlq_visibility_timeout_seconds=int(queue_cfg.get("dlqVisibilityTimeoutSeconds", 60)),
+            visibility_timeout=int(queue_cfg.get("visibilityTimeout", 15 * 60)),
+            dlq_visibility_timeout=int(queue_cfg.get("dlqVisibilityTimeout", 60)),
             redrive_max_receive_count=int(queue_cfg.get("redriveMaxReceiveCount", 3)),
         )
 

@@ -55,15 +55,20 @@ The project uses:
    ```sh
    cd deploy
    uv sync --extra dev
-   uv run pulumi preview --stack dev
+   # Use the local stack (passphrase: 'localstack')
+   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local
    ```
 3. Apply the stack against LocalStack when ready:
    ```sh
-   uv run pulumi up --stack dev
+   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
    ```
 4. Run Dagster services as described in the application README once infrastructure is provisioned.
 
 See individual component READMEs for detailed setup instructions.
+
+### Stack Passphrases
+- `local` stack: passphrase is `localstack` (for use with LocalStack development)
+- `dev` stack: passphrase is managed separately
 
 ## Code Quality & Linting
 
@@ -87,7 +92,7 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv 
   - Implement reusable infrastructure helpers as functions that return dataclasses (e.g. `create_postgres_database`) instead of component subclasses. Functions live under `deploy/components/` and each module must remain independently importable (no re-exporting `__init__.py`).
   - Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
   - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
-  - When validating changes, run `uv run pulumi preview --stack <name>` followed by `uv run pulumi up --stack <name>` against the LocalStack instance.
+  - When validating changes, run `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local` followed by `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local` against the LocalStack instance.
 
 ---
 

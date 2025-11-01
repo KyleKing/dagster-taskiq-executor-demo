@@ -35,15 +35,15 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
    ```bash
    cd deploy
    uv sync
-   uv run pulumi stack init dev     # first time only
-   uv run pulumi up --stack dev
+   # Use the local stack (passphrase: 'localstack')
+   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
    ```
-   The default stack configuration (`Pulumi.dev.yaml`) points the AWS provider at `http://localhost:4566` and seeds demo names for the ECS cluster and SQS queue.
+   The stack configurations (`Pulumi.local.yaml`) point the AWS provider at `http://localhost:4566` and seed demo names for the ECS cluster and SQS queue.
 
 3. Update configuration as needed, for example:
    ```bash
-   uv run pulumi config set queueName my-queue --stack dev
-   uv run pulumi up --stack dev
+   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi config set queueName my-queue --stack local
+   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
    ```
 
 ## Configuration
