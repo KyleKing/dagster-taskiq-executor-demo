@@ -1,13 +1,13 @@
 # Implementation Plan
 
-- [-] 1. Set up project structure and infrastructure foundation
+- [ ] 1. Set up project structure and infrastructure foundation
   - Create AGENTS.md for this project
   - Create directory structure for Dagster jobs, TaskIQ executor, infrastructure, and testing components using uv and jdx/mise
   - Improve Docker Compose configuration for latest LocalStack with SQS, ECS, EC2, and RDS services
   - Configure Pulumi Python project structure with proper dependencies replacing initial boilerplate as needed
   - _Requirements: 1.1, 1.3, 7.3_
 
-- [ ] 2. Implement LocalStack infrastructure with Pulumi
+- [ ] 2. Implement LocalStack infrastructure with Pulum
   - [ ] 2.1 Create RDS PostgreSQL instance for Dagster storage
     - Define RDS instance with appropriate configuration for Dagster workloads
     - Configure security groups and networking for database access

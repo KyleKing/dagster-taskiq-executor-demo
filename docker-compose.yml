@@ -1,18 +1,50 @@
 services:
   localstack:
-    image: localstack/localstack:3.2
+    image: localstack/localstack:3.8
     container_name: localstack
     ports:
       - "4566:4566" # edge port for AWS APIs
       - "4510-4559:4510-4559" # additional service ports used by LocalStack
     environment:
-      - SERVICES=ecs,sqs
+      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
       - DEBUG=${LOCALSTACK_DEBUG:-0}
       - LOCALSTACK_PERSISTENCE=${LOCALSTACK_PERSISTENCE:-1}
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN-}
       - ECS_BACKEND=docker
+      - RDS_ENGINE=postgres
+      - POSTGRES_USER=dagster
+      - POSTGRES_PASSWORD=dagster
+      - POSTGRES_DB=dagster
     volumes:
       - "./localstack/init:/etc/localstack/init/ready.d"
       - "./localstack/data:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - dagster-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: dagster-postgres
+    environment:
+      - POSTGRES_USER=dagster
+      - POSTGRES_PASSWORD=dagster
+      - POSTGRES_DB=dagster
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dagster-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dagster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  dagster-network:
+    driver: bridge

@@ -30,11 +30,27 @@ The project uses:
 - Docker Compose for LocalStack orchestration
 - Pulumi for infrastructure provisioning
 
+## Project Structure
+
+```
+./
+├── app/                    # Main Python application
+│   ├── src/
+│   │   ├── dagster_jobs/   # Dagster job definitions
+│   │   ├── taskiq_executor/# TaskIQ executor implementation
+│   │   ├── auto_scaler/    # Auto-scaling service
+│   │   └── load_simulator/ # Load testing framework
+│   ├── tests/              # Test suite
+│   └── pyproject.toml      # Python dependencies
+├── deploy/                 # Pulumi infrastructure code
+├── localstack/             # LocalStack configuration
+└── docker-compose.yml      # Container orchestration
+```
+
 ## Getting Started
 
-1. Install dependencies with `uv sync`
-2. Set up LocalStack with Docker Compose
-3. Deploy infrastructure with Pulumi
-4. Run Dagster jobs and monitor execution
+2. Set up LocalStack with Docker Compose (TBD)
+3. Deploy infrastructure with Pulumi (TBD, maybe: `cd deploy && uv sync && uv run pulumi preview`)
+4. Run Dagster jobs and monitor execution (TBD, maybe: `cd app && uv sync && uv run ..?`)
 
 See individual component READMEs for detailed setup instructions.
