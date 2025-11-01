@@ -22,6 +22,7 @@ graph TB
         SQS[SQS Queues]
         ECS[ECS Service]
         EC2[EC2 Instances]
+        RDS[RDS PostgreSQL]
         IAM[IAM Roles]
     end
     
@@ -48,15 +49,21 @@ graph TB
     UI --> DW
     
     DD --> SQS
+    DD --> RDS
+    DW --> RDS
     JS --> DD
     SQS --> TW1
     SQS --> TW2
     SQS --> TWN
+    TW1 --> RDS
+    TW2 --> RDS
+    TWN --> RDS
     
     AS --> ECS
     LS --> DD
     MON --> SQS
     MON --> ECS
+    MON --> RDS
 ```
 
 ### Component Interaction Flow
@@ -95,16 +102,7 @@ sequenceDiagram
 - `IdempotencyManager`: Ensures exactly-once execution semantics
 
 **Implementation Details**:
-```python
-class DagsterTaskIQExecutor(Executor):
-    def __init__(self, sqs_endpoint: str, queue_name: str):
-        self.broker = SQSBroker(sqs_endpoint, queue_name)
-        self.idempotency_manager = IdempotencyManager()
-    
-    def execute(self, plan_context, execution_plan):
-        # Serialize ops and enqueue with idempotency keys
-        # Handle execution coordination and result collection
-```
+The executor integrates with Dagster's execution framework to distribute ops across TaskIQ workers while maintaining state consistency through PostgreSQL storage. Key responsibilities include op serialization, task distribution via SQS, result collection, and coordination with Dagster's run storage system.
 
 ### Auto Scaling Service
 
@@ -138,22 +136,12 @@ class DagsterTaskIQExecutor(Executor):
 - SQS: Message queuing with FIFO queues for ordering and deduplication
 - ECS: Container orchestration for Dagster and TaskIQ services
 - EC2: Virtual instances for ECS tasks
+- RDS: PostgreSQL database for Dagster run storage, event logs, and asset metadata
 - IAM: Role-based access control for service authentication
 - CloudWatch: Metrics and logging (simulated)
 
 **Pulumi Resources**:
-```python
-# SQS Queue with deduplication
-task_queue = aws.sqs.Queue("dagster-taskiq-queue",
-    fifo_queue=True,
-    content_based_deduplication=True,
-    visibility_timeout_seconds=900)
-
-# ECS Cluster and Services
-cluster = aws.ecs.Cluster("dagster-cluster")
-dagster_service = aws.ecs.Service("dagster-daemon", ...)
-taskiq_service = aws.ecs.Service("taskiq-workers", ...)
-```
+The infrastructure includes SQS queues with FIFO ordering and deduplication, RDS PostgreSQL instances for Dagster storage, ECS clusters and services for containerized workloads, and IAM roles for secure service communication. All resources are configured with appropriate networking, security groups, and dependency management.
 
 ## Data Models
 
@@ -185,11 +173,17 @@ class ExecutionResult:
 
 ### State Management
 
+**Dagster Storage Configuration**:
+- **Run Storage**: PostgreSQL tables for run metadata, execution plans, and run status
+- **Event Log Storage**: PostgreSQL tables for step execution events, asset materializations, and observations  
+- **Schedule Storage**: PostgreSQL tables for job schedules and sensor state
+- **Compute Log Storage**: File-based storage with S3-compatible interface via LocalStack
+
 **IdempotencyRecord**:
-- Stored in DynamoDB (LocalStack)
+- Stored in PostgreSQL alongside Dagster run data
 - Key: `{run_id}#{step_key}`
 - Status: PENDING, RUNNING, COMPLETED, FAILED
-- TTL: 24 hours for cleanup
+- Integrated with Dagster's event log for consistency
 
 ## Error Handling
 
@@ -207,8 +201,8 @@ class ExecutionResult:
 
 3. **Dagster Daemon Failures**:
    - ECS health checks and automatic restart
-   - Persistent storage for run state in LocalStack RDS
-   - Resume incomplete runs on restart
+   - Persistent storage for run state in PostgreSQL RDS
+   - Resume incomplete runs on restart using Dagster's built-in recovery mechanisms
 
 4. **Network Partitions**:
    - TaskIQ workers cache execution context locally
@@ -254,16 +248,7 @@ class ExecutionResult:
 5. **Exactly-Once Validation**: Duplicate message handling
 
 **Load Testing Framework**:
-```python
-class LoadTestScenario:
-    def __init__(self, job_rate: float, failure_rate: float, duration: int):
-        self.job_rate = job_rate
-        self.failure_rate = failure_rate
-        self.duration = duration
-    
-    async def execute(self):
-        # Generate jobs, inject failures, measure outcomes
-```
+The load testing system generates configurable job submission patterns, injects various failure scenarios, and measures system performance and reliability metrics. It validates exactly-once execution guarantees and system recovery capabilities under stress conditions.
 
 ### Performance Testing
 

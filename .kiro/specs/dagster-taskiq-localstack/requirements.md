@@ -14,6 +14,7 @@ This document specifies the requirements for a local demonstration application t
 - **Job_Scheduler**: The component responsible for triggering Dagster jobs every ten minutes
 - **Load_Simulator**: The testing component that simulates different execution load conditions
 - **Auto_Scaler**: The component that scales ECS tasks up or down based on queue depth and system load
+- **RDS_Backend**: The PostgreSQL database service in LocalStack that stores Dagster's run history, asset metadata, and execution state
 
 ## Requirements
 
@@ -23,11 +24,12 @@ This document specifies the requirements for a local demonstration application t
 
 #### Acceptance Criteria
 
-1. THE LocalStack_Environment SHALL provide SQS, ECS, and EC2 services through Docker Compose
-2. THE Dagster_System SHALL run as containerized services in the LocalStack_Environment ECS
-3. THE TaskIQ_Executor SHALL integrate with Dagster to execute ops on distributed workers
-4. THE LocalStack_Environment SHALL be accessible through standard AWS SDK calls
-5. THE Dagster_System SHALL provide a web UI accessible from the host machine
+1. THE LocalStack_Environment SHALL provide SQS, ECS, EC2, and RDS services through Docker Compose
+2. THE RDS_Backend SHALL run PostgreSQL database for Dagster metadata and run storage
+3. THE Dagster_System SHALL run as containerized services in the LocalStack_Environment ECS
+4. THE TaskIQ_Executor SHALL integrate with Dagster to execute ops on distributed workers
+5. THE LocalStack_Environment SHALL be accessible through standard AWS SDK calls
+6. THE Dagster_System SHALL provide a web UI accessible from the host machine
 
 ### Requirement 2
 
@@ -50,8 +52,9 @@ This document specifies the requirements for a local demonstration application t
 1. THE Dagster_System SHALL provide jobs with "slow" async ops that execute for 5±2 minutes using asyncio.sleep
 2. THE Dagster_System SHALL provide jobs with "fast" async ops that execute for 20±10 seconds using asyncio.sleep
 3. THE Job_Scheduler SHALL trigger job execution every ten minutes automatically
-4. THE Dagster_System SHALL support multiple concurrent job executions
-5. THE Load_Simulator SHALL allow configuration of job mix ratios for testing scenarios
+4. THE RDS_Backend SHALL persist all job run history, execution logs, and asset lineage
+5. THE Dagster_System SHALL support multiple concurrent job executions
+6. THE Load_Simulator SHALL allow configuration of job mix ratios for testing scenarios
 
 ### Requirement 4
 
@@ -95,7 +98,7 @@ This document specifies the requirements for a local demonstration application t
 
 #### Acceptance Criteria
 
-1. THE Pulumi_Infrastructure SHALL define all LocalStack resources including ECS services, SQS queues, and IAM roles
+1. THE Pulumi_Infrastructure SHALL define all LocalStack resources including ECS services, SQS queues, RDS PostgreSQL instances, and IAM roles
 2. THE Pulumi_Infrastructure SHALL support environment-specific configuration through parameter files
 3. THE Docker_Compose SHALL orchestrate LocalStack and related services with proper networking
 4. THE Pulumi_Infrastructure SHALL implement proper resource dependencies and cleanup procedures

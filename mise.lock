@@ -1,0 +1,7 @@
+[[tools.node]]
+version = "25.1.0"
+backend = "core:node"
+
+[[tools.python]]
+version = "3.14.0"
+backend = "core:python"
