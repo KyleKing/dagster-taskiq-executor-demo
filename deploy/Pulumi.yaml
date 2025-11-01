@@ -1,0 +1,4 @@
+name: localstack-ecs-sqs
+runtime:
+  name: python
+description: Pulumi stack for LocalStack ECS and SQS demo resources

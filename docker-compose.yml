@@ -1,0 +1,18 @@
+services:
+  localstack:
+    image: localstack/localstack:3.2
+    container_name: localstack
+    ports:
+      - "4566:4566" # edge port for AWS APIs
+      - "4510-4559:4510-4559" # additional service ports used by LocalStack
+    environment:
+      - SERVICES=ecs,sqs
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - DEBUG=${LOCALSTACK_DEBUG:-0}
+      - LOCALSTACK_PERSISTENCE=${LOCALSTACK_PERSISTENCE:-1}
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN-}
+      - ECS_BACKEND=docker
+    volumes:
+      - "./localstack/init:/etc/localstack/init/ready.d"
+      - "./localstack/data:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"

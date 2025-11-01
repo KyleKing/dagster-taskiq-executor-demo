@@ -1,0 +1,7 @@
+config:
+  localstack-ecs-sqs:accessKey: test
+  localstack-ecs-sqs:clusterName: demo-cluster
+  localstack-ecs-sqs:endpoint: http://localhost:4566
+  localstack-ecs-sqs:queueName: demo-queue
+  localstack-ecs-sqs:region: us-east-1
+  localstack-ecs-sqs:secretKey: test
