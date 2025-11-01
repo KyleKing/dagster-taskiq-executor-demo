@@ -15,12 +15,13 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
 
 ## Key Features
 
-- Exactly-once execution guarantees
-- Automatic scaling based on queue depth
-- Failure simulation and recovery testing
-- Mixed workload support (fast/slow jobs)
-- Infrastructure as code with Pulumi
-- Comprehensive monitoring and metrics
+- Implemented according to documentation in `.kiro/specs/dagster-taskiq-localstack/*.md`
+    - Exactly-once execution guarantees
+    - Automatic scaling based on queue depth
+    - Failure simulation and recovery testing
+    - Mixed workload support (fast/slow jobs)
+    - Infrastructure as code with Pulumi
+    - Comprehensive monitoring and metrics
 
 ## Development Setup
 
@@ -57,11 +58,26 @@ See individual component READMEs for detailed setup instructions.
 
 ## Code Quality & Linting
 
-- **ruff**: Fast Python linter and formatter (with preview mode enabled)
-- **mypy**: Static type checker
-- **pyright**: Additional static type checker for comprehensive coverage
-
-```bash
-cd app && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright
-cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright
+```sh
+cd app && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright && uv run pytest
+cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright && uv run pytest
 ```
+
+## Python Guidance
+
+- Follow best practices for DRY, YAGNI, and functional code for Python 3.13
+- Ensure that ruff, mypy, pyright, and pytest all pass as described above after making changes
+- For testing:
+    - Use `pytest.mark.parametrize` to keep tests easy to maintain and follow the AAA pattern
+    - Only test at the interface level (e.g. Dagster Job) and avoid writing low-level unit tests unless there is critical logic that can't be easily tested easily at the interface
+    - Write the fewest tests that provide the most coverage
+
+## Pulumi Guidance
+
+- Follow above Python guidance and Pulumi best practices, additionally follow:
+  - Create reusable Pulumi "components" such as `components/rds_serverless.py` for reusability, which would implement all necessary infrastructure for a new RDS instance similar to how terragrunt recommends best practices for Terraform but adapted to Pulumi
+  - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially
+
+---
+
+Keep this file up to date as major changes are made or errors in implementation are corrected

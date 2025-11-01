@@ -86,6 +86,34 @@ dlq = aws.sqs.Queue(
     opts=ResourceOptions(provider=provider),
 )
 
+# RDS Subnet Group
+rds_subnet_group = aws.rds.SubnetGroup(
+    "dagster-rds-subnet-group",
+    name=f"{project_name}-rds-{environment}",
+    subnet_ids=default_subnets.ids,
+    description="Subnet group for Dagster RDS instance",
+    opts=ResourceOptions(provider=provider),
+)
+
+# RDS PostgreSQL Instance
+rds_instance = aws.rds.Instance(
+    "dagster-rds",
+    identifier=f"{project_name}-rds-{environment}",
+    engine="postgres",
+    engine_version="15.4",
+    instance_class="db.t3.micro",
+    allocated_storage=20,
+    storage_type="gp2",
+    db_name="dagster",
+    username="dagster",
+    password="dagster",
+    vpc_security_group_ids=[dagster_sg.id],
+    db_subnet_group_name=rds_subnet_group.name,
+    skip_final_snapshot=True,
+    publicly_accessible=True,
+    opts=ResourceOptions(provider=provider),
+)
+
 # ECS Cluster
 ecs_cluster = aws.ecs.Cluster(
     "dagster-cluster",
@@ -109,6 +137,33 @@ ecs_task_role = aws.iam.Role(
             }
         ]
     }""",
+    opts=ResourceOptions(provider=provider),
+)
+
+# ECS Task Execution Role
+ecs_execution_role = aws.iam.Role(
+    "ecs-execution-role",
+    name=f"{project_name}-ecs-execution-{environment}",
+    assume_role_policy="""{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "ecs-tasks.amazonaws.com"
+                }
+            }
+        ]
+    }""",
+    opts=ResourceOptions(provider=provider),
+)
+
+# Attach execution role policy
+execution_role_policy = aws.iam.RolePolicyAttachment(
+    "ecs-execution-role-policy",
+    role=ecs_execution_role.name,
+    policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
     opts=ResourceOptions(provider=provider),
 )
 
@@ -146,12 +201,140 @@ task_policy = aws.iam.RolePolicy(
                     "Action": [
                         "logs:CreateLogGroup",
                         "logs:CreateLogStream",
-                        "logs:PutLogEvents"
+                        "logs:PutLogEvents",
+                        "ecs:DescribeServices",
+                        "ecs:UpdateService",
+                        "ecs:DescribeTasks",
+                        "ecs:ListTasks"
                     ],
                     "Resource": "*"
                 }}
             ]
         }}"""
+    ),
+    opts=ResourceOptions(provider=provider),
+)
+
+# ECS Task Definition for Dagster Daemon
+dagster_daemon_task = aws.ecs.TaskDefinition(
+    "dagster-daemon-task",
+    family=f"{project_name}-dagster-daemon-{environment}",
+    network_mode="awsvpc",
+    requires_compatibilities=["FARGATE"],
+    cpu="512",
+    memory="1024",
+    execution_role_arn=ecs_execution_role.arn,
+    task_role_arn=ecs_task_role.arn,
+    container_definitions=pulumi.Output.all(rds_instance.endpoint, taskiq_queue.id).apply(
+        lambda args: f"""[
+            {{
+                "name": "dagster-daemon",
+                "image": "dagster-taskiq:latest",
+                "essential": true,
+                "environment": [
+                    {{"name": "POSTGRES_HOST", "value": "{args[0].split(':')[0]}"}},
+                    {{"name": "POSTGRES_PORT", "value": "5432"}},
+                    {{"name": "POSTGRES_USER", "value": "dagster"}},
+                    {{"name": "POSTGRES_PASSWORD", "value": "dagster"}},
+                    {{"name": "POSTGRES_DB", "value": "dagster"}},
+                    {{"name": "AWS_ENDPOINT_URL", "value": "http://localstack:4566"}},
+                    {{"name": "TASKIQ_QUEUE_NAME", "value": "{args[1]}"}},
+                    {{"name": "ECS_CLUSTER_NAME", "value": "{project_name}-{environment}"}}
+                ],
+                "logConfiguration": {{
+                    "logDriver": "awslogs",
+                    "options": {{
+                        "awslogs-group": "/aws/ecs/dagster-daemon",
+                        "awslogs-region": "{region}",
+                        "awslogs-stream-prefix": "ecs"
+                    }}
+                }}
+            }}
+        ]"""
+    ),
+    opts=ResourceOptions(provider=provider),
+)
+
+# ECS Task Definition for Dagster Webserver
+dagster_webserver_task = aws.ecs.TaskDefinition(
+    "dagster-webserver-task",
+    family=f"{project_name}-dagster-webserver-{environment}",
+    network_mode="awsvpc",
+    requires_compatibilities=["FARGATE"],
+    cpu="512",
+    memory="1024",
+    execution_role_arn=ecs_execution_role.arn,
+    task_role_arn=ecs_task_role.arn,
+    container_definitions=pulumi.Output.all(rds_instance.endpoint).apply(
+        lambda args: f"""[
+            {{
+                "name": "dagster-webserver",
+                "image": "dagster-taskiq:latest",
+                "essential": true,
+                "portMappings": [
+                    {{
+                        "containerPort": 3000,
+                        "protocol": "tcp"
+                    }}
+                ],
+                "environment": [
+                    {{"name": "POSTGRES_HOST", "value": "{args[0].split(':')[0]}"}},
+                    {{"name": "POSTGRES_PORT", "value": "5432"}},
+                    {{"name": "POSTGRES_USER", "value": "dagster"}},
+                    {{"name": "POSTGRES_PASSWORD", "value": "dagster"}},
+                    {{"name": "POSTGRES_DB", "value": "dagster"}},
+                    {{"name": "AWS_ENDPOINT_URL", "value": "http://localstack:4566"}}
+                ],
+                "logConfiguration": {{
+                    "logDriver": "awslogs",
+                    "options": {{
+                        "awslogs-group": "/aws/ecs/dagster-webserver",
+                        "awslogs-region": "{region}",
+                        "awslogs-stream-prefix": "ecs"
+                    }}
+                }}
+            }}
+        ]"""
+    ),
+    opts=ResourceOptions(provider=provider),
+)
+
+# ECS Task Definition for TaskIQ Worker
+taskiq_worker_task = aws.ecs.TaskDefinition(
+    "taskiq-worker-task",
+    family=f"{project_name}-taskiq-worker-{environment}",
+    network_mode="awsvpc",
+    requires_compatibilities=["FARGATE"],
+    cpu="256",
+    memory="512",
+    execution_role_arn=ecs_execution_role.arn,
+    task_role_arn=ecs_task_role.arn,
+    container_definitions=pulumi.Output.all(rds_instance.endpoint, taskiq_queue.id, dlq.id).apply(
+        lambda args: f"""[
+            {{
+                "name": "taskiq-worker",
+                "image": "dagster-taskiq:latest",
+                "essential": true,
+                "environment": [
+                    {{"name": "POSTGRES_HOST", "value": "{args[0].split(':')[0]}"}},
+                    {{"name": "POSTGRES_PORT", "value": "5432"}},
+                    {{"name": "POSTGRES_USER", "value": "dagster"}},
+                    {{"name": "POSTGRES_PASSWORD", "value": "dagster"}},
+                    {{"name": "POSTGRES_DB", "value": "dagster"}},
+                    {{"name": "AWS_ENDPOINT_URL", "value": "http://localstack:4566"}},
+                    {{"name": "TASKIQ_QUEUE_NAME", "value": "{args[1]}"}},
+                    {{"name": "TASKIQ_DLQ_NAME", "value": "{args[2]}"}}
+                ],
+                "logConfiguration": {{
+                    "logDriver": "awslogs",
+                    "options": {{
+                        "awslogs-group": "/aws/ecs/taskiq-worker",
+                        "awslogs-region": "{region}",
+                        "awslogs-stream-prefix": "ecs"
+                    }}
+                }}
+            }}
+        ]"""
     ),
     opts=ResourceOptions(provider=provider),
 )
@@ -167,3 +350,6 @@ pulumi.export("task_role_arn", ecs_task_role.arn)
 pulumi.export("security_group_id", dagster_sg.id)
 pulumi.export("vpc_id", default_vpc.id)
 pulumi.export("subnet_ids", default_subnets.ids)
+pulumi.export("rds_endpoint", rds_instance.endpoint)
+pulumi.export("rds_port", rds_instance.port)
+pulumi.export("rds_db_name", rds_instance.db_name)

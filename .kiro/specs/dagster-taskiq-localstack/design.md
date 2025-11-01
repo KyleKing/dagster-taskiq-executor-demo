@@ -98,11 +98,11 @@ sequenceDiagram
 **Key Interfaces**:
 - `DagsterTaskIQExecutor`: Main executor class implementing Dagster's executor interface
 - `TaskIQOpTask`: Serializable task representation for remote execution
-- `SQSBroker`: TaskIQ broker implementation for LocalStack SQS
-- `IdempotencyManager`: Ensures exactly-once execution semantics
+- `SQSBroker`: TaskIQ broker implementation for LocalStack SQS using built-in taskiq-aio-sqs
+- `IdempotencyManager`: Simple state tracking using Dagster's existing storage
 
 **Implementation Details**:
-The executor integrates with Dagster's execution framework to distribute ops across TaskIQ workers while maintaining state consistency through PostgreSQL storage. Key responsibilities include op serialization, task distribution via SQS, result collection, and coordination with Dagster's run storage system.
+The executor uses minimal dependencies, leveraging Dagster's built-in serialization and TaskIQ's existing SQS broker. Key responsibilities include op distribution via SQS, result collection, and coordination with Dagster's run storage system. No additional logging frameworks or CLI libraries are needed beyond what Dagster and TaskIQ provide.
 
 ### Auto Scaling Service
 
@@ -138,10 +138,10 @@ The executor integrates with Dagster's execution framework to distribute ops acr
 - EC2: Virtual instances for ECS tasks
 - RDS: PostgreSQL database for Dagster run storage, event logs, and asset metadata
 - IAM: Role-based access control for service authentication
-- CloudWatch: Metrics and logging (simulated)
+- CloudWatch: Basic logging using LocalStack's built-in capabilities
 
 **Pulumi Resources**:
-The infrastructure includes SQS queues with FIFO ordering and deduplication, RDS PostgreSQL instances for Dagster storage, ECS clusters and services for containerized workloads, and IAM roles for secure service communication. All resources are configured with appropriate networking, security groups, and dependency management.
+The infrastructure uses standard AWS resources through Pulumi's AWS provider, configured to target LocalStack endpoints. This includes SQS FIFO queues, RDS PostgreSQL instances, ECS clusters and task definitions, and IAM roles. All resources use LocalStack's default networking and minimal configuration to reduce complexity.
 
 ## Data Models
 

@@ -87,6 +87,7 @@ log "Starting LocalStack initialization for Dagster TaskIQ demo"
 wait_for_service "sqs"
 wait_for_service "ecs"
 wait_for_service "logs"
+wait_for_service "rds"
 
 # Create resources
 create_fifo_queue "${QUEUE_NAME}" "Main TaskIQ queue"

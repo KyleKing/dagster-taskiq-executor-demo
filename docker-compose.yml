@@ -6,7 +6,7 @@ services:
       - "4566:4566" # edge port for AWS APIs
       - "4510-4559:4510-4559" # additional service ports used by LocalStack
     environment:
-      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs
+      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs,sts,s3
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
       - DEBUG=${LOCALSTACK_DEBUG:-0}
       - LOCALSTACK_PERSISTENCE=${LOCALSTACK_PERSISTENCE:-1}
@@ -16,12 +16,21 @@ services:
       - POSTGRES_USER=dagster
       - POSTGRES_PASSWORD=dagster
       - POSTGRES_DB=dagster
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LOCALSTACK_HOST=localstack
+      - HOSTNAME_EXTERNAL=localstack
     volumes:
       - "./localstack/init:/etc/localstack/init/ready.d"
       - "./localstack/data:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
       - dagster-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   postgres:
     image: postgres:15-alpine
