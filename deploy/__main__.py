@@ -1,11 +1,10 @@
-"""
-Pulumi infrastructure for Dagster TaskIQ LocalStack demo.
+"""Pulumi infrastructure for Dagster TaskIQ LocalStack demo.
 Creates SQS queues, ECS cluster, RDS instance, and IAM roles.
 """
 
 import pulumi
-from pulumi import ResourceOptions
 import pulumi_aws as aws
+from pulumi import ResourceOptions
 
 # Configuration
 config = pulumi.Config()
@@ -44,7 +43,7 @@ provider = aws.Provider(
 default_vpc = aws.ec2.get_vpc(default=True, opts=pulumi.InvokeOptions(provider=provider))
 default_subnets = aws.ec2.get_subnets(
     filters=[aws.ec2.GetSubnetsFilterArgs(name="vpc-id", values=[default_vpc.id])],
-    opts=pulumi.InvokeOptions(provider=provider)
+    opts=pulumi.InvokeOptions(provider=provider),
 )
 
 # Security Groups
@@ -55,28 +54,13 @@ dagster_sg = aws.ec2.SecurityGroup(
     vpc_id=default_vpc.id,
     ingress=[
         aws.ec2.SecurityGroupIngressArgs(
-            from_port=3000,
-            to_port=3000,
-            protocol="tcp",
-            cidr_blocks=["0.0.0.0/0"],
-            description="Dagster Web UI"
+            from_port=3000, to_port=3000, protocol="tcp", cidr_blocks=["0.0.0.0/0"], description="Dagster Web UI"
         ),
         aws.ec2.SecurityGroupIngressArgs(
-            from_port=5432,
-            to_port=5432,
-            protocol="tcp",
-            cidr_blocks=["10.0.0.0/8"],
-            description="PostgreSQL"
+            from_port=5432, to_port=5432, protocol="tcp", cidr_blocks=["10.0.0.0/8"], description="PostgreSQL"
         ),
     ],
-    egress=[
-        aws.ec2.SecurityGroupEgressArgs(
-            from_port=0,
-            to_port=0,
-            protocol="-1",
-            cidr_blocks=["0.0.0.0/0"]
-        )
-    ],
+    egress=[aws.ec2.SecurityGroupEgressArgs(from_port=0, to_port=0, protocol="-1", cidr_blocks=["0.0.0.0/0"])],
     opts=ResourceOptions(provider=provider),
 )
 

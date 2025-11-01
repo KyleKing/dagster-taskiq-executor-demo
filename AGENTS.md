@@ -54,3 +54,14 @@ The project uses:
 4. Run Dagster jobs and monitor execution (TBD, maybe: `cd app && uv sync && uv run ..?`)
 
 See individual component READMEs for detailed setup instructions.
+
+## Code Quality & Linting
+
+- **ruff**: Fast Python linter and formatter (with preview mode enabled)
+- **mypy**: Static type checker
+- **pyright**: Additional static type checker for comprehensive coverage
+
+```bash
+cd app && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright
+cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright
+```
