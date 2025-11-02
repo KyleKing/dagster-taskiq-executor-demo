@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from pulumi import ResourceOptions
+import pulumi
 from pulumi_aws import Provider, servicediscovery
 
 
@@ -11,6 +11,7 @@ class ServiceDiscoveryResources:
     """Outputs for the Cloud Map namespace and services."""
 
     namespace: servicediscovery.PrivateDnsNamespace
+    daemon_service: servicediscovery.Service
     webserver_service: servicediscovery.Service
 
 
@@ -32,7 +33,24 @@ def create_service_discovery(
         name=f"{project_name}-{environment}.local",
         vpc=vpc_id,
         description="Service discovery namespace for Dagster services",
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    daemon_service = servicediscovery.Service(
+        f"{resource_name}-daemon",
+        name="dagster-daemon",
+        namespace_id=namespace.id,
+        dns_config=servicediscovery.ServiceDnsConfigArgs(
+            namespace_id=namespace.id,
+            dns_records=[
+                servicediscovery.ServiceDnsConfigDnsRecordArgs(
+                    ttl=10,
+                    type="A",
+                )
+            ],
+            routing_policy="MULTIVALUE",
+        ),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     webserver_service = servicediscovery.Service(
@@ -49,7 +67,9 @@ def create_service_discovery(
             ],
             routing_policy="MULTIVALUE",
         ),
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
-    return ServiceDiscoveryResources(namespace=namespace, webserver_service=webserver_service)
+    return ServiceDiscoveryResources(
+        namespace=namespace, daemon_service=daemon_service, webserver_service=webserver_service
+    )

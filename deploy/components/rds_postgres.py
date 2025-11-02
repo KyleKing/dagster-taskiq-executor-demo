@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pulumi
-from pulumi import ResourceOptions
 from pulumi_aws import Provider, rds
 
 
@@ -42,10 +41,11 @@ def create_postgres_database(
         name=f"{project_name}-rds-{environment}",
         subnet_ids=list(subnet_ids),
         description="Subnet group for Dagster RDS instance",
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     instance = rds.Instance(
+        # HACK: temporary settings for LocalStack, but will eventually migrate to best practices
         f"{resource_name}-instance",
         identifier=f"{project_name}-rds-{environment}",
         engine="postgres",
@@ -71,7 +71,9 @@ def create_postgres_database(
         performance_insights_enabled=False,
         deletion_protection=False,
         parameter_group_name="default.postgres15",
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
+        port=4510,  # Appears to be required for LocalStack?
+        # https://www.pulumi.com/registry/packages/aws/api-docs/rds/instance/#port_nodejs
     )
 
     return DatabaseResources(subnet_group=subnet_group, instance=instance)

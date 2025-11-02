@@ -6,6 +6,10 @@ RUN groupadd --system --gid 999 nonroot \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,20 +22,17 @@ ENV PIP_NO_CACHE_DIR=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv
 
 ENV DAGSTER_HOME=/opt/dagster/dagster_home
-RUN mkdir -p /opt/dagster/dagster_home
-
-RUN apt-get update \
-    && apt-get install -y libpq-dev gcc \
-    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p $DAGSTER_HOME \
+    && chown -R nonroot:nonroot /opt/dagster
 
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock,readonly \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml,readonly \
-    uv sync --locked --no-dev --no-install-project --with=uv_build
+    uv sync --locked --no-dev --no-install-project --group=uv-build
 
-COPY . --chown=nonroot:nonroot /app
+COPY --chown=nonroot:nonroot . /app
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
-    uv sync --locked --no-dev --offline
+    uv sync --locked --no-dev
 
 USER nonroot
 ENTRYPOINT []

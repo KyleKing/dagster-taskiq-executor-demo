@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pulumi
 import pulumi_aws as aws
-from pulumi import ResourceOptions
 
 from components.ecs_cluster import create_ecs_cluster
 from components.iam import create_ecs_iam_roles
@@ -150,10 +149,10 @@ def main() -> None:
                 assign_public_ip=True,
             ),
             service_registries=aws.ecs.ServiceServiceRegistriesArgs(
-                registry_arn=service_discovery.namespace.arn,
+                registry_arn=service_discovery.daemon_service.arn,
             ),
         ),
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     dagster_webserver_service = aws.ecs.Service(
@@ -180,7 +179,7 @@ def main() -> None:
                 registry_arn=service_discovery.webserver_service.arn,
             ),
         ),
-        opts=ResourceOptions(provider=provider, depends_on=[load_balancer.listener]),
+        opts=pulumi.ResourceOptions(provider=provider, depends_on=[load_balancer.listener]),
     )
 
     taskiq_worker_service = aws.ecs.Service(
@@ -197,7 +196,7 @@ def main() -> None:
                 assign_public_ip=True,
             ),
         ),
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     # Stack outputs to simplify debugging and downstream configuration.

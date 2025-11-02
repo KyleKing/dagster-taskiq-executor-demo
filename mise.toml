@@ -1,3 +1,7 @@
 [tools]
 node = "latest"
 python = "latest"
+
+[env]
+_.file = { path = ".env", redact = true }
+PULUMI_CONFIG_PASSPHRASE = "See README!"

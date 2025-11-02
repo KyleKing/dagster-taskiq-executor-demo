@@ -3,7 +3,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pulumi import Input, ResourceOptions
+import pulumi
+from pulumi import Input
 from pulumi_aws import Provider, lb
 
 
@@ -38,7 +39,7 @@ def create_load_balancer(
         subnets=list(subnet_ids),
         security_groups=security_group_ids,
         internal=False,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     target_group = lb.TargetGroup(
@@ -59,7 +60,7 @@ def create_load_balancer(
             timeout=5,
             unhealthy_threshold=2,
         ),
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     listener = lb.Listener(
@@ -73,7 +74,7 @@ def create_load_balancer(
                 target_group_arn=target_group.arn,
             )
         ],
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     return LoadBalancerResources(

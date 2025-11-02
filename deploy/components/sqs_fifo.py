@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pulumi
-from pulumi import ResourceOptions
 from pulumi_aws import Provider, sqs
 
 
@@ -44,7 +43,7 @@ def create_fifo_queue_with_dlq(
         fifo_throughput_limit="perMessageGroupId",
         visibility_timeout_seconds=dlq_visibility_timeout,
         message_retention_seconds=message_retention_seconds,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     redrive_policy = pulumi.Output.all(dead_letter_queue.arn).apply(
@@ -67,7 +66,7 @@ def create_fifo_queue_with_dlq(
         receive_wait_time_seconds=20,
         max_message_size=262144,
         redrive_policy=redrive_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     return QueueResources(queue=queue, dead_letter_queue=dead_letter_queue)
@@ -109,7 +108,7 @@ def attach_queue_access_policy(
         f"{policy_name}-queue-policy",
         queue_url=queues.queue.id,
         policy=formatted_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     formatted_dlq_policy = pulumi.Output.all(queues.dead_letter_queue.arn, principal_arns).apply(
@@ -120,5 +119,5 @@ def attach_queue_access_policy(
         f"{policy_name}-dlq-policy",
         queue_url=queues.dead_letter_queue.id,
         policy=formatted_dlq_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )

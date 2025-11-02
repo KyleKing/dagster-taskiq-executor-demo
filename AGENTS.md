@@ -58,7 +58,7 @@ The project uses:
    # Use the local stack (passphrase: 'localstack')
    PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local
    ```
-3. Apply the stack against LocalStack when ready:
+3. Do not auto-apply and instead inform the user they can run:
    ```sh
    PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
    ```
@@ -74,7 +74,7 @@ See individual component READMEs for detailed setup instructions.
 
 ```sh
 cd app && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright && uv run pytest
-cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright && uv run pytest
+cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && uv run pyright && uv run pytest
 ```
 
 ## Python Guidance
@@ -89,11 +89,22 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy && uv 
 ## Pulumi Guidance
 
 - Follow above Python guidance and Pulumi best practices, additionally follow:
-  - Implement reusable infrastructure helpers as functions that return dataclasses (e.g. `create_postgres_database`) instead of component subclasses. Functions live under `deploy/components/` and each module must remain independently importable (no re-exporting `__init__.py`).
-  - Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
-  - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
-  - When validating changes, run `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local` followed by `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local` against the LocalStack instance.
+- Implement reusable infrastructure helpers as functions that return dataclasses (e.g. `create_postgres_database`) instead of component subclasses. Functions live under `deploy/components/` and each module must remain independently importable (no re-exporting `__init__.py`).
+- Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
+- Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
 
 ---
 
 Keep this file up to date as major changes are made or errors in implementation are corrected
+
+## Collaboration & Git Workflow
+
+- Assume a human operator is actively managing the git repository state in real time.
+- They may stage, commit, or modify other files unrelated to your task; do not assume repository cleanliness.
+- Avoid undoing or overwriting human changes—coordinate through explicit instructions if conflicts arise.
+
+## Automation Notes
+
+- When validating changes, run `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local`
+- If Pulumi doesn't stop and is running for more than 10 minutes, that likely means there was a failure and the logs from Docker Compose LocalStack need to be inspected. Do not let Pulumi run for more than 10 minutes. If Pulumi is stopped (Ctrl-C twice), then a human must run `pulumi cancel` and reconfirm the stack name to release the lock
+- Pulumi commands must include `--yes --non-interactive` so the CLI never waits for manual confirmation.

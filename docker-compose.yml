@@ -1,59 +1,24 @@
 services:
   localstack:
-    image: localstack/localstack:4.10
-    container_name: localstack
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
+    image: localstack/localstack-pro:4.1.0  # required for Pro
     ports:
-      - "4566:4566" # edge port for AWS APIs
-      - "4510-4559:4510-4559" # additional service ports used by LocalStack
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "127.0.0.1:443:443"              # LocalStack HTTPS Gateway (Pro)
     environment:
-      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs,sts,s3
+      # Activate LocalStack Pro: https://docs.localstack.cloud/getting-started/auth-token/
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:?}  # required for Pro (RDS, etc.)
+      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
-      - DEBUG=${LOCALSTACK_DEBUG:-0}
-      - LOCALSTACK_PERSISTENCE=${LOCALSTACK_PERSISTENCE:-1}
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN-}
-      - ECS_BACKEND=docker
-      - RDS_ENGINE=postgres
-      - POSTGRES_USER=dagster
-      - POSTGRES_PASSWORD=dagster
-      - POSTGRES_DB=dagster
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - LOCALSTACK_HOST=localstack
-      - HOSTNAME_EXTERNAL=localstack
+      - DEBUG=${DEBUG:-0}
+      - PERSISTENCE=${PERSISTENCE:-0}
+      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53
+      # HACK: May or may not be required?
+      # - DOCKER_HOST=unix:///var/run/docker.sock
+      # - ECS_BACKEND=docker
+      # - HOSTNAME_EXTERNAL=localstack
+      # - LOCALSTACK_HOST=localstack
     volumes:
-      - "./localstack/init:/etc/localstack/init/ready.d"
-      - "./localstack/data:/var/lib/localstack"
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
-    networks:
-      - dagster-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
-  postgres:
-    image: postgres:17-alpine
-    container_name: dagster-postgres
-    environment:
-      - POSTGRES_USER=dagster
-      - POSTGRES_PASSWORD=dagster
-      - POSTGRES_DB=dagster
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - dagster-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-U", "dagster"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-
-networks:
-  dagster-network:
-    driver: bridge

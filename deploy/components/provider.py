@@ -22,16 +22,24 @@ def create_localstack_provider(name: str, config: LocalStackProviderConfig) -> a
     Returns:
         aws.Provider: Provider configured for LocalStack endpoints.
     """
-    endpoint_mapping = aws.ProviderEndpointArgs(
-        ecs=config.endpoint,
-        sqs=config.endpoint,
-        rds=config.endpoint,
-        ec2=config.endpoint,
-        iam=config.endpoint,
-        sts=config.endpoint,
-        logs=config.endpoint,
-        cloudwatchlogs=config.endpoint,
-    )
+    endpoint_services = [
+        "cloudwatchlogs",
+        "ec2",
+        "ecs",
+        "elasticloadbalancing",
+        "elasticloadbalancingv2",
+        "elb",
+        "elbv2",
+        "iam",
+        "logs",
+        "rds",
+        "route53",
+        "servicediscovery",
+        "sqs",
+        "sts",
+    ]
+
+    endpoint_mapping = aws.ProviderEndpointArgs(**dict.fromkeys(endpoint_services, config.endpoint))
 
     return aws.Provider(
         name,

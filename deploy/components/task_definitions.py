@@ -6,7 +6,6 @@ import json
 from dataclasses import dataclass
 
 import pulumi
-from pulumi import ResourceOptions
 from pulumi_aws import Provider, ecs
 
 
@@ -99,7 +98,7 @@ def create_task_definitions(
         execution_role_arn=execution_role_arn,
         task_role_arn=task_role_arn,
         container_definitions=daemon_definitions,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     webserver_definitions = database_output.apply(
@@ -147,7 +146,7 @@ def create_task_definitions(
         execution_role_arn=execution_role_arn,
         task_role_arn=task_role_arn,
         container_definitions=webserver_definitions,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     worker_definitions = pulumi.Output.all(database_output, queue_url, dlq_url).apply(
@@ -194,7 +193,7 @@ def create_task_definitions(
         execution_role_arn=execution_role_arn,
         task_role_arn=task_role_arn,
         container_definitions=worker_definitions,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     return TaskDefinitions(

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from pulumi import ResourceOptions
+import pulumi
 from pulumi_aws import Provider, ecs
 
 
@@ -39,7 +39,7 @@ def create_ecs_cluster(
                 logging="DEFAULT",
             )
         ),
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     return ClusterResources(cluster=cluster)

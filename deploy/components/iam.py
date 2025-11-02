@@ -6,7 +6,6 @@ import json
 from dataclasses import dataclass
 
 import pulumi
-from pulumi import ResourceOptions
 from pulumi_aws import Provider, iam
 
 
@@ -47,21 +46,21 @@ def create_ecs_iam_roles(
         f"{resource_name}-task",
         name=f"{project_name}-ecs-task-{environment}",
         assume_role_policy=assume_role_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     execution_role = iam.Role(
         f"{resource_name}-execution",
         name=f"{project_name}-ecs-execution-{environment}",
         assume_role_policy=assume_role_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     iam.RolePolicyAttachment(
         f"{resource_name}-execution-policy",
         role=execution_role.name,
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     inline_policy = pulumi.Output.all(queue_arn, dlq_arn).apply(
@@ -127,7 +126,7 @@ def create_ecs_iam_roles(
         f"{resource_name}-inline",
         role=task_role.id,
         policy=inline_policy,
-        opts=ResourceOptions(provider=provider),
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
     return IamRoles(task_role=task_role, execution_role=execution_role)
