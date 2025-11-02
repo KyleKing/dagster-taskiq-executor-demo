@@ -33,8 +33,7 @@ class IdempotencyStorage:
         """Get idempotency record by key."""
         with self.db_manager.get_connection() as conn:
             result = conn.execute(
-                "SELECT * FROM taskiq_idempotency_records WHERE idempotency_key = %s",
-                (idempotency_key,)
+                "SELECT * FROM taskiq_idempotency_records WHERE idempotency_key = %s", (idempotency_key,)
             ).fetchone()
             if result:
                 return IdempotencyRecord(
@@ -52,48 +51,60 @@ class IdempotencyStorage:
         with self.db_manager.get_connection() as conn:
             # Try to insert first
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO taskiq_idempotency_records
                     (idempotency_key, state, created_at, updated_at, task_data, result_data)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    record.idempotency_key,
-                    record.state.value,
-                    record.created_at,
-                    record.updated_at,
-                    record.task_data,
-                    record.result_data,
-                ))
+                """,
+                    (
+                        record.idempotency_key,
+                        record.state.value,
+                        record.created_at,
+                        record.updated_at,
+                        record.task_data,
+                        record.result_data,
+                    ),
+                )
             except Exception:
                 # Update if insert failed (key exists)
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE taskiq_idempotency_records
                     SET state = %s, updated_at = %s, task_data = %s, result_data = %s
                     WHERE idempotency_key = %s
-                """, (
-                    record.state.value,
-                    record.updated_at,
-                    record.task_data,
-                    record.result_data,
-                    record.idempotency_key,
-                ))
+                """,
+                    (
+                        record.state.value,
+                        record.updated_at,
+                        record.task_data,
+                        record.result_data,
+                        record.idempotency_key,
+                    ),
+                )
             conn.commit()
 
     def update_state(self, idempotency_key: str, state: TaskState, result_data: str | None = None) -> None:
         """Update the state of an idempotency record."""
         with self.db_manager.get_connection() as conn:
             if result_data is not None:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE taskiq_idempotency_records
                     SET state = %s, updated_at = %s, result_data = %s
                     WHERE idempotency_key = %s
-                """, (state.value, datetime.now(UTC), result_data, idempotency_key))
+                """,
+                    (state.value, datetime.now(UTC), result_data, idempotency_key),
+                )
             else:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE taskiq_idempotency_records
                     SET state = %s, updated_at = %s
                     WHERE idempotency_key = %s
-                """, (state.value, datetime.now(UTC), idempotency_key))
+                """,
+                    (state.value, datetime.now(UTC), idempotency_key),
+                )
             conn.commit()
 
     def is_completed(self, idempotency_key: str) -> bool:

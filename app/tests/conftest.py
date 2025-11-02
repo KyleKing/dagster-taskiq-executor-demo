@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -11,6 +12,14 @@ from dagster import DagsterInstance
 from dagster.core.test_utils import instance_for_test  # type: ignore[import-not-found]
 
 from dagster_taskiq.config.settings import Settings
+
+# Configure pytest-postgresql to use mise-installed system Postgres
+os.environ.setdefault("POSTGRESQL_HOST", "localhost")
+os.environ.setdefault("POSTGRESQL_PORT", "5432")
+os.environ.setdefault("POSTGRESQL_USER", "postgres")
+os.environ.setdefault("POSTGRESQL_PASSWORD", "")
+os.environ.setdefault("POSTGRESQL_DBNAME", "postgres")
+os.environ.setdefault("POSTGRESQL_CONNECTION_TYPE", "psycopg")
 
 
 @pytest.fixture(scope="session")

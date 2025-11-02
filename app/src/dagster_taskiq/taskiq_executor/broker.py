@@ -37,6 +37,7 @@ class LocalStackSqsBroker(SqsAsyncBroker):
     def startup_sync(self) -> None:
         """Synchronous startup for use in Dagster executor."""
         import asyncio
+
         asyncio.run(self.startup())
 
     async def shutdown(self) -> None:
@@ -52,6 +53,7 @@ class LocalStackSqsBroker(SqsAsyncBroker):
     def shutdown_sync(self) -> None:
         """Synchronous shutdown for use in Dagster executor."""
         import asyncio
+
         asyncio.run(self.shutdown())
 
     async def kick(self, message: Any) -> None:
@@ -66,4 +68,5 @@ class LocalStackSqsBroker(SqsAsyncBroker):
     def kick_sync(self, message: Any) -> None:
         """Synchronous message sending for use in Dagster executor."""
         import asyncio
+
         asyncio.run(self.kick(message))

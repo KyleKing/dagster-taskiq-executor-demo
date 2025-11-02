@@ -16,23 +16,24 @@ from dagster import (
 from dagster._core.execution.plan.objects import StepFailureData, StepSuccessData
 from dagster._core.execution.plan.step import StepKind
 from dagster._core.executor.base import Executor
+from dagster_shared.error import SerializableErrorInfo
 
 from .broker import LocalStackSqsBroker
 from .models import IdempotencyStorage, get_idempotency_storage
 from .task_payloads import ExecutionResult, IdempotencyRecord, OpExecutionTask, TaskState
 
 __all__ = [
-    "TaskIQExecutor",
-    "LocalStackSqsBroker",
-    "IdempotencyStorage",
-    "get_idempotency_storage",
     "ExecutionResult",
     "IdempotencyRecord",
+    "IdempotencyStorage",
+    "LocalStackSqsBroker",
     "OpExecutionTask",
+    "TaskIQExecutor",
     "TaskState",
+    "get_idempotency_storage",
+    "taskiq_app",
     "taskiq_executor",
 ]
-from pydantic import Field
 
 from dagster_taskiq.config.settings import Settings
 from dagster_taskiq.taskiq_executor.broker import LocalStackSqsBroker
@@ -42,6 +43,9 @@ from dagster_taskiq.taskiq_executor.task_payloads import (
     OpExecutionTask,
     TaskState,
 )
+
+# Import the TaskIQ app instance
+from .app import taskiq_app
 
 
 class TaskIQExecutor(Executor):
@@ -139,7 +143,9 @@ class TaskIQExecutor(Executor):
             step_context = plan_context.for_step(step)
             yield DagsterEvent.step_failure_event(
                 step_context=step_context,
-                step_failure_data=StepFailureData(error=str(e), user_failure_data=None),
+                step_failure_data=StepFailureData(
+                    error=SerializableErrorInfo(str(e), [], "Exception"), user_failure_data=None
+                ),
             )
 
     def _poll_for_results(self, plan_context: Any, execution_plan: Any) -> Iterator[DagsterEvent]:
@@ -159,7 +165,7 @@ class TaskIQExecutor(Executor):
                     continue
 
                 # Check if task is completed
-                if record.state in (TaskState.COMPLETED, TaskState.FAILED):
+                if record.state in {TaskState.COMPLETED, TaskState.FAILED}:
                     completed_steps.append(step_key)
                     step = next((s for s in execution_plan.steps if s.key == step_key), None)
                     if step:
@@ -181,7 +187,10 @@ class TaskIQExecutor(Executor):
                     step_context = plan_context.for_step(step)
                     yield DagsterEvent.step_failure_event(
                         step_context=step_context,
-                        step_failure_data=StepFailureData(error="Task execution timeout", user_failure_data=None),
+                        step_failure_data=StepFailureData(
+                            error=SerializableErrorInfo("Task execution timeout", [], "Exception"),
+                            user_failure_data=None,
+                        ),
                     )
 
     def _yield_completion_events(self, plan_context: Any, step: Any, state: TaskState) -> Iterator[DagsterEvent]:
@@ -189,7 +198,7 @@ class TaskIQExecutor(Executor):
         step_context = plan_context.for_step(step)
 
         if state == TaskState.COMPLETED:
-            yield DagsterEvent.step_success_event(step_context, StepSuccessData(duration_ms=0))
+            yield DagsterEvent.step_success_event(step_context, StepSuccessData(duration_ms=0.0))
         elif state == TaskState.FAILED:
             idempotency_key = f"{plan_context.run_id}:{step.key}"
             record = self._idempotency_storage.get_record(idempotency_key)
@@ -197,7 +206,9 @@ class TaskIQExecutor(Executor):
 
             yield DagsterEvent.step_failure_event(
                 step_context=step_context,
-                step_failure_data=StepFailureData(error=error_msg, user_failure_data=None),
+                step_failure_data=StepFailureData(
+                    error=SerializableErrorInfo(error_msg, [], "Exception"), user_failure_data=None
+                ),
             )
 
     def _resolve_inputs(self, step: Any, plan_context: Any) -> dict[str, Any]:
@@ -213,12 +224,7 @@ class TaskIQExecutor(Executor):
 
 @executor(
     name="taskiq",
-    config_schema={
-        "use_localstack": Field(
-            default=True,
-            description="Whether to use LocalStack for SQS",
-        ),
-    },
+    config_schema={},
     requirements=[
         ExecutorRequirement.RECONSTRUCTABLE_JOB,
         ExecutorRequirement.NON_EPHEMERAL_INSTANCE,

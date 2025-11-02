@@ -165,13 +165,14 @@ def create_taskiq_infrastructure(
 
     # Create worker task definition
     def create_worker_container(args: tuple[str, str, str, str]) -> list[ContainerDefinition]:
-        db_endpoint, queue_url, dlq_url, image = args
+        db_endpoint, queue_name, dlq_name, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
         return [
             ContainerDefinition(
                 name="taskiq-worker",
                 image=image,
+                command=["python", "-m", "dagster_taskiq.taskiq_executor.worker"],
                 environment={
                     "POSTGRES_HOST": host,
                     "POSTGRES_PORT": "5432",
@@ -182,13 +183,13 @@ def create_taskiq_infrastructure(
                     "AWS_DEFAULT_REGION": region,
                     "DAGSTER_HOME": "/opt/dagster/dagster_home",
                     "PYTHONPATH": "/opt/dagster/app",
-                    "TASKIQ_QUEUE_NAME": queue_url,
-                    "TASKIQ_DLQ_NAME": dlq_url,
-                    "WORKER_CONCURRENCY": "2",
+                    "TASKIQ_QUEUE_NAME": queue_name,
+                    "TASKIQ_DLQ_NAME": dlq_name,
+                    "TASKIQ_WORKER_HEALTH_PORT": "8080",
                     "TASKIQ_WORKER_ID": "worker-${HOSTNAME}",
                 },
                 health_check=HealthCheck(
-                    command=["CMD-SHELL", "python -c \"import taskiq; print('healthy')\" || exit 1"],
+                    command=["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
                     interval=30,
                     timeout=10,
                     retries=2,
@@ -202,8 +203,12 @@ def create_taskiq_infrastructure(
     def _serialize_worker_containers(args: tuple[str, str, str, str]) -> str:
         return json.dumps([c.to_dict() for c in create_worker_container(args)])
 
+    # Extract queue names from the queue names passed to create_fifo_queue_with_dlq
+    queue_name = f"{project_name}-taskiq-{environment}.fifo"
+    dlq_name = f"{project_name}-taskiq-dlq-{environment}.fifo"
+
     container_defs_json = pulumi.Output.all(
-        database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image
+        database_endpoint, queue_name, dlq_name, container_image
     ).apply(lambda args: _serialize_worker_containers(cast("tuple[str, str, str, str]", tuple(args))))
 
     worker_task_definition = create_fargate_task_definition(

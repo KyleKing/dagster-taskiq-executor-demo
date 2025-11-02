@@ -23,6 +23,26 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
     - Infrastructure as code with Pulumi
     - Comprehensive monitoring and metrics
 
+## TaskIQ Implementation Notes
+
+While the project is named "dagster-taskiq-executor" and uses TaskIQ-related terminology, the actual worker implementation does not use the TaskIQ framework directly. Instead, it implements a custom async worker using aioboto3 for SQS message consumption.
+
+### Why Not Use the TaskIQ Framework?
+
+The TaskIQ framework was evaluated but ultimately not used for the following reasons:
+
+1. **Dagster Integration Complexity**: TaskIQ's task registration and execution model doesn't align well with Dagster's op/step execution lifecycle. Dagster ops require specific context reconstruction, resource management, and execution metadata that TaskIQ's generic task abstraction doesn't support.
+
+2. **Idempotency Requirements**: The implementation requires exactly-once execution semantics with custom idempotency storage in PostgreSQL. TaskIQ's built-in retry mechanisms and state management are designed for simpler task queues and don't provide the granular control needed for Dagster's execution model.
+
+3. **Custom Payload Handling**: Dagster ops need structured payloads (`OpExecutionTask`) with run/step metadata, execution context, and result reporting. TaskIQ's serialization and payload handling is too generic and would require extensive customization.
+
+4. **Result Reporting**: The executor polls for task completion via idempotency storage rather than TaskIQ's result backend. This allows for better integration with Dagster's run monitoring and failure handling.
+
+5. **Async Execution Control**: The worker needs fine-grained control over async execution, graceful shutdown, and health checks that TaskIQ's broker abstractions don't expose.
+
+The custom implementation provides the necessary control and integration points while maintaining compatibility with TaskIQ's naming conventions and overall architecture patterns.
+
 ## Development Setup
 
 > [!IMPORTANT]
@@ -94,7 +114,7 @@ See individual component READMEs for detailed setup instructions.
 ## Code Quality & Linting
 
 ```sh
-cd app && uv run ruff format && uv run ruff check --fix && uv run mypy && uv run pyright && uv run pytest
+cd app && uv run ruff format && uv run ruff check --fix && uv run mypy . && uv run pyright && uv run pytest
 cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && uv run pyright && uv run pytest
 ```
 
@@ -138,6 +158,28 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && u
 ---
 
 Keep this file up to date as major changes are made or errors in implementation are corrected
+
+## Project Status
+
+### Stage 01 – TaskIQ Executor Foundation ✅ COMPLETED
+- Implemented TaskIQ executor with SQS-based distributed job execution
+- Added idempotency storage using PostgreSQL
+- Created payload models for task serialization
+- Integrated executor into Dagster jobs
+- Comprehensive testing with interface-level mocks
+
+### Stage 02 – TaskIQ Worker Runtime ✅ COMPLETED
+- Built TaskIQ worker service consuming from SQS queues
+- Implemented worker lifecycle management with graceful shutdown
+- Added HTTP health check endpoint for ECS monitoring
+- Created CLI entrypoint for worker execution
+- Updated Pulumi infrastructure for ECS task definitions
+- Configured container commands and environment variables
+- Integrated health checks and logging
+
+### Next Steps
+- Stage 03: Implement auto-scaling based on queue depth
+- Stage 04: Add load simulation and performance testing
 
 ## Collaboration & Git Workflow
 

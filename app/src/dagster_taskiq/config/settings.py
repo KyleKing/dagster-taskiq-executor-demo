@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # TaskIQ Configuration
     taskiq_worker_concurrency: int = Field(default=4, validation_alias="TASKIQ_WORKER_CONCURRENCY")
     taskiq_visibility_timeout: int = Field(default=300, validation_alias="TASKIQ_VISIBILITY_TIMEOUT")
+    taskiq_worker_health_port: int = Field(default=8080, validation_alias="TASKIQ_WORKER_HEALTH_PORT")
 
     # Auto Scaler Configuration
     autoscaler_min_workers: int = Field(default=2, validation_alias="AUTOSCALER_MIN_WORKERS")
@@ -100,7 +101,7 @@ class Settings(BaseSettings):
     def dagster_postgres_url(self) -> str:
         """Get Dagster PostgreSQL connection URL."""
         return (
-            f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 

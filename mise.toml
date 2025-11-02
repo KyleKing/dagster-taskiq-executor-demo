@@ -1,4 +1,5 @@
 [tools]
+"asdf:postgres" = "17"
 node = "latest"
 "pipx:awscli-local" = "latest"
 python = "3.13"

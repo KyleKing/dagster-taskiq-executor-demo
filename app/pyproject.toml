@@ -11,8 +11,7 @@ dependencies = [
     "taskiq-aio-sqs>=0.4.0",
     "pydantic>=2.10.0,<=2.11.0", # base_dir is missing a type annotation
     "pydantic-settings>=2.0.0",
-    "boto3>=1.34.0",
-    "psycopg2-binary>=2.9.0",
+    "aioboto3>=13.0.0",
     "sqlalchemy>=1.4.0",
     "PyYAML>=6.0.0",
     "structlog>=25.5.0",
@@ -120,6 +119,7 @@ dev = [
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "types-pyyaml>=6.0.12.20250915",
+    "pytest-postgresql>=7",
 ]
 uv-build = [
     "uv-build>=0.9.7",

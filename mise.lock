@@ -1,3 +1,7 @@
+[[tools."asdf:postgres"]]
+version = "17.6"
+backend = "asdf:postgres"
+
 [[tools.node]]
 version = "25.1.0"
 backend = "core:node"

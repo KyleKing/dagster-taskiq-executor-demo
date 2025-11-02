@@ -46,6 +46,7 @@ class ContainerDefinition:
     image: str
     environment: dict[str, str]
     essential: bool = True
+    command: list[str] | None = None
     port_mappings: list[PortMapping] | None = None
     health_check: HealthCheck | None = None
     log_config: LogConfig | None = None
@@ -64,6 +65,9 @@ class ContainerDefinition:
             "environment": [{"name": k, "value": v} for k, v in self.environment.items()],
             "stopTimeout": self.stop_timeout,
         }
+
+        if self.command:
+            definition["command"] = self.command
 
         if self.port_mappings:
             definition["portMappings"] = [
