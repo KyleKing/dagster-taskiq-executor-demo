@@ -6,6 +6,87 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
 
 ## Architecture Components
 
+### High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Host Machine"
+        DC[Docker Compose]
+        PU[Pulumi Infrastructure]
+        UI[Web Browser]
+    end
+
+    subgraph "LocalStack Container"
+        SQS[SQS Queues]
+        ECS[ECS Service]
+        EC2[EC2 Instances]
+        RDS[RDS PostgreSQL]
+        IAM[IAM Roles]
+    end
+
+    subgraph "Dagster ECS Tasks"
+        DD[Dagster Daemon]
+        DW[Dagster Web UI]
+        JS[Job Scheduler]
+    end
+
+    subgraph "TaskIQ Worker ECS Tasks"
+        TW1[TaskIQ Worker 1]
+        TW2[TaskIQ Worker 2]
+        TWN[TaskIQ Worker N]
+    end
+
+    subgraph "Support Services"
+        AS[Auto Scaler]
+        LS[Load Simulator]
+        MON[Monitoring]
+    end
+
+    DC --> LocalStack
+    PU --> LocalStack
+    UI --> DW
+
+    DD --> SQS
+    DD --> RDS
+    DW --> RDS
+    JS --> DD
+    SQS --> TW1
+    SQS --> TW2
+    SQS --> TWN
+    TW1 --> RDS
+    TW2 --> RDS
+    TWN --> RDS
+
+    AS --> ECS
+    LS --> DD
+    MON --> SQS
+    MON --> ECS
+    MON --> RDS
+```
+
+### Component Interaction Flow
+
+```mermaid
+sequenceDiagram
+    participant JS as Job Scheduler
+    participant DD as Dagster Daemon
+    participant TE as TaskIQ Executor
+    participant SQS as SQS Queue
+    participant TW as TaskIQ Worker
+    participant AS as Auto Scaler
+
+    JS->>DD: Trigger scheduled job
+    DD->>TE: Execute job with ops
+    TE->>SQS: Enqueue op tasks with idempotency keys
+    AS->>SQS: Monitor queue depth
+    AS->>ECS: Scale workers based on load
+    TW->>SQS: Poll for tasks
+    SQS->>TW: Deliver task message
+    TW->>TW: Execute Dagster op
+    TW->>SQS: Acknowledge completion
+    TW->>DD: Report op completion
+```
+
 - **Dagster**: Orchestration platform with daemon and web UI
 - **TaskIQ**: Distributed task execution framework
 - **LocalStack**: Local AWS service emulation (SQS, ECS, EC2, RDS)
@@ -14,6 +95,18 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
 - **Load Simulator**: Testing framework for various load scenarios
 
 ## Key Features
+
+### User Stories
+
+- **As a developer**, I want to run a complete AWS-like Dagster deployment locally, so that I can test and demonstrate distributed job execution without cloud costs.
+- **As a system administrator**, I want TaskIQ to use SQS as a message broker, so that job execution is decoupled and scalable.
+- **As a data engineer**, I want Dagster jobs with variable execution times, so that I can test system behavior under different load conditions.
+- **As a reliability engineer**, I want automatic scaling and failure recovery, so that the system maintains performance and reliability under varying loads.
+- **As a data engineer**, I want exactly-once execution guarantees, so that no Dagster op executes more than once even during failures.
+- **As a developer**, I want comprehensive end-to-end testing capabilities, so that I can validate system behavior under various load and failure conditions.
+- **As a DevOps engineer**, I want infrastructure as code management, so that the LocalStack environment is reproducible and version-controlled.
+
+### Implementation Highlights
 
 - Implemented according to documentation in `.kiro/specs/dagster-taskiq-localstack/*.md`
     - Exactly-once execution guarantees
@@ -43,6 +136,40 @@ The TaskIQ framework was evaluated but ultimately not used for the following rea
 
 The custom implementation provides the necessary control and integration points while maintaining compatibility with TaskIQ's naming conventions and overall architecture patterns.
 
+### Data Models
+
+**OpExecutionTask**:
+```python
+@dataclass
+class OpExecutionTask:
+    op_name: str
+    run_id: str
+    step_key: str
+    execution_context: Dict[str, Any]
+    idempotency_key: str
+    retry_count: int = 0
+    max_retries: int = 3
+```
+
+**ExecutionResult**:
+```python
+@dataclass
+class ExecutionResult:
+    success: bool
+    output_data: Optional[Dict[str, Any]]
+    error_message: Optional[str]
+    execution_time: float
+    worker_id: str
+```
+
+### Error Handling
+
+**Failure Scenarios and Recovery**:
+1. **Worker Crashes During Execution**: SQS visibility timeout triggers redelivery; new worker checks idempotency record before re-execution.
+2. **SQS Connection Failures**: Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s); circuit breaker after 5 consecutive failures.
+3. **Dagster Daemon Failures**: ECS health checks and automatic restart; persistent storage for run state in PostgreSQL.
+4. **Network Partitions**: Workers cache execution context locally; reconciliation on connectivity restoration.
+
 ## Implementation Status
 
 ### ✅ Completed Components
@@ -62,6 +189,16 @@ The custom implementation provides the necessary control and integration points 
 
 ### 📋 Critical Path Forward
 Complete core execution functionality in `.ai/plans/stage-01-02-completion.md` before proceeding to auto-scaling (Stage 03) and load simulation (Stage 04).
+
+### Testing Strategy
+
+**Unit Testing**: TaskIQ executor, auto-scaler decision logic, idempotency validation.
+
+**Integration Testing**: End-to-end job execution flows, scale up/down scenarios, worker failure recovery, network resilience.
+
+**Load Testing**: Configurable job patterns, failure injection, performance metrics collection.
+
+**Validation Framework**: Exactly-once verification through execution tracking and audit trails.
 
 ## Development Setup
 

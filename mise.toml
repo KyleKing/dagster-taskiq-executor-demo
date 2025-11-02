@@ -1,6 +1,12 @@
 # Root mise.toml - Monorepo Orchestration
 # This file coordinates tasks across the entire repository
 
+[settings]
+experimental = true
+
+# [hooks]
+# enter = "mise install --quiet"
+
 [tools]
 "asdf:postgres" = "17"
 node = "latest"
@@ -18,6 +24,10 @@ PULUMI_CONFIG_PASSPHRASE = "See README!"
 # ==============================================================================
 # General Tasks
 # ==============================================================================
+
+[tasks.bump]
+description = "Bump all tool versions to latest and update mise.toml/lock"
+run = "mise up --bump"
 
 [tasks.toml-sort]
 description = "Format all toml files"
