@@ -27,7 +27,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "pulumi" },
     { name = "pulumi-aws" },
-    { name = "pulumi-docker" },
+    { name = "pulumi-docker-build" },
 ]
 
 [package.dev-dependencies]
@@ -41,7 +41,7 @@ dev = [
 requires-dist = [
     { name = "pulumi", specifier = ">=3.100.0" },
     { name = "pulumi-aws", specifier = ">=6.0.0" },
-    { name = "pulumi-docker", specifier = ">=4.0.0" },
+    { name = "pulumi-docker-build", specifier = ">=0.1.0a1761112614" },
 ]
 
 [package.metadata.requires-dev]
@@ -209,17 +209,17 @@ wheels = [
 ]
 
 [[package]]
-name = "pulumi-docker"
-version = "4.9.0"
+name = "pulumi-docker-build"
+version = "0.1.0a1761112614"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parver" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/99/37/b89a1992308609620e8225449940e70bd9a227435ccf42c39938668058c5/pulumi_docker-4.9.0.tar.gz", hash = "sha256:335cb42097e05ed15f940fc5d44e31bcb856e067354639b670775ce88029276b", size = 108365, upload-time = "2025-09-26T04:04:35.867Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/90/a1ede3bd8bdc1aa925e351a255929e3819efae28a705889d7a24ab7757dc/pulumi_docker_build-0.1.0a1761112614.tar.gz", hash = "sha256:f1d5b98a15f770da8928c449cec426333a320bfc8b4a3a208c1d2186094934ed", size = 38772, upload-time = "2025-10-22T06:20:54.936Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/23/90a7c2735445c04fb8443a576baf9e914cc3b50f5f3603389e48f33868fa/pulumi_docker-4.9.0-py3-none-any.whl", hash = "sha256:d1bdd85f8292d2901b40ae1ae2742b325b1eda807bc9b658bfb6353cb043501a", size = 129825, upload-time = "2025-09-26T04:04:33.921Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/3c/78f84e3a5ac16a5ed32e9528e2d79abd28bd6e9477b1acc697f2f6013b4d/pulumi_docker_build-0.1.0a1761112614-py3-none-any.whl", hash = "sha256:465fda9c382f6783b57440bfeb30c3ad8e55af7cd13eee2cb13c6e0647fca7c8", size = 43498, upload-time = "2025-10-22T06:20:53.544Z" },
 ]
 
 [[package]]

@@ -8,6 +8,7 @@ import pulumi
 import pulumi_aws as aws
 from pulumi_aws import ec2, iam
 
+from components.container_image import create_container_image
 from components.ecs_cluster import create_ecs_cluster
 from components.network import fetch_default_network
 from components.provider import LocalStackProviderConfig, create_localstack_provider
@@ -57,6 +58,17 @@ def main() -> None:
         role=execution_role.name,
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
         opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    # Build and push container image
+    container_image = create_container_image(
+        "dagster-taskiq",
+        provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        context_path="../app",
+        dockerfile_path="../app/Dockerfile",
+        platform="linux/amd64",
     )
 
     # Create ECS cluster
@@ -113,7 +125,7 @@ def main() -> None:
         project_name=settings.project.name,
         environment=settings.project.environment,
         region=settings.aws.region,
-        container_image=settings.services.image,
+        container_image=container_image.image_uri,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database.instance.endpoint,
         execution_role_arn=execution_role.arn,
@@ -132,7 +144,7 @@ def main() -> None:
         region=settings.aws.region,
         vpc_id=network.vpc.id,
         subnet_ids=network.subnets.ids,
-        container_image=settings.services.image,
+        container_image=container_image.image_uri,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database.instance.endpoint,
         queue_url=taskiq.queues.queue.id,
@@ -208,6 +220,8 @@ def main() -> None:
     )
 
     # Stack outputs to simplify debugging and downstream configuration.
+    pulumi.export("container_image_uri", container_image.image_uri)
+    pulumi.export("ecr_repository_url", container_image.repository.repository_url)
     pulumi.export("queue_url", taskiq.queues.queue.id)
     pulumi.export("queue_arn", taskiq.queues.queue.arn)
     pulumi.export("dlq_url", taskiq.queues.dead_letter_queue.id)

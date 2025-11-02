@@ -52,9 +52,8 @@ class DatabaseSettings:
 
 @dataclass
 class ServiceSettings:
-    """ECS service sizing and container image configuration."""
+    """ECS service sizing configuration."""
 
-    image: str
     daemon_desired_count: int
     webserver_desired_count: int
     worker_desired_count: int
@@ -112,7 +111,7 @@ class StackSettings:
 
         database_cfg = _get_mapping("database")
         database = DatabaseSettings(
-            engine_version=str(database_cfg.get("engineVersion", "15.4")),
+            engine_version=str(database_cfg.get("engineVersion", "17.4")),
             instance_class=str(database_cfg.get("instanceClass", "db.t3.micro")),
             allocated_storage=int(database_cfg.get("allocatedStorage", 20)),
             max_allocated_storage=int(database_cfg.get("maxAllocatedStorage", 100)),
@@ -123,7 +122,6 @@ class StackSettings:
 
         services_cfg = _get_mapping("services")
         services = ServiceSettings(
-            image=str(services_cfg.get("image", "dagster-taskiq:latest")),
             daemon_desired_count=int(services_cfg.get("daemonDesiredCount", 1)),
             webserver_desired_count=int(services_cfg.get("webserverDesiredCount", 1)),
             worker_desired_count=int(services_cfg.get("workerDesiredCount", 2)),

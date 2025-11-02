@@ -94,40 +94,17 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && u
 
 ### Infrastructure Organization: `components/` vs `modules/`
 
-Use two-tier infrastructure organization to balance reusability and application-specific needs:
+**`deploy/components/`** - Generic, reusable AWS primitives
+- Technology-focused thin wrappers (VPC, ECS, RDS, SQS)
+- Functions returning dataclasses, independently importable (no `__init__.py` re-exports)
+- Examples: `sqs_fifo.py`, `ecs_helpers.py`, `rds_postgres.py`
 
-**`deploy/components/`** - Low-level, generic, reusable infrastructure primitives
-- Purpose: Provide thin wrappers around AWS resources with sensible defaults
-- Examples: VPC/network utilities, ECS cluster setup, RDS databases, SQS queues, ECS task definition helpers
-- Characteristics:
-  - Technology-focused (e.g., "create an SQS FIFO queue with DLQ")
-  - Highly reusable across different projects
-  - Minimal business logic or application-specific configuration
-  - Functions that return dataclasses (e.g., `create_postgres_database`)
-  - Each module must remain independently importable (no re-exporting `__init__.py`)
-  - Can include helper utilities to reduce common Pulumi boilerplate (e.g., `ecs_helpers.py` for task definitions)
+**`deploy/modules/`** - Application-specific infrastructure bundles
+- Compose multiple components with application logic
+- Know about Dagster, TaskIQ, and other app concerns
+- Examples: `dagster.py` (complete deployment), `taskiq.py` (queues + workers + IAM)
 
-**`deploy/modules/`** - Higher-level, application-specific infrastructure bundles
-- Purpose: Compose components into complete, application-ready infrastructure packages
-- Examples: Complete Dagster deployment (web UI, daemon, security, load balancer), TaskIQ worker infrastructure (queues, workers, IAM)
-- Characteristics:
-  - Application-focused (e.g., "set up complete Dagster infrastructure")
-  - Bundle multiple components with application-specific configuration
-  - Contain business logic and opinionated defaults for the specific use case
-  - Return comprehensive dataclasses containing all created resources
-  - May create IAM policies, security groups, and other application-specific glue
-
-**Decision Guidelines:**
-1. Can this be reused in a completely different project with minimal changes? → `components/`
-2. Does it bundle multiple AWS resources specifically for this application? → `modules/`
-3. Does it need to know about application-level concerns (like Dagster or TaskIQ)? → `modules/`
-4. Is it a pure AWS infrastructure primitive with minimal configuration? → `components/`
-
-**Examples:**
-- `components/sqs_fifo.py` - Generic FIFO queue creation (reusable)
-- `modules/taskiq.py` - TaskIQ-specific queue + worker + IAM bundle (application-specific)
-- `components/ecs_helpers.py` - Common task definition patterns (reusable)
-- `modules/dagster.py` - Complete Dagster deployment with UI, security, discovery (application-specific)
+**Guideline**: Reusable across projects? → `components/`. Application-specific bundle? → `modules/`
 
 ---
 

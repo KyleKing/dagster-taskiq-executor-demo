@@ -13,7 +13,7 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
       - DEBUG=${DEBUG:-0}
       - PERSISTENCE=${PERSISTENCE:-0}
-      - SERVICES=sqs,ecs,ec2,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53
+      - SERVICES=sqs,ecs,ec2,ecr,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53
       # HACK: May or may not be required?
       # - DOCKER_HOST=unix:///var/run/docker.sock
       # - ECS_BACKEND=docker
