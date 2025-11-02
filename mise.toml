@@ -37,29 +37,29 @@ run = "toml-sort --in-place **/pyproject.toml"
 
 # ==============================================================================
 # Monorepo Orchestration Tasks
-# These tasks coordinate work across app/ and deploy/ subdirectories
+# These tasks coordinate work across dagster-taskiq-demo/ and deploy/ subdirectories
 # ==============================================================================
 
 [tasks.install]
-description = "Install all dependencies (app + deploy + dagster-taskiq)"
+description = "Install all dependencies (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run install",
+    "mise -C dagster-taskiq-demo run install",
     "mise -C deploy run install",
     "mise -C dagster-taskiq run install",
 ]
 
 [tasks.checks]
-description = "Check all code (app + deploy + dagster-taskiq)"
+description = "Check all code (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run checks",
+    "mise -C dagster-taskiq-demo run checks",
     "mise -C deploy run checks",
     "mise -C dagster-taskiq run checks",
 ]
 
 [tasks.fixes]
-description = "Lint and auto-fix all code (app + deploy + dagster-taskiq)"
+description = "Lint and auto-fix all code (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run fixes",
+    "mise -C dagster-taskiq-demo run fixes",
     "mise -C deploy run fixes",
     "mise -C dagster-taskiq run fixes",
 ]
@@ -71,8 +71,8 @@ run = [
 
 [tasks.build]
 description = "Build Docker image with docker bake"
-run = "docker buildx bake app"
-sources = ["app/**/*", "docker-bake.hcl", "app/Dockerfile"]
+run = "docker buildx bake dagster-taskiq-demo"
+sources = ["dagster-taskiq-demo/**/*", "docker-bake.hcl", "dagster-taskiq-demo/Dockerfile"]
 outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
 
 [tasks."docker:login"]

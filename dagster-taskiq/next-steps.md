@@ -27,7 +27,7 @@
   - Configuration helpers for SQS queues, concurrency, heartbeat intervals, retries.
 
 ### 2. Replace Celery Primitives with TaskIQ
-- Swap Celery app/broker configuration for TaskIQ-compatible SQS abstractions. Reuse idempotency logic already prototyped in `app/src/dagster_taskiq_demo/taskiq_executor/__init__.py`.
+- Swap Celery app/broker configuration for TaskIQ-compatible SQS abstractions. Reuse idempotency logic already prototyped in `dagster-taskiq-demo/src/dagster_taskiq_demo/taskiq_executor/__init__.py`.
 - Re-implement message serialization (`OpExecutionTask`) to align with Dagster step payloads and exactly-once semantics.
 - Remove Celery task decorators; instead provide TaskIQ-compatible coroutine runners invoked by the worker.
 - Replace Celery event/heartbeat handling with Dagster instance event reporting via `report_engine_event` and `DagsterEvent`s.

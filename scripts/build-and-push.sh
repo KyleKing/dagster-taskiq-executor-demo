@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}/.."
 
 echo "🔨 Building Docker image..."
-docker buildx bake app
+docker buildx bake dagster-taskiq-demo
 
 echo "🔍 Getting ECR repository URI..."
 REPO_URI=$(awslocal ecr describe-repositories \

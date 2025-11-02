@@ -165,7 +165,7 @@ See individual component READMEs for detailed setup instructions.
 4. **Start Dagster Services:**
    ```sh
    # Start Dagster daemon and webserver
-   cd app && python -m dagster dev
+   cd dagster-taskiq-demo && python -m dagster dev
    ```
 
 5. **Run Load Simulation Scenarios:**
@@ -245,7 +245,7 @@ mise run localstack:stop
 mise run check
 
 # Or run individual components
-cd app && mise run format && mise run lint --fix && mise run typecheck && mise run test
+cd dagster-taskiq-demo && mise run format && mise run lint --fix && mise run typecheck && mise run test
 cd deploy && mise run format && mise run lint --fix && mise run typecheck && mise run test
 
 # Pass custom arguments to tools
