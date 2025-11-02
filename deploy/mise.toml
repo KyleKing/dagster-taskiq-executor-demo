@@ -2,41 +2,32 @@
 # This file defines tasks for Pulumi infrastructure deployment
 
 # ==============================================================================
-# Development Tasks
+# Common Development Tasks
 # ==============================================================================
 
 [tasks.install]
 description = "Install deploy dependencies"
-alias = "i"
 run = "uv sync --all-groups"
 sources = ["pyproject.toml", "uv.lock"]
 
 [tasks.test]
 description = "Run deploy tests with pytest (pass additional args)"
-alias = "t"
 run = "uv run pytest"
-sources = ["**/*.py", "tests/**/*.py"]
-
-[tasks.lint]
-description = "Lint deploy code with ruff (pass --fix to auto-fix)"
-alias = "l"
-run = "uv run ruff check"
-sources = ["**/*.py", "tests/**/*.py"]
+sources = ["**/*.py"]
 
 [tasks.format]
 description = "Format deploy code with ruff (pass --check to check only)"
-alias = "f"
 run = "uv run ruff format"
-sources = ["**/*.py", "tests/**/*.py"]
-
-[tasks.typecheck]
-description = "Run type checkers (mypy + pyright)"
-alias = "tc"
-run = [
-    "uv run mypy .",
-    "uv run pyright",
-]
 sources = ["**/*.py"]
+
+[tasks.lint]
+description = "Lint deploy code with ruff (pass --fix to auto-fix)"
+run = "uv run ruff check"
+sources = ["**/*.py"]
+
+[tasks."lint:power-fix"]
+description = "Attempt to fix all lint errors"
+run = "mise run lint --fix --unsafe-fiuxes"
 
 [tasks.mypy]
 description = "Run mypy type checker (pass additional args)"
@@ -48,79 +39,39 @@ description = "Run pyright type checker (pass additional args)"
 run = "uv run pyright"
 sources = ["**/*.py"]
 
-[tasks.check]
-description = "Run all checks (lint + typecheck + test)"
-alias = "c"
-depends = ["lint", "typecheck", "test"]
+[tasks.checks]
+description = "Run all read-only checks (lint + typechecks + test)"
+depends = ["lint", "mypy", "pyright", "test"]
+
+[tasks.fixes]
+description = "Run all fixes (ruff format and linter)"
+depends = ["format", "lint:power-fix"]
 
 # ==============================================================================
 # Infrastructure Tasks (Pulumi)
 # ==============================================================================
 
-[tasks.up]
-description = "Deploy infrastructure with Pulumi"
-alias = "u"
+[tasks."pulumi:up"]
+description = "Deploy infrastructure with Pulumi (update)"
 run = "uv run pulumi up --yes --stack local"
 
-[tasks.down]
+[tasks."pulumi:down"]
 description = "Destroy infrastructure with Pulumi"
-alias = "d"
 confirm = "Are you sure you want to destroy the infrastructure?"
 run = "uv run pulumi destroy --yes --stack local"
 
-[tasks.preview]
+[tasks."pulumi:preview"]
 description = "Preview infrastructure changes"
-alias = "p"
 run = "uv run pulumi preview --stack local"
 
-[tasks.refresh]
+[tasks."pulumi:refresh"]
 description = "Refresh Pulumi state"
 run = "uv run pulumi refresh --yes --stack local"
 
-[tasks.outputs]
+[tasks."pulumi:outputs"]
 description = "Show Pulumi stack outputs"
-alias = "o"
 run = "uv run pulumi stack output --stack local"
 
-[tasks.config]
+[tasks."pulumi:config"]
 description = "Show Pulumi configuration"
 run = "uv run pulumi config --stack local"
-
-# ==============================================================================
-# Utility Tasks
-# ==============================================================================
-
-[tasks.clean]
-description = "Clean build artifacts and caches"
-run = [
-    "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.ruff_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.mypy_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type f -name '*.pyc' -delete 2>/dev/null || true",
-    "echo 'Cleaned deploy caches and artifacts'",
-]
-
-[tasks."clean:venv"]
-description = "Remove virtual environment"
-confirm = "This will remove the deploy virtual environment. Continue?"
-run = "rm -rf .venv"
-
-# ==============================================================================
-# CI Tasks
-# ==============================================================================
-
-[tasks.ci]
-description = "Run all CI checks for deploy"
-run = [
-    "echo '==> Formatting deploy code...'",
-    "uv run ruff format .",
-    "echo '==> Linting deploy code...'",
-    "uv run ruff check .",
-    "echo '==> Type checking deploy code...'",
-    "uv run mypy .",
-    "uv run pyright",
-    "echo '==> Running deploy tests...'",
-    "uv run pytest",
-    "echo '✓ All deploy CI checks passed!'",
-]

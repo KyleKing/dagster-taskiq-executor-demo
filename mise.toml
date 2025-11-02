@@ -4,9 +4,6 @@
 [settings]
 experimental = true
 
-# [hooks]
-# enter = "mise install --quiet"
-
 [tools]
 "asdf:postgres" = "17"
 node = "latest"
@@ -15,7 +12,6 @@ node = "latest"
 python = "3.13"
 
 [env]
-# PLANNED: redact = true only works if the strings are actually secret tokens
 _.file = { path = ".env" }
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
@@ -23,12 +19,16 @@ PROJECT_NAME = "dagster-taskiq-demo"
 PULUMI_CONFIG_PASSPHRASE = "See README!"
 
 # ==============================================================================
-# General Tasks
+# Meta-Tasks for Mise Management
 # ==============================================================================
 
-[tasks.bump]
+[tasks."mise:bump"]
 description = "Bump all tool versions to latest and update mise.toml/lock"
 run = "mise up --bump"
+
+# ==============================================================================
+# General Utilities
+# ==============================================================================
 
 [tasks.toml-sort]
 description = "Format all toml files"
@@ -41,72 +41,36 @@ run = "toml-sort --in-place **/pyproject.toml"
 # ==============================================================================
 
 [tasks.install]
-description = "Install all dependencies (app + deploy)"
-alias = "i"
+description = "Install all dependencies (app + deploy + dagster-taskiq)"
 run = [
     "mise -C app run install",
     "mise -C deploy run install",
+    "mise -C dagster-taskiq run install",
 ]
 
-[tasks.test]
-description = "Run all tests (app + deploy)"
-alias = "t"
+[tasks.checks]
+description = "Check all code (app + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run test",
-    "mise -C deploy run test",
+    "mise -C app run checks",
+    "mise -C deploy run checks",
+    "mise -C dagster-taskiq run checks",
 ]
 
-[tasks.lint]
-description = "Lint all code (app + deploy)"
-alias = "l"
+[tasks.fix]
+description = "Lint and auto-fix all code (app + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run lint",
-    "mise -C deploy run lint",
+    "mise -C app run lint -- --fix",
+    "mise -C deploy run lint -- --fix",
+    "mise -C dagster-taskiq run lint -- --fix",
 ]
-
-[tasks."lint:fix"]
-description = "Lint and auto-fix all code"
-run = [
-    "mise -C app run lint:fix",
-    "mise -C deploy run lint:fix",
-]
-
-[tasks.format]
-description = "Format all code (app + deploy)"
-alias = "f"
-run = [
-		  "mise toml-sort",
-    "mise -C app run format",
-    "mise -C deploy run format",
-]
-
-[tasks."format:check"]
-description = "Check formatting without modifying files"
-run = [
-    "mise -C app run format:check",
-    "mise -C deploy run format:check",
-]
-
-[tasks.typecheck]
-description = "Type check all code (app + deploy)"
-alias = "tc"
-run = [
-    "mise -C app run typecheck",
-    "mise -C deploy run typecheck",
-]
-
-[tasks.check]
-description = "Run all checks (lint + typecheck + test)"
-alias = "c"
-depends = ["lint", "typecheck", "test"]
 
 # ==============================================================================
 # Docker & Build Tasks
+# PLANNED: de-duplicate with build and push script
 # ==============================================================================
 
 [tasks.build]
 description = "Build Docker image with docker bake"
-alias = "b"
 run = "docker buildx bake app"
 sources = ["app/**/*", "docker-bake.hcl", "app/Dockerfile"]
 outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
@@ -132,47 +96,17 @@ fi
 
 [tasks.push]
 description = "Build and push Docker image to LocalStack ECR"
-alias = "p"
 depends = ["build"]
 run = "./scripts/build-and-push.sh"
 
 # ==============================================================================
-# Infrastructure Tasks (Pulumi)
-# Delegates to deploy/mise.toml but provides convenience aliases
-# ==============================================================================
-
-[tasks.up]
-description = "Deploy infrastructure with Pulumi"
-alias = "infra:up"
-run = "mise -C deploy run up"
-
-[tasks.down]
-description = "Destroy infrastructure with Pulumi"
-alias = "infra:down"
-confirm = "Are you sure you want to destroy the infrastructure?"
-run = "mise -C deploy run down"
-
-[tasks.preview]
-description = "Preview infrastructure changes"
-alias = "infra:preview"
-run = "mise -C deploy run preview"
-
-[tasks.refresh]
-description = "Refresh Pulumi state"
-run = "mise -C deploy run refresh"
-
-[tasks.outputs]
-description = "Show Pulumi stack outputs"
-run = "mise -C deploy run outputs"
-
-# ==============================================================================
-# LocalStack Service Management
+# LocalStack Service Management (via Docker Compose)
 # ==============================================================================
 
 [tasks."localstack:start"]
 description = "Start LocalStack container"
 alias = "start"
-run = "docker compose up -d localstack"
+run = "docker compose up --build --remove-orphans"
 
 [tasks."localstack:stop"]
 description = "Stop LocalStack container"
@@ -192,16 +126,17 @@ run = "docker compose logs -f localstack"
 description = "Check LocalStack health"
 run = '''
 echo "Checking LocalStack health..."
-curl -s http://localhost:4566/_localstack/health | python3 -m json.tool || echo "LocalStack not running"
+(curl -s http://localhost:4566/_localstack/health | jq) || echo "LocalStack not running"
 '''
 
+# PLANNED: Consider similar helper for Pulumi to remove (forget) the pulumi stack when LocalStack is purged
 [tasks."localstack:reset"]
 description = "Reset LocalStack state (removes volume data)"
 confirm = "This will delete all LocalStack data. Continue?"
 run = [
-    "docker compose down -v",
+    "mise run localstack:stop",
     "rm -rf volume/*",
-    "docker compose up -d localstack",
+    "mise run localstack:start",
 ]
 
 # ==============================================================================
@@ -228,65 +163,15 @@ run = "awslocal ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-d
 description = "List running ECS tasks"
 run = "awslocal ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
 
+# TODO: Consider other helpers for logs and possibly reading from Pulumi Outputs for the values instead of ENV
+
 # ==============================================================================
 # Composite Workflow Tasks
 # ==============================================================================
 
-[tasks.setup]
+[tasks.env-setup]
 description = "Initial project setup (check env, install deps)"
 run = [
     "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
     "mise install",
-]
-depends = ["install"]
-
-[tasks.dev]
-description = "Start development environment (LocalStack + deps)"
-depends = ["localstack:start", "install"]
-run = '''
-echo "Waiting for LocalStack to be ready..."
-timeout 60 bash -c 'until curl -s http://localhost:4566/_localstack/health > /dev/null 2>&1; do sleep 1; done' || {
-  echo "LocalStack failed to start"
-  exit 1
-}
-echo "LocalStack is ready!"
-echo "Run 'mise run infra:up' to deploy infrastructure"
-echo "Run 'mise run push' to build and push the Docker image"
-'''
-
-[tasks.deploy]
-description = "Full deployment workflow (build, infra, push)"
-depends = ["localstack:start", "up", "push"]
-run = "echo 'Deployment complete! Check services: mise run aws:services'"
-
-[tasks.clean]
-description = "Clean build artifacts and caches in all projects"
-run = [
-    "mise -C app run clean",
-    "mise -C deploy run clean",
-    "echo 'Cleaned all project caches and artifacts'",
-]
-
-[tasks."clean:all"]
-description = "Clean everything including venvs and Docker"
-confirm = "This will remove all virtual environments and Docker images. Continue?"
-depends = ["clean"]
-run = [
-    "mise -C app run clean:venv 2>/dev/null || true",
-    "mise -C deploy run clean:venv 2>/dev/null || true",
-    "docker image rm dagster-taskiq-demo:latest 2>/dev/null || true",
-    "echo 'Cleaned all build artifacts, venvs, and Docker images'",
-]
-
-# ==============================================================================
-# CI/CD Tasks
-# ==============================================================================
-
-[tasks.ci]
-description = "Run all CI checks (format, lint, typecheck, test)"
-run = [
-    "echo '==> Running CI checks across all projects...'",
-    "mise -C app run ci",
-    "mise -C deploy run ci",
-    "echo '✓ All CI checks passed!'",
 ]

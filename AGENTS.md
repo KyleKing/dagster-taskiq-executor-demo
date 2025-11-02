@@ -6,180 +6,44 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
 
 ## Architecture Components
 
-### High-Level Architecture
-
-```mermaid
-graph TB
-    subgraph "Host Machine"
-        DC[Docker Compose]
-        PU[Pulumi Infrastructure]
-        UI[Web Browser]
-    end
-
-    subgraph "LocalStack Container"
-        SQS[SQS Queues]
-        ECS[ECS Service]
-        EC2[EC2 Instances]
-        RDS[RDS PostgreSQL]
-        IAM[IAM Roles]
-    end
-
-    subgraph "Dagster ECS Tasks"
-        DD[Dagster Daemon]
-        DW[Dagster Web UI]
-        JS[Job Scheduler]
-    end
-
-    subgraph "TaskIQ Worker ECS Tasks"
-        TW1[TaskIQ Worker 1]
-        TW2[TaskIQ Worker 2]
-        TWN[TaskIQ Worker N]
-    end
-
-    subgraph "Support Services"
-        AS[Auto Scaler]
-        LS[Load Simulator]
-        MON[Monitoring]
-    end
-
-    DC --> LocalStack
-    PU --> LocalStack
-    UI --> DW
-
-    DD --> SQS
-    DD --> RDS
-    DW --> RDS
-    JS --> DD
-    SQS --> TW1
-    SQS --> TW2
-    SQS --> TWN
-    TW1 --> RDS
-    TW2 --> RDS
-    TWN --> RDS
-
-    AS --> ECS
-    LS --> DD
-    MON --> SQS
-    MON --> ECS
-    MON --> RDS
-```
-
-### Component Interaction Flow
-
-```mermaid
-sequenceDiagram
-    participant JS as Job Scheduler
-    participant DD as Dagster Daemon
-    participant TE as TaskIQ Executor
-    participant SQS as SQS Queue
-    participant TW as TaskIQ Worker
-    participant AS as Auto Scaler
-
-    JS->>DD: Trigger scheduled job
-    DD->>TE: Execute job with ops
-    TE->>SQS: Enqueue op tasks with idempotency keys
-    AS->>SQS: Monitor queue depth
-    AS->>ECS: Scale workers based on load
-    TW->>SQS: Poll for tasks
-    SQS->>TW: Deliver task message
-    TW->>TW: Execute Dagster op
-    TW->>SQS: Acknowledge completion
-    TW->>DD: Report op completion
-```
-
 - **Dagster**: Orchestration platform with daemon and web UI
 - **TaskIQ**: Distributed task execution framework
 - **LocalStack**: Local AWS service emulation (SQS, ECS, EC2, RDS)
-- **PostgreSQL**: Database backend for Dagster metadata and state
-- **Auto-scaler**: Dynamic worker scaling based on queue depth
 - **Load Simulator**: Testing framework for various load scenarios
 
 ## Key Features
 
 ### User Stories
 
-- **As a developer**, I want to run a complete AWS-like Dagster deployment locally, so that I can test and demonstrate distributed job execution without cloud costs.
-- **As a system administrator**, I want TaskIQ to use SQS as a message broker, so that job execution is decoupled and scalable.
-- **As a data engineer**, I want Dagster jobs with variable execution times, so that I can test system behavior under different load conditions.
-- **As a reliability engineer**, I want automatic scaling and failure recovery, so that the system maintains performance and reliability under varying loads.
-- **As a data engineer**, I want exactly-once execution guarantees, so that no Dagster op executes more than once even during failures.
-- **As a developer**, I want comprehensive end-to-end testing capabilities, so that I can validate system behavior under various load and failure conditions.
-- **As a DevOps engineer**, I want infrastructure as code management, so that the LocalStack environment is reproducible and version-controlled.
+- **As a data engineer**, I want to test Dagster jobs with variable execution times locally, so that I can test system behavior under different load conditions and see how TaskIQ will work in production.
+- **As a reliability engineer**, I want automatic scaling based on Queue Depth for Dagster Workers on ECS using TaskIQ and SQS. When draining ECS nodes, I expect idempotent jobs to be retried by the next available worker. Lastly, I expect the hosting cost to be reasonable.
 
-### Implementation Highlights
-
-- Implemented according to documentation in `.kiro/specs/dagster-taskiq-localstack/*.md`
-    - Exactly-once execution guarantees
-    - Automatic scaling based on queue depth
-    - Failure simulation and recovery testing
-    - Mixed workload support (fast/slow jobs)
-    - Infrastructure as code with Pulumi
-    - Comprehensive monitoring and metrics
-
-## TaskIQ Implementation Notes
+#### TaskIQ Implementation Notes
 
 While the project is named "dagster-taskiq-executor" and uses TaskIQ-related terminology, the actual worker implementation does not use the TaskIQ framework directly. Instead, it implements a custom async worker using aioboto3 for SQS message consumption.
 
-### Why Not Use the TaskIQ Framework?
+##### Why Not Use the TaskIQ Framework?
 
 The TaskIQ framework was evaluated but ultimately not used for the following reasons:
 
 1. **Dagster Integration Complexity**: TaskIQ's task registration and execution model doesn't align well with Dagster's op/step execution lifecycle. Dagster ops require specific context reconstruction, resource management, and execution metadata that TaskIQ's generic task abstraction doesn't support.
-
 2. **Idempotency Requirements**: The implementation requires exactly-once execution semantics with custom idempotency storage in PostgreSQL. TaskIQ's built-in retry mechanisms and state management are designed for simpler task queues and don't provide the granular control needed for Dagster's execution model.
-
 3. **Custom Payload Handling**: Dagster ops need structured payloads (`OpExecutionTask`) with run/step metadata, execution context, and result reporting. TaskIQ's serialization and payload handling is too generic and would require extensive customization.
-
 4. **Result Reporting**: The executor polls for task completion via idempotency storage rather than TaskIQ's result backend. This allows for better integration with Dagster's run monitoring and failure handling.
-
 5. **Async Execution Control**: The worker needs fine-grained control over async execution, graceful shutdown, and health checks that TaskIQ's broker abstractions don't expose.
 
 The custom implementation provides the necessary control and integration points while maintaining compatibility with TaskIQ's naming conventions and overall architecture patterns.
 
-### Data Models
-
-**OpExecutionTask**:
-```python
-@dataclass
-class OpExecutionTask:
-    op_name: str
-    run_id: str
-    step_key: str
-    execution_context: Dict[str, Any]
-    idempotency_key: str
-    retry_count: int = 0
-    max_retries: int = 3
-```
-
-**ExecutionResult**:
-```python
-@dataclass
-class ExecutionResult:
-    success: bool
-    output_data: Optional[Dict[str, Any]]
-    error_message: Optional[str]
-    execution_time: float
-    worker_id: str
-```
-
 ### Error Handling
 
 **Failure Scenarios and Recovery**:
+
 1. **Worker Crashes During Execution**: SQS visibility timeout triggers redelivery; new worker checks idempotency record before re-execution.
 2. **SQS Connection Failures**: Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s); circuit breaker after 5 consecutive failures.
 3. **Dagster Daemon Failures**: ECS health checks and automatic restart; persistent storage for run state in PostgreSQL.
 4. **Network Partitions**: Workers cache execution context locally; reconciliation on connectivity restoration.
 
 ## Implementation Status
-
-### ✅ Completed Components
-- **Task Payloads & Idempotency**: JSON-serializable dataclasses with PostgreSQL persistence
-- **SQS Broker**: Custom aioboto3-based broker (not using TaskIQ framework)
-- **Basic Executor**: TaskIQExecutor with step dispatching and result polling
-- **Worker Application**: Async SQS consumer with health checks and graceful shutdown
-- **Container Integration**: ECS task definitions with worker commands and health probes
-- **Repository Configuration**: TaskIQ executor set as default
-- **Auto-Scaler**: Dynamic worker scaling based on queue depth with failure simulation
 
 ### 🚧 In Progress / Next Steps
 - **Actual Step Execution**: Worker currently simulates execution; needs real Dagster `execute_step` integration
@@ -193,13 +57,10 @@ Complete core execution functionality in `.ai/plans/stage-01-02-completion.md` b
 
 ### Testing Strategy
 
-**Unit Testing**: TaskIQ executor, auto-scaler decision logic, idempotency validation.
-
-**Integration Testing**: End-to-end job execution flows, scale up/down scenarios, worker failure recovery, network resilience.
-
-**Load Testing**: Configurable job patterns, failure injection, performance metrics collection.
-
-**Validation Framework**: Exactly-once verification through execution tracking and audit trails.
+- **Unit Testing**: TaskIQ executor, auto-scaler decision logic, idempotency validation.
+- **Integration Testing**: End-to-end job execution flows, scale up/down scenarios, worker failure recovery, network resilience.
+- **Load Testing**: Configurable job patterns, failure injection, performance metrics collection.
+- **Validation Framework**: Exactly-once verification through execution tracking and audit trails.
 
 ## Development Setup
 
@@ -217,35 +78,32 @@ The project uses:
 This project uses `mise` to define common development tasks. All tasks support passing additional arguments to the underlying tools.
 
 **Common Tasks:**
+
 - `mise run install` - Install dependencies for app and deploy
-- `mise run test` - Run tests for app and deploy
-- `mise run lint` - Lint code (pass `--fix` to auto-fix)
-- `mise run format` - Format code (pass `--check` to check only)
-- `mise run typecheck` - Run type checkers
-- `mise run check` - Run all checks (lint + typecheck + test)
+- `mise run checks` - Run read-only checks per directory (lint, typecheck, and test), which can take a few minutes
+- `mise run fixes` - Run fixes per directory
+- Per directory:
+    - `mise run test` - Run tests for app and deploy
+    - `mise run lint` - Lint code (pass `--fix` to auto-fix)
+    - `mise run format` - Format code (pass `--check` to check only)
+    - `mise run typecheck` - Run type checkers
+    - `mise run checks` - Run all read-only checks (lint + typecheck + test)
 
 **Passing Custom Arguments:**
+
 ```sh
-mise run test -- -v -k "test_name"  # Pass pytest arguments
+mise run test -- -v -k "test_name" # Pass pytest arguments
 mise run lint -- --fix --select F  # Pass ruff arguments
-mise run mypy -- --help             # Get mypy help
+mise run mypy -- --help            # Get mypy help
 ```
 
 **Running Multiple Tasks:**
+
 ```sh
 mise run format ::: lint ::: typecheck  # Run in parallel
 ```
 
-## Project Structure
-
-```
-./
-├── app/                    # Main Python application
-│   ├── src/                # Pyton Dagster Application code
-│   └-─ tests/              # App Test suite
-├── deploy/                 # Pulumi infrastructure as code
-└── docker-compose.yml      # LocalStack service
-```
+<!-- TODO: below needs manual review to be more concise -->
 
 ## Getting Started
 
@@ -253,20 +111,19 @@ mise run format ::: lint ::: typecheck  # Run in parallel
 
 1. Launch LocalStack:
    ```sh
-   docker compose up -d localstack
+   mise run localstack:start
    ```
 
 2. Deploy the infrastructure with Pulumi:
    ```sh
-   mise run up
+   cd deploy && mise run pulumi:up
    ```
    This creates the ECR repository and other AWS resources in LocalStack.
 
-3. Build and push the application Docker image to LocalStack ECR:
+3. Build and push the application Docker image to the new LocalStack ECR:
    ```sh
    ./scripts/build-and-push.sh
    ```
-   This script uses Docker Bake to build the application image and pushes it to LocalStack ECR using `awslocal`.
 
 4. Run Dagster services as described in the application README once infrastructure is provisioned.
 
@@ -278,13 +135,9 @@ mise run format ::: lint ::: typecheck  # Run in parallel
 
 **Infrastructure changes:**
 1. Update Pulumi code
-2. Run: `mise run up`
+2. Run: `cd deploy && PULUMI_CONFIG_PASSPHRASE=localstack mise run pulumi:up`
 
 See individual component READMEs for detailed setup instructions.
-
-### Stack Passphrases
-- `local` stack: passphrase is `localstack` (for use with LocalStack development)
-- `dev` stack: passphrase is managed separately
 
 ## Code Quality & Linting
 

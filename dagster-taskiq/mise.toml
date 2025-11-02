@@ -4,97 +4,48 @@
 [env]
 PYTHONPATH = "src"
 
-# TODO: Merge with root mise.toml and implement findings below
-
 # ==============================================================================
-# Development Tasks
+# Common Development Tasks
 # ==============================================================================
 
 [tasks.install]
-description = "Install app dependencies"
-alias = "i"
+description = "Install deploy dependencies"
 run = "uv sync --all-groups"
 sources = ["pyproject.toml", "uv.lock"]
 
 [tasks.test]
-description = "Run app tests with pytest (pass additional args)"
-alias = "t"
+description = "Run deploy tests with pytest (pass additional args)"
 run = "uv run pytest"
-sources = ["src/**/*.py", "tests/**/*.py"]
-
-[tasks.lint]
-description = "Lint app code with ruff (pass --fix to auto-fix)"
-alias = "l"
-run = "uv run ruff check"
-sources = ["src/**/*.py", "tests/**/*.py"]
+sources = ["**/*.py"]
 
 [tasks.format]
-description = "Format app code with ruff (pass --check to check only)"
-alias = "f"
+description = "Format deploy code with ruff (pass --check to check only)"
 run = "uv run ruff format"
-sources = ["src/**/*.py", "tests/**/*.py"]
+sources = ["**/*.py"]
 
-# [tasks.typecheck]
-# description = "Run type checkers (mypy + pyright)"
-# alias = "tc"
-# # TODO: Revisit removing `typecheck`, but requires documentation changes
-# run = "mise run mypy ::: pyright"
-# sources = ["src/**/*.py", "tests/**/*.py"]
+[tasks.lint]
+description = "Lint deploy code with ruff (pass --fix to auto-fix)"
+run = "uv run ruff check"
+sources = ["**/*.py"]
+
+[tasks."lint:power-fix"]
+description = "Attempt to fix all lint errors"
+run = "mise run lint --fix --unsafe-fiuxes"
 
 [tasks.mypy]
 description = "Run mypy type checker (pass additional args)"
 run = "uv run mypy"
-# PLANNED: make sure checking both source and tests
-sources = ["src/**/*.py", "tests/**/*.py"]
+sources = ["**/*.py"]
 
 [tasks.pyright]
 description = "Run pyright type checker (pass additional args)"
 run = "uv run pyright"
-# PLANNED: make sure checking both source and tests
-sources = ["src/**/*.py", "tests/**/*.py"]
+sources = ["**/*.py"]
 
-[tasks.check]
-description = "Run all checks (lint + typecheck + test)"
-alias = "c"
+[tasks.checks]
+description = "Run all read-only checks (lint + typechecks + test)"
 depends = ["lint", "mypy", "pyright", "test"]
 
-# ==============================================================================
-# Utility Tasks
-# ==============================================================================
-
-# PLANNED: Clean isn't that helpful - only useful for resetting the LocalStack and Pulumi state
-# [tasks.clean]
-# description = "Clean build artifacts and caches"
-# run = [
-#     "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true",
-#     "find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true",
-#     "find . -type d -name '.ruff_cache' -exec rm -rf {} + 2>/dev/null || true",
-#     "find . -type d -name '.mypy_cache' -exec rm -rf {} + 2>/dev/null || true",
-#     "find . -type f -name '*.pyc' -delete 2>/dev/null || true",
-#     "echo 'Cleaned app caches and artifacts'",
-# ]
-#
-# [tasks."clean:venv"]
-# description = "Remove virtual environment"
-# confirm = "This will remove the app virtual environment. Continue?"
-# run = "rm -rf .venv"
-
-# ==============================================================================
-# CI Tasks
-# ==============================================================================
-
-# # TODO: This should just be `check`, right?
-# [tasks.ci]
-# description = "Run all CI checks for app"
-# run = [
-#     "echo '==> Formatting app code...'",
-#     "uv run ruff format .",
-#     "echo '==> Linting app code...'",
-#     "uv run ruff check .",
-#     "echo '==> Type checking app code...'",
-#     "uv run mypy src",
-#     "uv run pyright",
-#     "echo '==> Running app tests...'",
-#     "uv run pytest",
-#     "echo '✓ All app CI checks passed!'",
-# ]
+[tasks.fixes]
+description = "Run all fixes (ruff format and linter)"
+depends = ["format", "lint:power-fix"]
