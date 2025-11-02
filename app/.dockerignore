@@ -1,0 +1,26 @@
+# Exclude Python artifacts
+__pycache__
+*.py[cod]
+
+# Virtual environments
+.venv/
+
+# Local development files
+.env
+.env.*
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Build artifacts
+build/
+dist/
+
+# Tests and caches
+.ruff_cache/
+.pytest_cache/
+tests/
+
+# Logs
+*.log

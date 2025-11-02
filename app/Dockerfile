@@ -1,38 +1,38 @@
-# Dockerfile for Dagster TaskIQ services
-FROM python:3.13-slim
+# Adapted from: https://github.com/astral-sh/uv-docker-example/blob/5748835918ec293d547bbe0e42df34e140aca1eb/Dockerfile
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+RUN groupadd --system --gid 999 nonroot \
+ && useradd --system --gid 999 --uid 999 --create-home nonroot
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv
-RUN pip install uv
-
-# Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_SYNC=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_TOOL_BIN_DIR=/usr/local/bin \
+    PATH="/opt/venv/bin:${PATH}" \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
-# Install dependencies
-RUN uv sync --frozen --no-dev
-
-# Copy application code
-COPY . .
-
-# Install the application
-RUN uv pip install -e .
-
-# Create dagster home directory
-RUN mkdir -p /opt/dagster/dagster_home
 ENV DAGSTER_HOME=/opt/dagster/dagster_home
+RUN mkdir -p /opt/dagster/dagster_home
 
-# Default command (can be overridden)
-CMD ["uv", "run", "dagster-daemon", "run"]
+RUN apt-get update \
+    && apt-get install -y libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock,readonly \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml,readonly \
+    uv sync --locked --no-dev --no-install-project --with=uv_build
+
+COPY . --chown=nonroot:nonroot /app
+RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
+    uv sync --locked --no-dev --offline
+
+USER nonroot
+ENTRYPOINT []
+CMD ["dagster-daemon", "run"]
