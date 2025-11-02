@@ -1,10 +1,6 @@
 # Root mise.toml - Monorepo Orchestration
 # This file coordinates tasks across the entire repository
 
-# Enable experimental monorepo support for task namespacing
-# Requires: MISE_EXPERIMENTAL=1 environment variable
-experimental_monorepo_root = true
-
 [tools]
 "asdf:postgres" = "17"
 node = "latest"
@@ -13,7 +9,6 @@ python = "3.13"
 
 [env]
 _.file = { path = ".env", redact = true }
-MISE_EXPERIMENTAL = "1"
 PULUMI_CONFIG_PASSPHRASE = "See README!"
 AWS_DEFAULT_REGION = "us-east-1"
 PROJECT_NAME = "dagster-taskiq-demo"
@@ -28,54 +23,54 @@ ENVIRONMENT = "local"
 description = "Install all dependencies (app + deploy)"
 alias = "i"
 run = [
-    "mise run //app:install",
-    "mise run //deploy:install",
+    "mise -C app run install",
+    "mise -C deploy run install",
 ]
 
 [tasks.test]
 description = "Run all tests (app + deploy)"
 alias = "t"
 run = [
-    "mise run //app:test",
-    "mise run //deploy:test",
+    "mise -C app run test",
+    "mise -C deploy run test",
 ]
 
 [tasks.lint]
 description = "Lint all code (app + deploy)"
 alias = "l"
 run = [
-    "mise run //app:lint",
-    "mise run //deploy:lint",
+    "mise -C app run lint",
+    "mise -C deploy run lint",
 ]
 
 [tasks."lint:fix"]
 description = "Lint and auto-fix all code"
 run = [
-    "mise run //app:lint:fix",
-    "mise run //deploy:lint:fix",
+    "mise -C app run lint:fix",
+    "mise -C deploy run lint:fix",
 ]
 
 [tasks.format]
 description = "Format all code (app + deploy)"
 alias = "f"
 run = [
-    "mise run //app:format",
-    "mise run //deploy:format",
+    "mise -C app run format",
+    "mise -C deploy run format",
 ]
 
 [tasks."format:check"]
 description = "Check formatting without modifying files"
 run = [
-    "mise run //app:format:check",
-    "mise run //deploy:format:check",
+    "mise -C app run format:check",
+    "mise -C deploy run format:check",
 ]
 
 [tasks.typecheck]
 description = "Type check all code (app + deploy)"
 alias = "tc"
 run = [
-    "mise run //app:typecheck",
-    "mise run //deploy:typecheck",
+    "mise -C app run typecheck",
+    "mise -C deploy run typecheck",
 ]
 
 [tasks.check]
@@ -127,26 +122,26 @@ run = "./scripts/build-and-push.sh"
 [tasks.up]
 description = "Deploy infrastructure with Pulumi"
 alias = "infra:up"
-run = "mise run //deploy:up"
+run = "mise -C deploy run up"
 
 [tasks.down]
 description = "Destroy infrastructure with Pulumi"
 alias = "infra:down"
 confirm = "Are you sure you want to destroy the infrastructure?"
-run = "mise run //deploy:down"
+run = "mise -C deploy run down"
 
 [tasks.preview]
 description = "Preview infrastructure changes"
 alias = "infra:preview"
-run = "mise run //deploy:preview"
+run = "mise -C deploy run preview"
 
 [tasks.refresh]
 description = "Refresh Pulumi state"
-run = "mise run //deploy:refresh"
+run = "mise -C deploy run refresh"
 
 [tasks.outputs]
 description = "Show Pulumi stack outputs"
-run = "mise run //deploy:outputs"
+run = "mise -C deploy run outputs"
 
 # ==============================================================================
 # LocalStack Service Management
@@ -245,8 +240,8 @@ run = "echo 'Deployment complete! Check services: mise run aws:services'"
 [tasks.clean]
 description = "Clean build artifacts and caches in all projects"
 run = [
-    "mise run //app:clean",
-    "mise run //deploy:clean",
+    "mise -C app run clean",
+    "mise -C deploy run clean",
     "echo 'Cleaned all project caches and artifacts'",
 ]
 
@@ -255,8 +250,8 @@ description = "Clean everything including venvs and Docker"
 confirm = "This will remove all virtual environments and Docker images. Continue?"
 depends = ["clean"]
 run = [
-    "mise run //app:clean:venv 2>/dev/null || true",
-    "mise run //deploy:clean:venv 2>/dev/null || true",
+    "mise -C app run clean:venv 2>/dev/null || true",
+    "mise -C deploy run clean:venv 2>/dev/null || true",
     "docker image rm dagster-taskiq-demo:latest 2>/dev/null || true",
     "echo 'Cleaned all build artifacts, venvs, and Docker images'",
 ]
@@ -269,7 +264,7 @@ run = [
 description = "Run all CI checks (format, lint, typecheck, test)"
 run = [
     "echo '==> Running CI checks across all projects...'",
-    "mise run //app:ci",
-    "mise run //deploy:ci",
+    "mise -C app run ci",
+    "mise -C deploy run ci",
     "echo '✓ All CI checks passed!'",
 ]
