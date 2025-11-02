@@ -152,51 +152,49 @@ def create_dagster_infrastructure(
     )
 
     # Attach Dagster-specific IAM permissions
-    inline_policy = json.dumps({
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "RDSAccess",
-                "Effect": "Allow",
-                "Action": [
-                    "rds:DescribeDBInstances",
-                    "rds:Connect",
-                    "rds:DescribeDBClusters",
-                ],
-                "Resource": "*",
-            },
-            {
-                "Sid": "ECSAccess",
-                "Effect": "Allow",
-                "Action": [
-                    "ecs:DescribeServices",
-                    "ecs:UpdateService",
-                    "ecs:DescribeTasks",
-                    "ecs:ListTasks",
-                    "ecs:DescribeClusters",
-                    "ecs:DescribeTaskDefinition",
-                ],
-                "Resource": "*",
-            },
-            {
-                "Sid": "CloudWatchLogs",
-                "Effect": "Allow",
-                "Action": [
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                    "logs:DescribeLogGroups",
-                    "logs:DescribeLogStreams",
-                ],
-                "Resource": "*",
-            },
-        ],
-    })
-
     iam.RolePolicy(
         f"{resource_name}-inline-policy",
         role=task_role.id,
-        policy=inline_policy,
+        policy=json.dumps({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "RDSAccess",
+                    "Effect": "Allow",
+                    "Action": [
+                        "rds:DescribeDBInstances",
+                        "rds:Connect",
+                        "rds:DescribeDBClusters",
+                    ],
+                    "Resource": "*",
+                },
+                {
+                    "Sid": "ECSAccess",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecs:DescribeServices",
+                        "ecs:UpdateService",
+                        "ecs:DescribeTasks",
+                        "ecs:ListTasks",
+                        "ecs:DescribeClusters",
+                        "ecs:DescribeTaskDefinition",
+                    ],
+                    "Resource": "*",
+                },
+                {
+                    "Sid": "CloudWatchLogs",
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "logs:DescribeLogGroups",
+                        "logs:DescribeLogStreams",
+                    ],
+                    "Resource": "*",
+                },
+            ],
+        }),
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
@@ -204,6 +202,7 @@ def create_dagster_infrastructure(
     def create_daemon_container(args: list[str]) -> list[ContainerDefinition]:
         db_endpoint, queue_url_val, cluster, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
+        port = db_endpoint.split(":", maxsplit=1)[1] if ":" in db_endpoint else "5432"
 
         return [
             ContainerDefinition(
@@ -211,7 +210,7 @@ def create_dagster_infrastructure(
                 image=image,
                 environment={
                     "POSTGRES_HOST": host,
-                    "POSTGRES_PORT": "5432",
+                    "POSTGRES_PORT": port,
                     "POSTGRES_USER": "dagster",
                     "POSTGRES_PASSWORD": "dagster",
                     "POSTGRES_DB": "dagster",
@@ -252,6 +251,7 @@ def create_dagster_infrastructure(
     def create_webserver_container(args: list[str]) -> list[ContainerDefinition]:
         db_endpoint, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
+        port = db_endpoint.split(":", maxsplit=1)[1] if ":" in db_endpoint else "5432"
 
         return [
             ContainerDefinition(
@@ -259,7 +259,7 @@ def create_dagster_infrastructure(
                 image=image,
                 environment={
                     "POSTGRES_HOST": host,
-                    "POSTGRES_PORT": "5432",
+                    "POSTGRES_PORT": port,
                     "POSTGRES_USER": "dagster",
                     "POSTGRES_PASSWORD": "dagster",
                     "POSTGRES_DB": "dagster",
@@ -340,14 +340,12 @@ def create_dagster_infrastructure(
     )
 
     # Create load balancer
-    security_group_output = pulumi.Output.from_input(security_group.id).apply(lambda sg: [sg])
-
     load_balancer = lb.LoadBalancer(
         f"{resource_name}-alb",
         name=f"{project_name}-alb-{environment}",
         load_balancer_type="application",
         subnets=list(subnet_ids),
-        security_groups=security_group_output,
+        security_groups=pulumi.Output.from_input(security_group.id).apply(lambda sg: [sg]),
         internal=False,
         opts=pulumi.ResourceOptions(provider=provider),
     )

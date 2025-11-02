@@ -118,6 +118,11 @@ def main() -> None:
         backup_retention_period=settings.database.backup_retention_period,
     )
 
+    # Combine database endpoint with port for both modules
+    database_endpoint_with_port = pulumi.Output.all(database.cluster.endpoint, database.cluster.port).apply(
+        lambda args: f"{args[0]}:{args[1]}"
+    )
+
     # Create TaskIQ infrastructure module
     taskiq = create_taskiq_infrastructure(
         "taskiq",
@@ -127,7 +132,7 @@ def main() -> None:
         region=settings.aws.region,
         container_image=ecr_repo.repository_uri,
         aws_endpoint_url=settings.aws.endpoint,
-        database_endpoint=database.cluster.endpoint,
+        database_endpoint=database_endpoint_with_port,
         execution_role_arn=execution_role.arn,
         message_retention_seconds=settings.queue.message_retention_seconds,
         queue_visibility_timeout=settings.queue.visibility_timeout,
@@ -146,7 +151,7 @@ def main() -> None:
         subnet_ids=network.subnets.ids,
         container_image=ecr_repo.repository_uri,
         aws_endpoint_url=settings.aws.endpoint,
-        database_endpoint=database.cluster.endpoint,
+        database_endpoint=database_endpoint_with_port,
         queue_url=taskiq.queues.queue.id,
         cluster_name=cluster.cluster.name,
         execution_role_arn=execution_role.arn,

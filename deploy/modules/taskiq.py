@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 from dataclasses import dataclass
 
 import pulumi
@@ -198,9 +199,12 @@ def create_taskiq_infrastructure(
             )
         ]
 
+    def _serialize_worker_containers(args: tuple[str, str, str, str]) -> str:
+        return json.dumps([c.to_dict() for c in create_worker_container(args)])
+
     container_defs_json = pulumi.Output.all(
         database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image
-    ).apply(lambda args: json.dumps([c.to_dict() for c in create_worker_container(args)]))
+    ).apply(lambda args: _serialize_worker_containers(cast(tuple[str, str, str, str], tuple(args))))
 
     worker_task_definition = create_fargate_task_definition(
         f"{resource_name}-worker-task",

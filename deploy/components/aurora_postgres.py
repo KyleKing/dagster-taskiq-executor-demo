@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import pulumi
 from pulumi_aws import Provider, kms, rds
+from pulumi_aws.rds import EngineType
 
 
 @dataclass
@@ -157,29 +158,30 @@ def create_postgres_database(
     # Create Aurora Serverless v2 instance
     cluster_instance = rds.ClusterInstance(
         f"{resource_name}-instance",
-        identifier=f"{project_name}-aurora-{environment}-instance-1",
-        cluster_identifier=cluster.id,
-        instance_class="db.serverless",  # Required for Serverless v2
-        engine="aurora-postgresql",
-        engine_version=engine_version,
-        publicly_accessible=publicly_accessible,
-        # Performance Insights
-        performance_insights_enabled=enable_performance_insights,
-        performance_insights_kms_key_id=None,  # Use default KMS key
-        performance_insights_retention_period=(
-            performance_insights_retention_period if enable_performance_insights else None
+        rds.ClusterInstanceArgs(
+            identifier=f"{project_name}-aurora-{environment}-instance-1",
+            cluster_identifier=cluster.id,
+            instance_class="db.serverless",  # Required for Serverless v2
+            engine=EngineType.AURORA_POSTGRESQL,
+            engine_version=engine_version,
+            publicly_accessible=publicly_accessible,
+            # Performance Insights
+            performance_insights_enabled=enable_performance_insights,
+            performance_insights_retention_period=(
+                performance_insights_retention_period if enable_performance_insights else None
+            ),
+            # Monitoring
+            monitoring_interval=0,  # Enhanced monitoring disabled
+            # Auto minor version upgrades
+            auto_minor_version_upgrade=True,
+            apply_immediately=False,
+            tags={
+                "Name": f"{project_name}-aurora-{environment}-instance-1",
+                "Project": project_name,
+                "Environment": environment,
+                "ManagedBy": "Pulumi",
+            },
         ),
-        # Monitoring
-        monitoring_interval=0,  # Enhanced monitoring disabled
-        # Auto minor version upgrades
-        auto_minor_version_upgrade=True,
-        apply_immediately=False,
-        tags={
-            "Name": f"{project_name}-aurora-{environment}-instance-1",
-            "Project": project_name,
-            "Environment": environment,
-            "ManagedBy": "Pulumi",
-        },
         opts=pulumi.ResourceOptions(
             provider=provider,
             depends_on=[cluster],
