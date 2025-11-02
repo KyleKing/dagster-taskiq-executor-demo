@@ -1,0 +1,165 @@
+"""Tests for config.py StackSettings loader."""
+
+from collections.abc import Mapping
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from config import StackSettings
+
+
+class TestStackSettings:
+    """Test StackSettings configuration loading."""
+
+    @patch("pulumi.Config")
+    def test_load_with_full_config(self, mock_config_class: MagicMock, mock_pulumi_config: MagicMock) -> None:
+        """Arrange: Mock Pulumi config with all values provided."""
+        mock_config_class.return_value = mock_pulumi_config
+
+        # Act: Load stack settings
+        settings = StackSettings.load()
+
+        # Assert: All settings are loaded correctly
+        assert isinstance(settings, StackSettings)
+        assert settings.project.name == "dagster-taskiq-demo"
+        assert settings.project.environment == "test"
+        assert settings.aws.region == "us-east-1"
+        assert settings.aws.endpoint == "http://localhost:4566"
+        assert settings.aws.access_key == "test"
+        assert settings.aws.secret_key == "test"
+        assert settings.queue.message_retention_seconds == 1209600
+        assert settings.queue.visibility_timeout == 900
+        assert settings.queue.dlq_visibility_timeout == 300
+        assert settings.queue.redrive_max_receive_count == 3
+        assert settings.database.engine_version == "17"
+        assert settings.database.min_capacity == 0.5
+        assert settings.database.max_capacity == 1.0
+        assert settings.database.username == "dagster"
+        assert settings.database.password == "dagster"
+        assert settings.database.db_name == "dagster"
+        assert settings.database.backup_retention_period == 7
+        assert settings.database.deletion_protection is False
+        assert settings.database.publicly_accessible is True
+        assert settings.services.daemon_desired_count == 1
+        assert settings.services.webserver_desired_count == 1
+        assert settings.services.worker_desired_count == 2
+
+    @patch("pulumi.Config")
+    @patch("pulumi.get_stack")
+    def test_load_with_defaults(self, mock_get_stack: MagicMock, mock_config_class: MagicMock) -> None:
+        """Arrange: Mock Pulumi config with minimal values."""
+        mock_get_stack.return_value = "local"
+
+        config = MagicMock(spec=pulumi.Config)
+
+        def mock_get_object(key: str) -> Mapping[str, Any] | None:
+            if key == "project":
+                return {}
+            return {}
+
+        config.get_object = mock_get_object
+        mock_config_class.return_value = config
+
+        # Act: Load stack settings
+        settings = StackSettings.load()
+
+        # Assert: Default values are applied
+        assert settings.project.name == "dagster-taskiq-demo"
+        assert settings.project.environment == "local"
+        assert settings.aws.region == "us-east-1"
+        assert settings.aws.endpoint == "http://localhost:4566"
+        assert settings.queue.message_retention_seconds == 14 * 24 * 60 * 60  # 14 days
+        assert settings.queue.visibility_timeout == 15 * 60  # 15 minutes
+        assert settings.queue.dlq_visibility_timeout == 60
+        assert settings.queue.redrive_max_receive_count == 3
+        assert settings.database.engine_version == "17"
+        assert settings.database.min_capacity == 0.5
+        assert settings.database.max_capacity == 1.0
+        assert settings.database.username == "dagster"
+        assert settings.database.password == "dagster"
+        assert settings.database.db_name == "dagster"
+        assert settings.database.backup_retention_period == 7
+        assert settings.database.deletion_protection is False
+        assert settings.database.publicly_accessible is True
+        assert settings.services.daemon_desired_count == 1
+        assert settings.services.webserver_desired_count == 1
+        assert settings.services.worker_desired_count == 2
+
+    @patch("pulumi.Config")
+    def test_load_with_invalid_config_type(self, mock_config_class: MagicMock) -> None:
+        """Arrange: Mock Pulumi config returning invalid type."""
+        config = MagicMock(spec=pulumi.Config)
+
+        def mock_get_object(key: str) -> Mapping[str, Any] | None:
+            if key == "project":
+                return "invalid_string"  # Should be a mapping
+            return {}
+
+        config.get_object = mock_get_object
+        mock_config_class.return_value = config
+
+        # Act & Assert: Should raise TypeError
+        with pytest.raises(TypeError, match="Pulumi config key 'project' must be an object."):
+            StackSettings.load()
+
+    @patch("pulumi.Config")
+    def test_load_with_missing_config_sections(self, mock_config_class: MagicMock) -> None:
+        """Arrange: Mock Pulumi config returning None for missing sections."""
+        config = MagicMock(spec=pulumi.Config)
+
+        def mock_get_object(key: str) -> Mapping[str, Any] | None:
+            return None  # All sections missing
+
+        config.get_object = mock_get_object
+        mock_config_class.return_value = config
+
+        # Act: Load stack settings
+        settings = StackSettings.load()
+
+        # Assert: Should use defaults for all missing sections
+        assert isinstance(settings, StackSettings)
+        assert settings.project.name == "dagster-taskiq-demo"
+        assert settings.project.environment == "local"  # Default from get_stack()
+
+    @pytest.mark.parametrize(
+        ("config_key", "field_name", "expected_value"),
+        [
+            ("project", "name", "custom-project"),
+            ("aws", "region", "eu-west-1"),
+            ("queue", "messageRetentionSeconds", "864000"),
+            ("database", "engineVersion", "16"),
+            ("services", "daemonDesiredCount", "3"),
+        ],
+    )
+    @patch("pulumi.Config")
+    def test_load_individual_config_overrides(
+        self, mock_config_class: MagicMock, config_key: str, field_name: str, expected_value: str
+    ) -> None:
+        """Arrange: Mock Pulumi config with specific overrides."""
+        config = MagicMock(spec=pulumi.Config)
+
+        def mock_get_object(key: str) -> Mapping[str, Any] | None:
+            if key == config_key:
+                return {field_name: expected_value}
+            return {}
+
+        config.get_object = mock_get_object
+        mock_config_class.return_value = config
+
+        # Act: Load stack settings
+        settings = StackSettings.load()
+
+        # Assert: Specific field is overridden
+        if config_key == "project":
+            assert getattr(settings.project, field_name) == expected_value
+        elif config_key == "aws":
+            assert getattr(settings.aws, field_name) == expected_value
+        elif config_key == "queue":
+            if field_name == "messageRetentionSeconds":
+                assert settings.queue.message_retention_seconds == int(expected_value)
+        elif config_key == "database":
+            if field_name == "engineVersion":
+                assert settings.database.engine_version == expected_value
+        elif config_key == "services" and field_name == "daemonDesiredCount":
+            assert settings.services.daemon_desired_count == int(expected_value)

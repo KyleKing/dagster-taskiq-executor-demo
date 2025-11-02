@@ -43,9 +43,28 @@ ignore = [
 ]
 unfixable = ["ERA001"]  # Commented-out code
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = [
+    "ANN001",   # Missing type annotation for function argument
+    "ANN201",   # Missing return type annotation for public function
+    "ANN202",   # Missing return type annotation for private function
+    "D100",     # Missing docstring in public module
+    "D101",     # Missing docstring in public class
+    "D102",     # Missing docstring in public method
+    "D103",     # Missing docstring in public function
+    "D104",     # Missing docstring in public package
+    "PLR2004",  # Magic value used in comparison
+    "S101",     # Use of assert detected
+    "S105",     # Possible hardcoded password
+    "S106",     # Possible hardcoded password
+    "S108",     # Probable insecure usage of temporary file or directory
+    "SLF001",   # Private member accessed
+    "ARG001",   # Unused function argument
+    "ARG002",   # Unused method argument
+]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
 [tool.mypy]
 python_version = "3.13"
 check_untyped_defs = true
@@ -74,5 +93,7 @@ reportUnknownVariableType = false
 dev = [
     "mypy>=1.18.2",
     "pyright>=1.1.407",
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
     "ruff>=0.14.3",
 ]
