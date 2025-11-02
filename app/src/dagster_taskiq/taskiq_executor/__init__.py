@@ -18,6 +18,7 @@ from dagster._core.execution.plan.step import StepKind
 from dagster._core.executor.base import Executor
 from dagster_shared.error import SerializableErrorInfo
 
+from .app import taskiq_app
 from .broker import LocalStackSqsBroker
 from .models import IdempotencyStorage, get_idempotency_storage
 from .task_payloads import ExecutionResult, IdempotencyRecord, OpExecutionTask, TaskState
@@ -34,15 +35,6 @@ __all__ = [
     "taskiq_app",
     "taskiq_executor",
 ]
-
-from dagster_taskiq.config.settings import Settings
-from dagster_taskiq.taskiq_executor.broker import LocalStackSqsBroker
-from dagster_taskiq.taskiq_executor.models import get_idempotency_storage
-from dagster_taskiq.taskiq_executor.task_payloads import (
-    IdempotencyRecord,
-    OpExecutionTask,
-    TaskState,
-)
 
 # Import the TaskIQ app instance
 from .app import taskiq_app

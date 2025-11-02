@@ -69,9 +69,9 @@ class DagsterTaskiqApp:
         started_at = datetime.now(UTC)
 
         try:
-            # For now, we'll simulate execution - in a real implementation,
-            # we would use Dagster's execution APIs to reconstruct and execute the step
-            self.logger.info("Simulating execution of step %s", task.step_key)
+            # TODO: Implement proper step execution using Dagster APIs
+            # For now, we'll simulate execution since full reconstruction is complex
+            self.logger.info("Simulating execution of step %s for run %s", task.step_key, task.run_id)
 
             # Simulate some work
             await asyncio.sleep(1.0)
@@ -91,6 +91,7 @@ class DagsterTaskiqApp:
             )
 
         except Exception as e:
+            self.logger.exception("Error executing step %s: %s", task.step_key, e)
             completed_at = datetime.now(UTC)
             execution_time = (completed_at - started_at).total_seconds()
 
