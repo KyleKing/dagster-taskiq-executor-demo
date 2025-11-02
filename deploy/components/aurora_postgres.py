@@ -127,7 +127,9 @@ def create_postgres_database(
         # Security and availability
         deletion_protection=deletion_protection,
         skip_final_snapshot=not deletion_protection,  # Skip snapshot only if deletion protection is off
-        final_snapshot_identifier=f"{project_name}-aurora-{environment}-final-snapshot" if deletion_protection else None,
+        final_snapshot_identifier=(
+            f"{project_name}-aurora-{environment}-final-snapshot" if deletion_protection else None
+        ),
         # Performance and monitoring
         enabled_cloudwatch_logs_exports=["postgresql"],
         enable_http_endpoint=False,  # Data API not needed for Dagster
@@ -163,7 +165,9 @@ def create_postgres_database(
         # Performance Insights
         performance_insights_enabled=enable_performance_insights,
         performance_insights_kms_key_id=kms_key.arn if enable_performance_insights else None,
-        performance_insights_retention_period=performance_insights_retention_period if enable_performance_insights else None,
+        performance_insights_retention_period=(
+            performance_insights_retention_period if enable_performance_insights else None
+        ),
         # Monitoring
         monitoring_interval=60 if enable_performance_insights else 0,
         # Auto minor version upgrades

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import pulumi
 from pulumi_aws import Provider, ecs, iam
 
+from components.cloudwatch_logs import create_ecs_log_group
 from components.ecs_helpers import (
     ContainerDefinition,
     HealthCheck,
@@ -24,6 +25,7 @@ class TaskIQResources:
     queues: QueueResources
     task_role: iam.Role
     worker_task_definition: ecs.TaskDefinition
+    worker_log_group: pulumi.Resource
 
 
 def create_taskiq_infrastructure(
@@ -137,6 +139,14 @@ def create_taskiq_infrastructure(
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
+    # Create CloudWatch log group for workers
+    worker_log_group = create_ecs_log_group(
+        f"{resource_name}-worker-logs",
+        provider=provider,
+        log_group_name=f"/aws/ecs/taskiq-worker-{environment}",
+        retention_in_days=14,
+    )
+
     # Attach queue access policy
     attach_queue_access_policy(
         f"{resource_name}-queue-access",
@@ -177,16 +187,20 @@ def create_taskiq_infrastructure(
                     "TASKIQ_WORKER_ID": "worker-${HOSTNAME}",
                 },
                 health_check=HealthCheck(
-                    command=["CMD-SHELL", "python -c \"import taskiq; print('healthy')\""],
+                    command=["CMD-SHELL", "python -c \"import taskiq; print('healthy')\" || exit 1"],
+                    interval=30,
+                    timeout=10,
+                    retries=2,
+                    start_period=90,
                 ),
-                log_config=LogConfig(log_group="/aws/ecs/taskiq-worker", region=region),
+                log_config=LogConfig(log_group=f"/aws/ecs/taskiq-worker-{environment}", region=region),
                 stop_timeout=300,
             )
         ]
 
-    container_defs_json = pulumi.Output.all(database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image).apply(
-        lambda args: json.dumps([c.to_dict() for c in create_worker_container(*args)])
-    )
+    container_defs_json = pulumi.Output.all(
+        database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image
+    ).apply(lambda args: json.dumps([c.to_dict() for c in create_worker_container(args)]))
 
     worker_task_definition = create_fargate_task_definition(
         f"{resource_name}-worker-task",
@@ -203,4 +217,5 @@ def create_taskiq_infrastructure(
         queues=queues,
         task_role=task_role,
         worker_task_definition=worker_task_definition,
+        worker_log_group=worker_log_group,
     )

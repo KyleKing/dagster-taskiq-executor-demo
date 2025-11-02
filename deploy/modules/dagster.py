@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pulumi
 from pulumi_aws import Provider, ec2, ecs, iam, lb, servicediscovery
 
+from components.cloudwatch_logs import create_ecs_log_group
 from components.ecs_helpers import (
     ContainerDefinition,
     HealthCheck,
@@ -26,6 +27,8 @@ class DagsterResources:
     task_role: iam.Role
     daemon_task_definition: ecs.TaskDefinition
     webserver_task_definition: ecs.TaskDefinition
+    daemon_log_group: pulumi.Resource
+    webserver_log_group: pulumi.Resource
     service_discovery_namespace: servicediscovery.PrivateDnsNamespace
     daemon_service_discovery: servicediscovery.Service
     webserver_service_discovery: servicediscovery.Service
@@ -114,6 +117,21 @@ def create_dagster_infrastructure(
         opts=pulumi.ResourceOptions(provider=provider, parent=security_group),
     )
 
+    # Create CloudWatch log groups
+    daemon_log_group = create_ecs_log_group(
+        f"{resource_name}-daemon-logs",
+        provider=provider,
+        log_group_name=f"/aws/ecs/dagster-daemon-{environment}",
+        retention_in_days=14,
+    )
+
+    webserver_log_group = create_ecs_log_group(
+        f"{resource_name}-webserver-logs",
+        provider=provider,
+        log_group_name=f"/aws/ecs/dagster-webserver-{environment}",
+        retention_in_days=14,
+    )
+
     # Create IAM role for Dagster services
     assume_role_policy = json.dumps({
         "Version": "2012-10-17",
@@ -183,7 +201,7 @@ def create_dagster_infrastructure(
     )
 
     # Create task definitions
-    def create_daemon_container(args: tuple[str, str, str, str]) -> list[ContainerDefinition]:
+    def create_daemon_container(args: list[str]) -> list[ContainerDefinition]:
         db_endpoint, queue_url_val, cluster, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
@@ -205,15 +223,19 @@ def create_dagster_infrastructure(
                     "ECS_CLUSTER_NAME": cluster,
                 },
                 health_check=HealthCheck(
-                    command=["CMD-SHELL", "python -c \"import dagster; print('healthy')\""],
+                    command=["CMD-SHELL", "python -c \"import dagster; print('healthy')\" || exit 1"],
+                    interval=30,
+                    timeout=10,
+                    retries=3,
+                    start_period=120,
                 ),
-                log_config=LogConfig(log_group="/aws/ecs/dagster-daemon", region=region),
+                log_config=LogConfig(log_group=f"/aws/ecs/dagster-daemon-{environment}", region=region),
                 stop_timeout=120,
             )
         ]
 
     daemon_container_defs_json = pulumi.Output.all(database_endpoint, queue_url, cluster_name, container_image).apply(
-        lambda args: json.dumps([c.to_dict() for c in create_daemon_container(*args)])
+        lambda args: json.dumps([c.to_dict() for c in create_daemon_container(args)])
     )
 
     daemon_task_definition = create_fargate_task_definition(
@@ -227,7 +249,7 @@ def create_dagster_infrastructure(
         memory="1024",
     )
 
-    def create_webserver_container(args: tuple[str, str]) -> list[ContainerDefinition]:
+    def create_webserver_container(args: list[str]) -> list[ContainerDefinition]:
         db_endpoint, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
@@ -249,14 +271,18 @@ def create_dagster_infrastructure(
                 port_mappings=[PortMapping(container_port=3000, name="dagster-web")],
                 health_check=HealthCheck(
                     command=["CMD-SHELL", "curl -f http://localhost:3000/server_info || exit 1"],
+                    interval=15,
+                    timeout=5,
+                    retries=3,
+                    start_period=60,
                 ),
-                log_config=LogConfig(log_group="/aws/ecs/dagster-webserver", region=region),
+                log_config=LogConfig(log_group=f"/aws/ecs/dagster-webserver-{environment}", region=region),
                 stop_timeout=30,
             )
         ]
 
     webserver_container_defs_json = pulumi.Output.all(database_endpoint, container_image).apply(
-        lambda args: json.dumps([c.to_dict() for c in create_webserver_container(*args)])
+        lambda args: json.dumps([c.to_dict() for c in create_webserver_container(args)])
     )
 
     webserver_task_definition = create_fargate_task_definition(
@@ -366,6 +392,8 @@ def create_dagster_infrastructure(
         task_role=task_role,
         daemon_task_definition=daemon_task_definition,
         webserver_task_definition=webserver_task_definition,
+        daemon_log_group=daemon_log_group,
+        webserver_log_group=webserver_log_group,
         service_discovery_namespace=namespace,
         daemon_service_discovery=daemon_service_discovery,
         webserver_service_discovery=webserver_service_discovery,

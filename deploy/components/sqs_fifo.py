@@ -100,9 +100,7 @@ def attach_queue_access_policy(
             ],
         })
 
-    formatted_policy = pulumi.Output.all(queues.queue.arn, principal_arns).apply(
-        lambda args: _policy_doc(*args)
-    )
+    formatted_policy = pulumi.Output.all(queues.queue.arn, principal_arns).apply(lambda args: _policy_doc(*args))
 
     sqs.QueuePolicy(
         f"{policy_name}-queue-policy",

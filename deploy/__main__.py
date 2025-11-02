@@ -171,6 +171,15 @@ def main() -> None:
             service_registries=aws.ecs.ServiceServiceRegistriesArgs(
                 registry_arn=dagster.daemon_service_discovery.arn,
             ),
+            deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                enable=True,
+                rollback=True,
+            ),
+            deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                type="ECS",
+            ),
+            health_check_grace_period_seconds=300,
+            force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider),
     )
@@ -198,6 +207,15 @@ def main() -> None:
             service_registries=aws.ecs.ServiceServiceRegistriesArgs(
                 registry_arn=dagster.webserver_service_discovery.arn,
             ),
+            deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                enable=True,
+                rollback=True,
+            ),
+            deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                type="ECS",
+            ),
+            health_check_grace_period_seconds=180,
+            force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider, depends_on=[dagster.listener]),
     )
@@ -215,6 +233,15 @@ def main() -> None:
                 security_groups=security_group_output,
                 assign_public_ip=True,
             ),
+            deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                enable=True,
+                rollback=True,
+            ),
+            deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                type="ECS",
+            ),
+            health_check_grace_period_seconds=120,
+            force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider),
     )
