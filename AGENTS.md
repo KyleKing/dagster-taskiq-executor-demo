@@ -90,6 +90,14 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && u
     - Only test at the interface level (e.g. Dagster Job) and avoid writing low-level unit tests unless there is critical logic that can't be easily tested easily at the interface
     - Write the fewest tests that provide the most coverage
 
+## Testing Guidance
+
+- Validate Dagster behavior end-to-end: job wiring, schedules, configuration loading, and repository completeness.
+- Avoid probing Dagster internals or private modules; skip trivial per-op tests unless business logic warrants it.
+- Keep test configuration centralized (e.g., `.env.test` fixtures) and favor lightweight boundary mocks such as replacing `asyncio.sleep`.
+- Stick to modern APIs like `execute_in_process()` and property accessors when asserting run results and definitions.
+- Never structure pytest suites with unittest-style classes or `unittest.TestCase`; use plain functions and parametrization instead.
+
 ## Pulumi Guidance
 
 - Follow above Python guidance and Pulumi best practices, additionally follow:
