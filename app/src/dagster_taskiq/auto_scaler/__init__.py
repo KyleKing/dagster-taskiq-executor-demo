@@ -1,1 +1,1 @@
-# Auto-scaling service for TaskIQ workers
+"""Auto-scaling service for TaskIQ workers."""

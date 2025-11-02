@@ -1,1 +1,1 @@
-# TaskIQ executor implementation for Dagster
+"""TaskIQ executor implementation for Dagster."""
