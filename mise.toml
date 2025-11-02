@@ -5,14 +5,24 @@
 "asdf:postgres" = "17"
 node = "latest"
 "pipx:awscli-local" = "latest"
+"pipx:toml-sort" = "latest"
 python = "3.13"
 
 [env]
 _.file = { path = ".env", redact = true }
-PULUMI_CONFIG_PASSPHRASE = "See README!"
 AWS_DEFAULT_REGION = "us-east-1"
-PROJECT_NAME = "dagster-taskiq-demo"
 ENVIRONMENT = "local"
+PROJECT_NAME = "dagster-taskiq-demo"
+PULUMI_CONFIG_PASSPHRASE = "See README!"
+
+# ==============================================================================
+# General Tasks
+# ==============================================================================
+
+[tasks.toml-sort]
+description = "Format all toml files"
+# FYI: Currently only formats pyproject.toml because mise.toml are manually sorted
+run = "toml-sort --in-place **/pyproject.toml"
 
 # ==============================================================================
 # Monorepo Orchestration Tasks
@@ -54,6 +64,7 @@ run = [
 description = "Format all code (app + deploy)"
 alias = "f"
 run = [
+		  "mise toml-sort",
     "mise -C app run format",
     "mise -C deploy run format",
 ]

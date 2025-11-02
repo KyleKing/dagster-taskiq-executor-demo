@@ -1,70 +1,22 @@
+[dependency-groups]
+dev = [
+  "mypy>=1.18.2",
+  "pyright>=1.1.407",
+  "pytest>=8.0.0",
+  "pytest-mock>=3.14.0",
+  "ruff>=0.14.3"
+]
+
 [project]
 name = "dagster-taskiq-localstack-infra"
 version = "0.0.0"
 description = "Pulumi infrastructure for Dagster TaskIQ LocalStack demo"
 requires-python = ">=3.13"
 dependencies = [
-    "pulumi>=3.100.0",
-    "pulumi-aws>=6.0.0",
+  "pulumi>=3.100.0",
+  "pulumi-aws>=6.0.0"
 ]
 
-[tool.uv]
-package = false
-
-[tool.ruff]
-line-length = 120
-target-version = "py313"
-preview = true
-
-[tool.ruff.lint]
-select = ["ALL"]
-ignore = [
-    "ANN002",   # Missing type annotation for *args
-    "ANN003",   # Missing type annotation for **kwargs
-    "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed
-    "BLE001",   # Do not catch blind exception: `Exception`
-    "COM812",   # Trailing comma missing (conflicts with formatter)
-    "CPY001",   # Missing copyright notice at top of file
-    "D203",     # 1 blank line required before class docstring (conflicts with D211)
-    "D213",     # Multi-line docstring summary should start at the second line (conflicts with D212)
-    "DOC501",   # Raised exception missing from docstring
-    "EM101",    # Exception must not use a string literal, assign to variable first
-    "FIX001",   # Line contains FIXME
-    "FIX002",   # Line contains TODO
-    "FIX004",   # Line contains HACK
-    "PLR0913",  # Too many arguments in function definition
-    "TC001",    # Move application import into a type-checking block
-    "TC002",    # Move third-party import into a type-checking block
-    "TC003",    # Move standard library import into a type-checking block
-    "TD001",    # Invalid TODO tag: `FIXME`
-    "TD002",    # Missing author in TODO
-    "TD003",    # Missing issue link on the line following this TODO
-    "TRY003",   # Avoid specifying long messages outside the exception class
-]
-unfixable = ["ERA001"]  # Commented-out code
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*.py" = [
-    "ANN001",   # Missing type annotation for function argument
-    "ANN201",   # Missing return type annotation for public function
-    "ANN202",   # Missing return type annotation for private function
-    "D100",     # Missing docstring in public module
-    "D101",     # Missing docstring in public class
-    "D102",     # Missing docstring in public method
-    "D103",     # Missing docstring in public function
-    "D104",     # Missing docstring in public package
-    "PLR2004",  # Magic value used in comparison
-    "S101",     # Use of assert detected
-    "S105",     # Possible hardcoded password
-    "S106",     # Possible hardcoded password
-    "S108",     # Probable insecure usage of temporary file or directory
-    "SLF001",   # Private member accessed
-    "ARG001",   # Unused function argument
-    "ARG002",   # Unused method argument
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
 [tool.mypy]
 python_version = "3.13"
 check_untyped_defs = true
@@ -89,11 +41,60 @@ reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportUnknownVariableType = false
 
-[dependency-groups]
-dev = [
-    "mypy>=1.18.2",
-    "pyright>=1.1.407",
-    "pytest>=8.0.0",
-    "pytest-mock>=3.14.0",
-    "ruff>=0.14.3",
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+preview = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "ANN002", # Missing type annotation for *args
+  "ANN003", # Missing type annotation for **kwargs
+  "ANN401", # Dynamically typed expressions (typing.Any) are disallowed
+  "BLE001", # Do not catch blind exception: `Exception`
+  "COM812", # Trailing comma missing (conflicts with formatter)
+  "CPY001", # Missing copyright notice at top of file
+  "D203", # 1 blank line required before class docstring (conflicts with D211)
+  "D213", # Multi-line docstring summary should start at the second line (conflicts with D212)
+  "DOC501", # Raised exception missing from docstring
+  "EM101", # Exception must not use a string literal, assign to variable first
+  "FIX001", # Line contains FIXME
+  "FIX002", # Line contains TODO
+  "FIX004", # Line contains HACK
+  "PLR0913", # Too many arguments in function definition
+  "TC001", # Move application import into a type-checking block
+  "TC002", # Move third-party import into a type-checking block
+  "TC003", # Move standard library import into a type-checking block
+  "TD001", # Invalid TODO tag: `FIXME`
+  "TD002", # Missing author in TODO
+  "TD003", # Missing issue link on the line following this TODO
+  "TRY003" # Avoid specifying long messages outside the exception class
 ]
+unfixable = ["ERA001"] # Commented-out code
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = [
+  "ANN001", # Missing type annotation for function argument
+  "ANN201", # Missing return type annotation for public function
+  "ANN202", # Missing return type annotation for private function
+  "D100", # Missing docstring in public module
+  "D101", # Missing docstring in public class
+  "D102", # Missing docstring in public method
+  "D103", # Missing docstring in public function
+  "D104", # Missing docstring in public package
+  "PLR2004", # Magic value used in comparison
+  "S101", # Use of assert detected
+  "S105", # Possible hardcoded password
+  "S106", # Possible hardcoded password
+  "S108", # Probable insecure usage of temporary file or directory
+  "SLF001", # Private member accessed
+  "ARG001", # Unused function argument
+  "ARG002" # Unused method argument
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.uv]
+package = false
