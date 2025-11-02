@@ -94,9 +94,12 @@ def test_load_with_invalid_config_type() -> None:
     config.get_object = mock_get_object
 
     # Act & Assert: Should raise TypeError
-    with patch("pulumi.Config", return_value=config), pytest.raises(
-        TypeError,
-        match=r"Pulumi config key 'project' must be an object.",
+    with (
+        patch("pulumi.Config", return_value=config),
+        pytest.raises(
+            TypeError,
+            match=r"Pulumi config key 'project' must be an object.",
+        ),
     ):
         StackSettings.load()
 

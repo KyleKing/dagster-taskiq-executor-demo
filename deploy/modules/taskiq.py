@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import cast
 from dataclasses import dataclass
+from typing import cast
 
 import pulumi
 from pulumi_aws import Provider, ecs, iam
@@ -204,7 +204,7 @@ def create_taskiq_infrastructure(
 
     container_defs_json = pulumi.Output.all(
         database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image
-    ).apply(lambda args: _serialize_worker_containers(cast(tuple[str, str, str, str], tuple(args))))
+    ).apply(lambda args: _serialize_worker_containers(cast("tuple[str, str, str, str]", tuple(args))))
 
     worker_task_definition = create_fargate_task_definition(
         f"{resource_name}-worker-task",

@@ -150,6 +150,7 @@ def setup_mocks() -> None:
     pulumi.runtime.set_mocks(Mocks())
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning:pulumi.runtime.resource")
 def test_create_dagster_infrastructure(
     mock_aws_provider: MagicMock, sample_resource_args: dict[str, str | list[str]]
 ) -> None:
@@ -158,18 +159,18 @@ def test_create_dagster_infrastructure(
 
     result = create_dagster_infrastructure(
         provider=mock_aws_provider,
-        resource_name=cast(str, sample_resource_args["resource_name"]),
-        project_name=cast(str, sample_resource_args["project_name"]),
-        environment=cast(str, sample_resource_args["environment"]),
-        region=cast(str, sample_resource_args["region"]),
-        vpc_id=cast(str, sample_resource_args["vpc_id"]),
-        subnet_ids=cast(list[str], sample_resource_args["subnet_ids"]),
-        container_image=cast(str, sample_resource_args["container_image"]),
-        aws_endpoint_url=cast(str, sample_resource_args["aws_endpoint_url"]),
-        database_endpoint=cast(str, sample_resource_args["database_endpoint"]),
-        queue_url=cast(str, sample_resource_args["queue_url"]),
-        cluster_name=cast(str, sample_resource_args["cluster_name"]),
-        execution_role_arn=cast(str, sample_resource_args["execution_role_arn"]),
+        resource_name=cast("str", sample_resource_args["resource_name"]),
+        project_name=cast("str", sample_resource_args["project_name"]),
+        environment=cast("str", sample_resource_args["environment"]),
+        region=cast("str", sample_resource_args["region"]),
+        vpc_id=cast("str", sample_resource_args["vpc_id"]),
+        subnet_ids=cast("list[str]", sample_resource_args["subnet_ids"]),
+        container_image=cast("str", sample_resource_args["container_image"]),
+        aws_endpoint_url=cast("str", sample_resource_args["aws_endpoint_url"]),
+        database_endpoint=cast("str", sample_resource_args["database_endpoint"]),
+        queue_url=cast("str", sample_resource_args["queue_url"]),
+        cluster_name=cast("str", sample_resource_args["cluster_name"]),
+        execution_role_arn=cast("str", sample_resource_args["execution_role_arn"]),
     )
 
     assert isinstance(result, DagsterResources)
