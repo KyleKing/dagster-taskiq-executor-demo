@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import os
-from typing import Any, Generator
-from unittest.mock import Mock, patch
+from collections.abc import Generator
 
 import pytest
-from dagster import DagsterInstance, build_op_context, build_job_context
+from dagster import DagsterInstance
 from dagster.core.test_utils import instance_for_test
 
 from dagster_taskiq.config.settings import Settings
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
     """Create an event loop for the test session."""
     loop = asyncio.new_event_loop()
     yield loop
@@ -24,89 +22,50 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 @pytest.fixture
 def test_settings() -> Settings:
-    """Create test settings with safe defaults."""
-    return Settings(
-        aws_region="us-east-1",
-        aws_endpoint_url="http://localhost:4566",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-        postgres_host="localhost",
-        postgres_port=5432,
-        postgres_user="test",
-        postgres_password="test",
-        postgres_db="test",
-        taskiq_queue_name="test-queue.fifo",
-        taskiq_dlq_name="test-dlq.fifo",
-        ecs_cluster_name="test-cluster",
-        dagster_home="/tmp/dagster_test",
-        dagster_webserver_host="localhost",
-        dagster_webserver_port=3001,
-        taskiq_worker_concurrency=2,
-        taskiq_visibility_timeout=60,
-        autoscaler_min_workers=1,
-        autoscaler_max_workers=5,
-        autoscaler_scale_up_threshold=3,
-        autoscaler_scale_down_threshold=1,
-        autoscaler_cooldown_seconds=30,
-        load_sim_job_interval_seconds=60,
-        load_sim_fast_job_duration_base=5,
-        load_sim_fast_job_duration_variance=2,
-        load_sim_slow_job_duration_base=30,
-        load_sim_slow_job_duration_variance=10,
-        log_level="DEBUG",
-    )
+    """Create test settings from .env.test file.
+
+    Uses pydantic-settings to load configuration from .env.test,
+    avoiding complex environment variable mocking.
+    """
+    return Settings(_env_file=".env.test", _env_file_encoding="utf-8")
 
 
 @pytest.fixture
-def dagster_instance() -> Generator[DagsterInstance, None, None]:
+def dagster_instance() -> Generator[DagsterInstance]:
     """Create a test Dagster instance."""
     with instance_for_test() as instance:
         yield instance
 
 
-@pytest.fixture
-def mock_op_context(dagster_instance: DagsterInstance) -> Mock:
-    """Create a mock operation context for testing."""
-    context = build_op_context(instance=dagster_instance)
-    return context
+# Simple mocks for speeding up integration tests without mocking Dagster internals
 
 
 @pytest.fixture
-def mock_job_context(dagster_instance: DagsterInstance) -> Mock:
-    """Create a mock job context for testing."""
-    context = build_job_context(instance=dagster_instance)
-    return context
+def mock_asyncio_sleep(monkeypatch):
+    """Mock asyncio.sleep to make tests run instantly.
 
+    This is a simple mock that doesn't touch Dagster internals - it just
+    makes asyncio.sleep return immediately for faster test execution.
+    """
 
-@pytest.fixture(autouse=True)
-def patch_settings(test_settings: Settings) -> Generator[None, None, None]:
-    """Automatically patch settings for all tests."""
-    with patch("dagster_taskiq.config.settings.settings", test_settings):
-        yield
+    async def instant_sleep(_duration):
+        """Instantly return without sleeping."""
+        pass
 
-
-@pytest.fixture
-def mock_asyncio_sleep() -> Generator[Mock, None, None]:
-    """Mock asyncio.sleep to speed up tests."""
-    with patch("asyncio.sleep", new_callable=Mock) as mock_sleep:
-        mock_sleep.return_value = asyncio.Future()
-        mock_sleep.return_value.set_result(None)
-        yield mock_sleep
+    monkeypatch.setattr("asyncio.sleep", instant_sleep)
 
 
 @pytest.fixture
-def mock_secrets_randbelow() -> Generator[Mock, None, None]:
-    """Mock secrets.randbelow for predictable test results."""
-    with patch("secrets.randbelow", return_value=0) as mock_randbelow:
-        yield mock_randbelow
+def mock_secrets_randbelow(monkeypatch):
+    """Mock secrets.randbelow to return deterministic values.
+
+    Returns 0 to give minimal variance (negative of the variance value)
+    for predictable test results without mocking Dagster internals.
+    """
+    monkeypatch.setattr("secrets.randbelow", lambda _x: 0)
 
 
-@pytest.fixture
-def mock_loop_time() -> Generator[Mock, None, None]:
-    """Mock asyncio event loop time for predictable test results."""
-    start_time = 1000.0
-    with patch("asyncio.get_event_loop") as mock_get_loop:
-        mock_loop = Mock()
-        mock_loop.time.side_effect = [start_time, start_time + 20.0]  # 20 second duration
-        mock_get_loop.return_value = mock_loop
-        yield mock_loop.time
+
+
+
+

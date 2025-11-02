@@ -20,15 +20,15 @@ class TestProductionSchedules:
         """Test that all schedules have expected names."""
         schedules = get_all_schedules()
         schedule_names = {schedule.name for schedule in schedules}
-        
+
         expected_names = {
             "fast_job_schedule",
-            "slow_job_schedule", 
+            "slow_job_schedule",
             "mixed_job_schedule",
             "parallel_fast_job_schedule",
             "sequential_slow_job_schedule",
         }
-        
+
         assert schedule_names == expected_names
 
     @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ class TestProductionSchedules:
         """Test that schedules are mapped to correct jobs."""
         schedules = get_all_schedules()
         schedule_dict = {schedule.name: schedule for schedule in schedules}
-        
+
         assert schedule_name in schedule_dict
         schedule = schedule_dict[schedule_name]
         assert schedule.job.name == expected_job_name
@@ -53,7 +53,7 @@ class TestProductionSchedules:
     def test_production_schedule_configuration(self):
         """Test that production schedules have correct configuration."""
         schedules = get_all_schedules()
-        
+
         for schedule in schedules:
             # All production schedules should run every 10 minutes
             assert schedule.cron_schedule == "*/10 * * * *"
@@ -66,7 +66,7 @@ class TestProductionSchedules:
     def test_schedule_descriptions(self):
         """Test that schedules have meaningful descriptions."""
         schedules = get_all_schedules()
-        
+
         for schedule in schedules:
             description = schedule.description.lower()
             # Should mention the job type
@@ -88,18 +88,18 @@ class TestTestingSchedules:
         """Test that testing schedules have expected names."""
         schedules = get_testing_schedules()
         schedule_names = {schedule.name for schedule in schedules}
-        
+
         expected_names = {
             "test_fast_job_schedule",
             "test_mixed_job_schedule",
         }
-        
+
         assert schedule_names == expected_names
 
     def test_testing_schedule_configuration(self):
         """Test that testing schedules have correct configuration."""
         schedules = get_testing_schedules()
-        
+
         for schedule in schedules:
             # All testing schedules should run every 2 minutes
             assert schedule.cron_schedule == "*/2 * * * *"
@@ -121,7 +121,7 @@ class TestTestingSchedules:
         """Test that testing schedules are mapped to correct jobs."""
         schedules = get_testing_schedules()
         schedule_dict = {schedule.name: schedule for schedule in schedules}
-        
+
         assert schedule_name in schedule_dict
         schedule = schedule_dict[schedule_name]
         assert schedule.job.name == expected_job_name
@@ -133,26 +133,26 @@ class TestScheduleIntegration:
     def test_schedule_job_references_valid(self):
         """Test that all schedule job references are valid."""
         all_schedules = get_all_schedules() + get_testing_schedules()
-        
+
         for schedule in all_schedules:
             # Job should have a name
             assert schedule.job.name is not None
             assert len(schedule.job.name) > 0
-            
+
             # Job should be executable (has ops)
-            assert len(schedule.job.op_defs) > 0
+            assert len(schedule.job.top_level_node_defs) > 0
 
     def test_no_duplicate_schedule_names(self):
         """Test that there are no duplicate schedule names across all schedules."""
         production_schedules = get_all_schedules()
         testing_schedules = get_testing_schedules()
-        
+
         production_names = {schedule.name for schedule in production_schedules}
         testing_names = {schedule.name for schedule in testing_schedules}
-        
+
         # No overlap between production and testing schedule names
         assert len(production_names & testing_names) == 0
-        
+
         # No duplicates within each set
         assert len(production_names) == len(production_schedules)
         assert len(testing_names) == len(testing_schedules)

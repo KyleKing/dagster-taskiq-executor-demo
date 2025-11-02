@@ -1,9 +1,8 @@
 """Dagster ops for fast and slow async operations."""
 
-from __future__ import annotations
-
 import asyncio
 import secrets
+import time
 from typing import Any
 
 import structlog
@@ -33,7 +32,7 @@ class SlowOpConfig(Config):
     data_size: int = Field(default=10000, description="Size of data to process")
 
 
-@op(config_schema=FastOpConfig)  # type: ignore[arg-type]
+@op
 async def fast_async_op(context: OpExecutionContext, config: FastOpConfig) -> dict[str, Any]:
     """Fast async operation that takes 20±10 seconds using asyncio.sleep.
 
@@ -52,7 +51,7 @@ async def fast_async_op(context: OpExecutionContext, config: FastOpConfig) -> di
     logger.info("fast_op_started", duration=duration, data_size=config.data_size)
 
     # Simulate async work with periodic progress updates
-    start_time = asyncio.get_event_loop().time()
+    start_time = asyncio.get_running_loop().time()
     progress_interval = max(1, duration // 3)  # Update progress 3 times during execution
 
     for i in range(duration):
@@ -61,7 +60,7 @@ async def fast_async_op(context: OpExecutionContext, config: FastOpConfig) -> di
             progress = (i / duration) * 100
             context.log.info("Fast op progress: %.1f%%", progress)
 
-    end_time = asyncio.get_event_loop().time()
+    end_time = asyncio.get_running_loop().time()
     actual_duration = end_time - start_time
 
     result = {
@@ -80,7 +79,7 @@ async def fast_async_op(context: OpExecutionContext, config: FastOpConfig) -> di
     return result
 
 
-@op(config_schema=SlowOpConfig)  # type: ignore[arg-type]
+@op
 async def slow_async_op(context: OpExecutionContext, config: SlowOpConfig) -> dict[str, Any]:
     """Slow async operation that takes 5±2 minutes using asyncio.sleep.
 
@@ -99,7 +98,7 @@ async def slow_async_op(context: OpExecutionContext, config: SlowOpConfig) -> di
     logger.info("slow_op_started", duration=duration, data_size=config.data_size)
 
     # Simulate async work with periodic progress updates
-    start_time = asyncio.get_event_loop().time()
+    start_time = asyncio.get_running_loop().time()
     progress_interval = max(10, duration // 10)  # Update progress 10 times during execution
 
     for i in range(duration):
@@ -108,7 +107,7 @@ async def slow_async_op(context: OpExecutionContext, config: SlowOpConfig) -> di
             progress = (i / duration) * 100
             context.log.info("Slow op progress: %.1f%%", progress)
 
-    end_time = asyncio.get_event_loop().time()
+    end_time = asyncio.get_running_loop().time()
     actual_duration = end_time - start_time
 
     result = {
@@ -142,7 +141,7 @@ def data_processing_op(context: OpExecutionContext, input_data: dict[str, Any]) 
 
     processed_data = {
         **input_data,
-        "processed_at": asyncio.get_event_loop().time(),
+        "processed_at": time.time(),
         "processor_op": context.op.name,
         "processing_run_id": context.run_id,
     }
@@ -190,7 +189,7 @@ def aggregation_op(
         "fast_op_result": fast_result,
         "slow_op_result": slow_result,
         "run_id": context.run_id,
-        "aggregated_at": asyncio.get_event_loop().time(),
+        "aggregated_at": time.time(),
     }
 
     context.log.info("Aggregation completed: %s items in %.2fs", total_data, total_duration)

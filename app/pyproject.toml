@@ -111,10 +111,41 @@ reportUnknownVariableType = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+env = [
+    "AWS_DEFAULT_REGION=us-east-1",
+    "AWS_ENDPOINT_URL=http://localhost:4566",
+    "AWS_ACCESS_KEY_ID=test",
+    "AWS_SECRET_ACCESS_KEY=test",
+    "POSTGRES_HOST=localhost",
+    "POSTGRES_PORT=5432",
+    "POSTGRES_USER=test",
+    "POSTGRES_PASSWORD=test",
+    "POSTGRES_DB=test",
+    "TASKIQ_QUEUE_NAME=test-queue.fifo",
+    "TASKIQ_DLQ_NAME=test-dlq.fifo",
+    "ECS_CLUSTER_NAME=test-cluster",
+    "DAGSTER_HOME=/tmp/dagster_test",
+    "DAGSTER_WEBSERVER_HOST=localhost",
+    "DAGSTER_WEBSERVER_PORT=3001",
+    "TASKIQ_WORKER_CONCURRENCY=2",
+    "TASKIQ_VISIBILITY_TIMEOUT=60",
+    "AUTOSCALER_MIN_WORKERS=1",
+    "AUTOSCALER_MAX_WORKERS=5",
+    "AUTOSCALER_SCALE_UP_THRESHOLD=3",
+    "AUTOSCALER_SCALE_DOWN_THRESHOLD=1",
+    "AUTOSCALER_COOLDOWN_SECONDS=30",
+    "LOAD_SIM_JOB_INTERVAL_SECONDS=60",
+    "LOAD_SIM_FAST_JOB_DURATION_BASE=5",
+    "LOAD_SIM_FAST_JOB_DURATION_VARIANCE=2",
+    "LOAD_SIM_SLOW_JOB_DURATION_BASE=30",
+    "LOAD_SIM_SLOW_JOB_DURATION_VARIANCE=10",
+    "LOG_LEVEL=DEBUG",
+]
 
 [dependency-groups]
 dev = [
     "pytest-asyncio>=0.24.0",
+    "pytest-env>=1.1.5",
     "ruff>=0.8.0",
     "pyright>=1.1.390",
     "mypy>=1.18.2",
