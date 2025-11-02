@@ -48,7 +48,7 @@ def create_fifo_queue_with_dlq(
 
     redrive_policy = pulumi.Output.all(dead_letter_queue.arn).apply(
         lambda dql_arn: json.dumps({
-            "deadLetterTargetArn": dql_arn,
+            "deadLetterTargetArn": [dql_arn],
             "maxReceiveCount": redrive_max_receive_count,
         })
     )

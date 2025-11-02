@@ -133,10 +133,11 @@ def create_postgres_database(
         # Performance and monitoring
         enabled_cloudwatch_logs_exports=["postgresql"],
         enable_http_endpoint=False,  # Data API not needed for Dagster
+        monitoring_interval=0,  # Enhanced monitoring disabled
         # IAM and authentication
         iam_database_authentication_enabled=True,
         # Network
-        port=5432,  # Standard PostgreSQL port
+        port=4510,  # Custom port for LocalStack
         # Auto minor version upgrades
         apply_immediately=False,  # Apply changes during maintenance window
         allow_major_version_upgrade=False,
@@ -164,12 +165,12 @@ def create_postgres_database(
         publicly_accessible=publicly_accessible,
         # Performance Insights
         performance_insights_enabled=enable_performance_insights,
-        performance_insights_kms_key_id=kms_key.arn if enable_performance_insights else None,
+        performance_insights_kms_key_id=None,  # Use default KMS key
         performance_insights_retention_period=(
             performance_insights_retention_period if enable_performance_insights else None
         ),
         # Monitoring
-        monitoring_interval=60 if enable_performance_insights else 0,
+        monitoring_interval=0,  # Enhanced monitoring disabled
         # Auto minor version upgrades
         auto_minor_version_upgrade=True,
         apply_immediately=False,
