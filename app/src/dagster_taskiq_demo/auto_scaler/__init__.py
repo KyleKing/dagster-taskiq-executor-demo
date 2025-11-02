@@ -6,8 +6,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import aioboto3
 
@@ -20,7 +19,7 @@ class QueueMetrics:
 
     visible_messages: int
     not_visible_messages: int
-    oldest_message_age_seconds: Optional[int]
+    oldest_message_age_seconds: int | None
     timestamp: datetime
 
 
@@ -41,7 +40,7 @@ class AutoScalerService:
         self.settings = settings
         self.logger = logging.getLogger(__name__)
         self.running = False
-        self.health_server: Optional[asyncio.Server] = None
+        self.health_server: asyncio.Server | None = None
         self.last_scale_time = 0.0
         self.current_worker_count = settings.autoscaler_min_workers
 
@@ -136,12 +135,12 @@ class AutoScalerService:
                 visible_messages=int(attributes["ApproximateNumberOfMessages"]),
                 not_visible_messages=int(attributes["ApproximateNumberOfMessagesNotVisible"]),
                 oldest_message_age_seconds=int(attributes.get("ApproximateAgeOfOldestMessage", 0)) or None,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
         except Exception as e:
             self.logger.exception("Failed to get queue metrics: %s", e)
             # Return zero metrics on error
-            return QueueMetrics(0, 0, None, datetime.now(timezone.utc))
+            return QueueMetrics(0, 0, None, datetime.now(UTC))
 
     def calculate_scaling_decision(self, metrics: QueueMetrics) -> ScalingDecision:
         """Calculate scaling decision based on queue metrics."""
@@ -156,14 +155,25 @@ class AutoScalerService:
         if metrics.visible_messages > scale_up_threshold:
             new_count = min(self.current_worker_count + 1, self.settings.autoscaler_max_workers)
             if new_count > self.current_worker_count:
-                return ScalingDecision("scale_up", new_count, f"visible messages ({metrics.visible_messages}) > threshold ({scale_up_threshold})")
+                return ScalingDecision(
+                    "scale_up",
+                    new_count,
+                    f"visible messages ({metrics.visible_messages}) > threshold ({scale_up_threshold})",
+                )
 
         # Scale down logic
         scale_down_threshold = self.current_worker_count * self.settings.autoscaler_scale_down_threshold
-        if metrics.visible_messages < scale_down_threshold and self.current_worker_count > self.settings.autoscaler_min_workers:
+        if (
+            metrics.visible_messages < scale_down_threshold
+            and self.current_worker_count > self.settings.autoscaler_min_workers
+        ):
             new_count = max(self.current_worker_count - 1, self.settings.autoscaler_min_workers)
             if new_count < self.current_worker_count:
-                return ScalingDecision("scale_down", new_count, f"visible messages ({metrics.visible_messages}) < threshold ({scale_down_threshold})")
+                return ScalingDecision(
+                    "scale_down",
+                    new_count,
+                    f"visible messages ({metrics.visible_messages}) < threshold ({scale_down_threshold})",
+                )
 
         return ScalingDecision("no_action", self.current_worker_count, "within thresholds")
 
@@ -173,8 +183,12 @@ class AutoScalerService:
             return
 
         try:
-            self.logger.info("Executing scaling action: %s to %d workers (%s)",
-                           decision.action, decision.target_count, decision.reason)
+            self.logger.info(
+                "Executing scaling action: %s to %d workers (%s)",
+                decision.action,
+                decision.target_count,
+                decision.reason,
+            )
 
             # Update ECS service
             await self.ecs_client.update_service(
@@ -286,9 +300,12 @@ class AutoScalerService:
             try:
                 # Get queue metrics
                 metrics = await self.get_queue_metrics()
-                self.logger.info("Queue metrics: visible=%d, not_visible=%d, oldest_age=%s",
-                               metrics.visible_messages, metrics.not_visible_messages,
-                               f"{metrics.oldest_message_age_seconds}s" if metrics.oldest_message_age_seconds else "unknown")
+                self.logger.info(
+                    "Queue metrics: visible=%d, not_visible=%d, oldest_age=%s",
+                    metrics.visible_messages,
+                    metrics.not_visible_messages,
+                    f"{metrics.oldest_message_age_seconds}s" if metrics.oldest_message_age_seconds else "unknown",
+                )
 
                 # Emit structured metrics (could be scraped by monitoring systems)
                 self._emit_metrics(metrics)
@@ -325,8 +342,9 @@ class AutoScalerService:
 
         # Alert if queue is getting too old
         if metrics.oldest_message_age_seconds and metrics.oldest_message_age_seconds > 300:  # 5 minutes
-            self.logger.warning("ALERT: Queue oldest message age (%ds) exceeds threshold (300s)",
-                              metrics.oldest_message_age_seconds)
+            self.logger.warning(
+                "ALERT: Queue oldest message age (%ds) exceeds threshold (300s)", metrics.oldest_message_age_seconds
+            )
 
     def _get_queue_url(self) -> str:
         """Get the SQS queue URL."""

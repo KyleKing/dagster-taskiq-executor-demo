@@ -18,11 +18,12 @@ from dagster._core.execution.plan.step import StepKind
 from dagster._core.executor.base import Executor
 from dagster_shared.error import SerializableErrorInfo
 
+from dagster_taskiq_demo.config.settings import Settings
+
 from .app import taskiq_app
 from .broker import LocalStackSqsBroker
 from .models import IdempotencyStorage, get_idempotency_storage
 from .task_payloads import ExecutionResult, IdempotencyRecord, OpExecutionTask, TaskState
-from ..config.settings import Settings
 
 __all__ = [
     "ExecutionResult",
@@ -38,7 +39,6 @@ __all__ = [
 ]
 
 # Import the TaskIQ app instance
-from .app import taskiq_app
 
 
 class TaskIQExecutor(Executor):

@@ -56,12 +56,12 @@ run = [
     "mise -C dagster-taskiq run checks",
 ]
 
-[tasks.fix]
+[tasks.fixes]
 description = "Lint and auto-fix all code (app + deploy + dagster-taskiq)"
 run = [
-    "mise -C app run lint -- --fix",
-    "mise -C deploy run lint -- --fix",
-    "mise -C dagster-taskiq run lint -- --fix",
+    "mise -C app run fixes",
+    "mise -C deploy run fixes",
+    "mise -C dagster-taskiq run fixes",
 ]
 
 # ==============================================================================

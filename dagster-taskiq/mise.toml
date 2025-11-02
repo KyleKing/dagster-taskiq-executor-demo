@@ -30,7 +30,7 @@ sources = ["**/*.py"]
 
 [tasks."lint:power-fix"]
 description = "Attempt to fix all lint errors"
-run = "mise run lint --fix --unsafe-fiuxes"
+run = "mise run lint --fix --unsafe-fixes"
 
 [tasks.mypy]
 description = "Run mypy type checker (pass additional args)"

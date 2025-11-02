@@ -1,7 +1,7 @@
 """Tests for auto-scaler service."""
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -79,7 +79,7 @@ class TestScalingDecision:
     def test_calculate_scaling_decision_scale_up(self, auto_scaler_service: AutoScalerService) -> None:
         """Test scale up decision."""
         auto_scaler_service.current_worker_count = 2
-        metrics = QueueMetrics(12, 0, None, datetime.now(timezone.utc))  # 12 > 2*5 = 10
+        metrics = QueueMetrics(12, 0, None, datetime.now(UTC))  # 12 > 2*5 = 10
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -90,7 +90,7 @@ class TestScalingDecision:
     def test_calculate_scaling_decision_scale_down(self, auto_scaler_service: AutoScalerService) -> None:
         """Test scale down decision."""
         auto_scaler_service.current_worker_count = 4
-        metrics = QueueMetrics(6, 0, None, datetime.now(timezone.utc))  # 6 < 4*2 = 8
+        metrics = QueueMetrics(6, 0, None, datetime.now(UTC))  # 6 < 4*2 = 8
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -98,10 +98,12 @@ class TestScalingDecision:
         assert decision.target_count == 3  # 4 - 1
         assert "visible messages (6)" in decision.reason
 
-    def test_calculate_scaling_decision_no_action_within_thresholds(self, auto_scaler_service: AutoScalerService) -> None:
+    def test_calculate_scaling_decision_no_action_within_thresholds(
+        self, auto_scaler_service: AutoScalerService
+    ) -> None:
         """Test no action when within thresholds."""
         auto_scaler_service.current_worker_count = 4
-        metrics = QueueMetrics(15, 0, None, datetime.now(timezone.utc))  # 15 > 4*2=8, < 4*5=20
+        metrics = QueueMetrics(15, 0, None, datetime.now(UTC))  # 15 > 4*2=8, < 4*5=20
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -112,7 +114,7 @@ class TestScalingDecision:
         """Test cooldown prevents scaling."""
         auto_scaler_service.current_worker_count = 2
         auto_scaler_service.last_scale_time = time.time()  # Current time
-        metrics = QueueMetrics(12, 0, None, datetime.now(timezone.utc))
+        metrics = QueueMetrics(12, 0, None, datetime.now(UTC))
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -122,7 +124,7 @@ class TestScalingDecision:
     def test_calculate_scaling_decision_respects_min_workers(self, auto_scaler_service: AutoScalerService) -> None:
         """Test scale down respects minimum workers."""
         auto_scaler_service.current_worker_count = 2  # Already at minimum
-        metrics = QueueMetrics(2, 0, None, datetime.now(timezone.utc))
+        metrics = QueueMetrics(2, 0, None, datetime.now(UTC))
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -132,7 +134,7 @@ class TestScalingDecision:
     def test_calculate_scaling_decision_respects_max_workers(self, auto_scaler_service: AutoScalerService) -> None:
         """Test scale up respects maximum workers."""
         auto_scaler_service.current_worker_count = 10  # Already at maximum
-        metrics = QueueMetrics(100, 0, None, datetime.now(timezone.utc))
+        metrics = QueueMetrics(100, 0, None, datetime.now(UTC))
 
         decision = auto_scaler_service.calculate_scaling_decision(metrics)
 
@@ -221,7 +223,7 @@ class TestMetricsEmission:
     def test_emit_metrics(self, auto_scaler_service: AutoScalerService) -> None:
         """Test metrics emission."""
         auto_scaler_service.current_worker_count = 3
-        metrics = QueueMetrics(5, 2, 150, datetime.now(timezone.utc))
+        metrics = QueueMetrics(5, 2, 150, datetime.now(UTC))
 
         auto_scaler_service._emit_metrics(metrics)
 
@@ -236,7 +238,7 @@ class TestMetricsEmission:
 
     def test_emit_metrics_alert_on_old_messages(self, auto_scaler_service: AutoScalerService) -> None:
         """Test alert emission for old messages."""
-        metrics = QueueMetrics(1, 0, 350, datetime.now(timezone.utc))  # Over 5 minutes
+        metrics = QueueMetrics(1, 0, 350, datetime.now(UTC))  # Over 5 minutes
 
         auto_scaler_service._emit_metrics(metrics)
 

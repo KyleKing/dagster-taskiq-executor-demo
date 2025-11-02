@@ -84,7 +84,8 @@ class DagsterTaskiqApp:
             # Get the run
             dagster_run = instance.get_run_by_id(task.run_id)
             if not dagster_run:
-                raise ValueError(f"Could not load run {task.run_id}")
+                msg = f"Could not load run {task.run_id}"
+                raise ValueError(msg)
 
             # Create execution plan
             execution_plan = create_execution_plan(
