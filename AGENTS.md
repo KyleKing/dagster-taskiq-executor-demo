@@ -50,25 +50,43 @@ The custom implementation provides the necessary control and integration points 
 
 The project uses:
 - `uv` for Python package management
-- `mise` (jdx/mise) for tool version management
+- `mise` (jdx/mise) for tool version management and task orchestration
 - Docker Compose for LocalStack orchestration
 - Pulumi for infrastructure provisioning
+
+### Mise Tasks
+
+This project uses `mise` to define common development tasks. All tasks support passing additional arguments to the underlying tools.
+
+**Common Tasks:**
+- `mise run install` - Install dependencies for app and deploy
+- `mise run test` - Run tests for app and deploy
+- `mise run lint` - Lint code (pass `--fix` to auto-fix)
+- `mise run format` - Format code (pass `--check` to check only)
+- `mise run typecheck` - Run type checkers
+- `mise run check` - Run all checks (lint + typecheck + test)
+
+**Passing Custom Arguments:**
+```sh
+mise run test -- -v -k "test_name"  # Pass pytest arguments
+mise run lint -- --fix --select F  # Pass ruff arguments
+mise run mypy -- --help             # Get mypy help
+```
+
+**Running Multiple Tasks:**
+```sh
+mise run format ::: lint ::: typecheck  # Run in parallel
+```
 
 ## Project Structure
 
 ```
 ./
 ├── app/                    # Main Python application
-│   ├── src/
-│   │   ├── dagster_jobs/   # Dagster job definitions
-│   │   ├── taskiq_executor/# TaskIQ executor implementation
-│   │   ├── auto_scaler/    # Auto-scaling service
-│   │   └── load_simulator/ # Load testing framework
-│   ├── tests/              # Test suite
-│   └── pyproject.toml      # Python dependencies
-├── deploy/                 # Pulumi infrastructure code
-├── localstack/             # LocalStack configuration
-└── docker-compose.yml      # Container orchestration
+│   ├── src/                # Pyton Dagster Application code
+│   └-─ tests/              # App Test suite
+├── deploy/                 # Pulumi infrastructure as code
+└── docker-compose.yml      # LocalStack service
 ```
 
 ## Getting Started
@@ -82,8 +100,7 @@ The project uses:
 
 2. Deploy the infrastructure with Pulumi:
    ```sh
-   cd deploy
-   uv run pulumi up --yes --stack local
+   mise run up
    ```
    This creates the ECR repository and other AWS resources in LocalStack.
 
@@ -103,7 +120,7 @@ The project uses:
 
 **Infrastructure changes:**
 1. Update Pulumi code
-2. Run: `cd deploy && uv run pulumi up --yes --stack local`
+2. Run: `mise run up`
 
 See individual component READMEs for detailed setup instructions.
 
@@ -114,8 +131,21 @@ See individual component READMEs for detailed setup instructions.
 ## Code Quality & Linting
 
 ```sh
-cd app && uv run ruff format && uv run ruff check --fix && uv run mypy . && uv run pyright && uv run pytest
-cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && uv run pyright && uv run pytest
+# Run all checks across app and deploy
+mise run check
+
+# Or run individual components
+cd app && mise run format && mise run lint --fix && mise run typecheck && mise run test
+cd deploy && mise run format && mise run lint --fix && mise run typecheck && mise run test
+
+# Pass custom arguments to tools
+mise run format --check  # Check formatting without modifying files
+mise run lint --fix      # Auto-fix linting issues
+mise run test -v         # Run tests with verbose output
+mise run mypy --help     # Get help for mypy
+
+# Run multiple tasks in parallel
+mise run format ::: lint ::: typecheck
 ```
 
 ## Python Guidance
@@ -159,28 +189,6 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && u
 
 Keep this file up to date as major changes are made or errors in implementation are corrected
 
-## Project Status
-
-### Stage 01 – TaskIQ Executor Foundation ✅ COMPLETED
-- Implemented TaskIQ executor with SQS-based distributed job execution
-- Added idempotency storage using PostgreSQL
-- Created payload models for task serialization
-- Integrated executor into Dagster jobs
-- Comprehensive testing with interface-level mocks
-
-### Stage 02 – TaskIQ Worker Runtime ✅ COMPLETED
-- Built TaskIQ worker service consuming from SQS queues
-- Implemented worker lifecycle management with graceful shutdown
-- Added HTTP health check endpoint for ECS monitoring
-- Created CLI entrypoint for worker execution
-- Updated Pulumi infrastructure for ECS task definitions
-- Configured container commands and environment variables
-- Integrated health checks and logging
-
-### Next Steps
-- Stage 03: Implement auto-scaling based on queue depth
-- Stage 04: Add load simulation and performance testing
-
 ## Collaboration & Git Workflow
 
 - Assume a human operator is actively managing the git repository state in real time.
@@ -189,10 +197,10 @@ Keep this file up to date as major changes are made or errors in implementation 
 
 ## Automation Notes
 
-- **Pulumi runs locally**: No Docker container required for Pulumi - just run `cd deploy && uv run pulumi <command>` directly
+- **Pulumi runs locally**: No Docker container required for Pulumi - just run `mise run <pulumi-task>` (e.g., `mise run up`, `mise run preview`)
 - **Docker Bake for builds**: Images are built using Docker Bake (see `docker-bake.hcl`) via `./scripts/build-and-push.sh`
 - **Image Build Separation**: Docker images are built and pushed separately from Pulumi using `./scripts/build-and-push.sh` and the `awslocal` CLI. This avoids networking complexity and uses LocalStack's well-tested workflow.
-- When validating changes, run `cd deploy && uv run pulumi preview --stack local`
+- When validating changes, run `mise run preview`
 - If Pulumi doesn't stop and is running for more than 10 minutes, that likely means there was a failure and the logs from Docker Compose LocalStack need to be inspected. Do not let Pulumi run for more than 10 minutes. If Pulumi is stopped (Ctrl-C twice), then a human must run `cd deploy && pulumi cancel` and reconfirm the stack name to release the lock
 - Pulumi commands must include `--yes` for automated deployments so the CLI never waits for manual confirmation.
 

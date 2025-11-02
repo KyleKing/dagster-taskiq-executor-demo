@@ -12,31 +12,21 @@ run = "uv sync --all-groups"
 sources = ["pyproject.toml", "uv.lock"]
 
 [tasks.test]
-description = "Run deploy tests with pytest"
+description = "Run deploy tests with pytest (pass additional args)"
 alias = "t"
 run = "uv run pytest"
 sources = ["**/*.py", "tests/**/*.py"]
 
 [tasks.lint]
-description = "Lint deploy code with ruff"
+description = "Lint deploy code with ruff (pass --fix to auto-fix)"
 alias = "l"
-run = "uv run ruff check ."
-sources = ["**/*.py", "tests/**/*.py"]
-
-[tasks."lint:fix"]
-description = "Lint and auto-fix issues"
-run = "uv run ruff check --fix ."
+run = "uv run ruff check"
 sources = ["**/*.py", "tests/**/*.py"]
 
 [tasks.format]
-description = "Format deploy code with ruff"
+description = "Format deploy code with ruff (pass --check to check only)"
 alias = "f"
-run = "uv run ruff format ."
-sources = ["**/*.py", "tests/**/*.py"]
-
-[tasks."format:check"]
-description = "Check formatting without modifying files"
-run = "uv run ruff format --check ."
+run = "uv run ruff format"
 sources = ["**/*.py", "tests/**/*.py"]
 
 [tasks.typecheck]
@@ -48,13 +38,13 @@ run = [
 ]
 sources = ["**/*.py"]
 
-[tasks."typecheck:mypy"]
-description = "Run mypy type checker"
-run = "uv run mypy ."
+[tasks.mypy]
+description = "Run mypy type checker (pass additional args)"
+run = "uv run mypy"
 sources = ["**/*.py"]
 
-[tasks."typecheck:pyright"]
-description = "Run pyright type checker"
+[tasks.pyright]
+description = "Run pyright type checker (pass additional args)"
 run = "uv run pyright"
 sources = ["**/*.py"]
 

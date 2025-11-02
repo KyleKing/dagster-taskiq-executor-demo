@@ -3,10 +3,27 @@
 This repository bootstraps a LocalStack container preconfigured with ECS and SQS so you can prototype AWS integrations locally.
 
 ## Prerequisites
-- `mise` (`brew install mise` and `mise install`) - manages tool versions (pulumi, uv, etc.)
+- `mise` (`brew install mise` and `mise install`) - manages tool versions and provides development tasks
 - Docker Desktop (or compatible Docker engine)
 - `awslocal` CLI (`uvx awscli-local` or `mise use pipx:awscli-local`) - **required** for pushing Docker images to LocalStack ECR
 - LocalStack Pro API key (`LOCALSTACK_AUTH_TOKEN`) to unlock ECS, RDS, Cloud Map, and ALB emulation
+
+## Development Tasks
+
+This project uses `mise` to define common development tasks:
+
+```bash
+mise run install    # Install dependencies
+mise run test       # Run tests
+mise run lint       # Lint code (pass --fix to auto-fix)
+mise run format     # Format code (pass --check to check only)
+mise run typecheck  # Run type checkers
+mise run up         # Deploy infrastructure
+mise run push       # Build and push Docker image
+```
+
+Pass custom arguments: `mise run test -- -v -k "test_name"`
+Run multiple tasks in parallel: `mise run format ::: lint ::: typecheck`
 
 ## Usage
 1. Set your LocalStack Pro token in `.env`
@@ -41,8 +58,7 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
 
 2. Deploy the infrastructure:
    ```bash
-   cd deploy
-   uv run pulumi up --yes --stack local
+   mise run up
    ```
    This creates the ECR repository and other AWS resources. The stack configuration (`Pulumi.local.yaml`) targets LocalStack at `http://localstack:4566`.
 
@@ -62,15 +78,13 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
 
 **Infrastructure changes:**
 ```bash
-cd deploy
-uv run pulumi up --yes --stack local
+mise run up
 ```
 
 **Configuration updates:**
 ```bash
-cd deploy
-uv run pulumi config set queueName my-queue --stack local
-uv run pulumi up --yes --stack local
+cd deploy && mise run config set queueName my-queue
+mise run up
 ```
 
 ## Configuration
@@ -84,6 +98,6 @@ Update these variables in your shell environment or in a `.env` file that Docker
 ## Notes
 - **Docker Bake**: Uses Docker Bake (see `docker-bake.hcl`) for declarative, reproducible container image builds
 - **Image Build Separation**: Docker images are built and pushed separately from Pulumi using `./scripts/build-and-push.sh` and the `awslocal` CLI. This avoids networking complexity with Pulumi's docker-build provider and uses LocalStack's well-tested workflow.
-- **Local Pulumi**: Pulumi runs directly on your machine (no Docker container needed) - just use `cd deploy && uv run pulumi <command>`
+- **Local Pulumi**: Pulumi runs directly on your machine (no Docker container needed) - just use `mise run <pulumi-task>` (e.g., `mise run up`, `mise run preview`)
 - ECS support requires Docker access inside the LocalStack container. The compose file mounts the host Docker socket for this purpose.
 - LocalStack Pro is required for all ECS, RDS, Service Discovery, and Application Load Balancer APIs used in this demo. Without a valid `LOCALSTACK_AUTH_TOKEN` Pulumi will fail with `InvalidClientTokenId` or `InternalFailure` responses from LocalStack.
