@@ -89,9 +89,45 @@ cd deploy && uv run ruff format && uv run ruff check --fix && uv run mypy . && u
 ## Pulumi Guidance
 
 - Follow above Python guidance and Pulumi best practices, additionally follow:
-- Implement reusable infrastructure helpers as functions that return dataclasses (e.g. `create_postgres_database`) instead of component subclasses. Functions live under `deploy/components/` and each module must remain independently importable (no re-exporting `__init__.py`).
 - Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
 - Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
+
+### Infrastructure Organization: `components/` vs `modules/`
+
+Use two-tier infrastructure organization to balance reusability and application-specific needs:
+
+**`deploy/components/`** - Low-level, generic, reusable infrastructure primitives
+- Purpose: Provide thin wrappers around AWS resources with sensible defaults
+- Examples: VPC/network utilities, ECS cluster setup, RDS databases, SQS queues, ECS task definition helpers
+- Characteristics:
+  - Technology-focused (e.g., "create an SQS FIFO queue with DLQ")
+  - Highly reusable across different projects
+  - Minimal business logic or application-specific configuration
+  - Functions that return dataclasses (e.g., `create_postgres_database`)
+  - Each module must remain independently importable (no re-exporting `__init__.py`)
+  - Can include helper utilities to reduce common Pulumi boilerplate (e.g., `ecs_helpers.py` for task definitions)
+
+**`deploy/modules/`** - Higher-level, application-specific infrastructure bundles
+- Purpose: Compose components into complete, application-ready infrastructure packages
+- Examples: Complete Dagster deployment (web UI, daemon, security, load balancer), TaskIQ worker infrastructure (queues, workers, IAM)
+- Characteristics:
+  - Application-focused (e.g., "set up complete Dagster infrastructure")
+  - Bundle multiple components with application-specific configuration
+  - Contain business logic and opinionated defaults for the specific use case
+  - Return comprehensive dataclasses containing all created resources
+  - May create IAM policies, security groups, and other application-specific glue
+
+**Decision Guidelines:**
+1. Can this be reused in a completely different project with minimal changes? → `components/`
+2. Does it bundle multiple AWS resources specifically for this application? → `modules/`
+3. Does it need to know about application-level concerns (like Dagster or TaskIQ)? → `modules/`
+4. Is it a pure AWS infrastructure primitive with minimal configuration? → `components/`
+
+**Examples:**
+- `components/sqs_fifo.py` - Generic FIFO queue creation (reusable)
+- `modules/taskiq.py` - TaskIQ-specific queue + worker + IAM bundle (application-specific)
+- `components/ecs_helpers.py` - Common task definition patterns (reusable)
+- `modules/dagster.py` - Complete Dagster deployment with UI, security, discovery (application-specific)
 
 ---
 

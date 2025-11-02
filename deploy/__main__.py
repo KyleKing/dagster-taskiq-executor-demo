@@ -2,26 +2,26 @@
 
 from __future__ import annotations
 
+import json
+
 import pulumi
 import pulumi_aws as aws
+from pulumi_aws import ec2, iam
 
 from components.ecs_cluster import create_ecs_cluster
-from components.iam import create_ecs_iam_roles
-from components.load_balancer import create_load_balancer
 from components.network import fetch_default_network
 from components.provider import LocalStackProviderConfig, create_localstack_provider
 from components.rds_postgres import create_postgres_database
-from components.security import create_dagster_security_group
-from components.service_discovery import create_service_discovery
-from components.sqs_fifo import attach_queue_access_policy, create_fifo_queue_with_dlq
-from components.task_definitions import create_task_definitions
 from config import StackSettings
+from modules.dagster import create_dagster_infrastructure
+from modules.taskiq import create_taskiq_infrastructure
 
 
 def main() -> None:
     """Provision the Dagster TaskIQ infrastructure on LocalStack."""
     settings = StackSettings.load()
 
+    # Create LocalStack provider
     provider = create_localstack_provider(
         "localstack",
         LocalStackProviderConfig(
@@ -32,57 +32,69 @@ def main() -> None:
         ),
     )
 
+    # Fetch networking resources
     network = fetch_default_network(provider=provider)
 
-    security_group = create_dagster_security_group(
-        "dagster-sg",
+    # Create shared ECS execution role
+    execution_role = iam.Role(
+        "ecs-execution-role",
+        name=f"{settings.project.name}-ecs-execution-{settings.project.environment}",
+        assume_role_policy=json.dumps({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": "sts:AssumeRole",
+                    "Effect": "Allow",
+                    "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+                }
+            ],
+        }),
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    iam.RolePolicyAttachment(
+        "ecs-execution-policy",
+        role=execution_role.name,
+        policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    # Create ECS cluster
+    cluster = create_ecs_cluster(
+        "dagster-cluster",
         provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+    )
+
+    # Create PostgreSQL database first (with placeholder security group)
+    # We'll create the security group separately
+    # Create security group for database access
+    db_security_group = ec2.SecurityGroup(
+        "dagster-db-sg",
+        name=f"{settings.project.name}-db-{settings.project.environment}",
+        description="Security group for PostgreSQL database",
         vpc_id=network.vpc.id,
-        project_name=settings.project.name,
-        environment=settings.project.environment,
+        opts=pulumi.ResourceOptions(provider=provider),
     )
 
-    queues = create_fifo_queue_with_dlq(
-        "taskiq",
-        provider=provider,
-        queue_name=f"{settings.project.name}-taskiq-{settings.project.environment}.fifo",
-        dlq_name=f"{settings.project.name}-taskiq-dlq-{settings.project.environment}.fifo",
-        message_retention_seconds=settings.queue.message_retention_seconds,
-        queue_visibility_timeout=settings.queue.visibility_timeout,
-        dlq_visibility_timeout=settings.queue.dlq_visibility_timeout,
-        redrive_max_receive_count=settings.queue.redrive_max_receive_count,
+    ec2.SecurityGroupRule(
+        "db-postgres-ingress",
+        type="ingress",
+        security_group_id=db_security_group.id,
+        from_port=5432,
+        to_port=5432,
+        protocol="tcp",
+        cidr_blocks=["10.0.0.0/8"],
+        description="PostgreSQL access from LocalStack network",
+        opts=pulumi.ResourceOptions(provider=provider, parent=db_security_group),
     )
-
-    iam_roles = create_ecs_iam_roles(
-        "ecs-iam",
-        provider=provider,
-        project_name=settings.project.name,
-        environment=settings.project.environment,
-        queue_arn=queues.queue.arn,
-        dlq_arn=queues.dead_letter_queue.arn,
-    )
-
-    attach_queue_access_policy(
-        "taskiq",
-        provider=provider,
-        queues=queues,
-        principal_arns=pulumi.Output.from_input(iam_roles.task_role.arn).apply(lambda arn: [arn]),
-        actions=[
-            "sqs:SendMessage",
-            "sqs:ReceiveMessage",
-            "sqs:DeleteMessage",
-            "sqs:GetQueueAttributes",
-            "sqs:ChangeMessageVisibility",
-        ],
-    )
-
-    security_group_output = pulumi.Output.from_input(security_group.security_group.id).apply(lambda sg: [sg])
 
     database = create_postgres_database(
         "dagster-db",
         provider=provider,
         subnet_ids=network.subnets.ids,
-        security_group_ids=[security_group.security_group.id],
+        security_group_ids=[db_security_group.id],
         db_name=settings.database.db_name,
         username=settings.database.username,
         password=settings.database.password,
@@ -94,15 +106,9 @@ def main() -> None:
         environment=settings.project.environment,
     )
 
-    cluster = create_ecs_cluster(
-        "dagster-cluster",
-        provider=provider,
-        project_name=settings.project.name,
-        environment=settings.project.environment,
-    )
-
-    tasks = create_task_definitions(
-        "dagster-tasks",
+    # Create TaskIQ infrastructure module
+    taskiq = create_taskiq_infrastructure(
+        "taskiq",
         provider=provider,
         project_name=settings.project.name,
         environment=settings.project.environment,
@@ -110,37 +116,39 @@ def main() -> None:
         container_image=settings.services.image,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database.instance.endpoint,
-        queue_url=queues.queue.id,
-        dlq_url=queues.dead_letter_queue.id,
-        cluster_name=cluster.cluster.name,
-        execution_role_arn=iam_roles.execution_role.arn,
-        task_role_arn=iam_roles.task_role.arn,
+        execution_role_arn=execution_role.arn,
+        message_retention_seconds=settings.queue.message_retention_seconds,
+        queue_visibility_timeout=settings.queue.visibility_timeout,
+        dlq_visibility_timeout=settings.queue.dlq_visibility_timeout,
+        redrive_max_receive_count=settings.queue.redrive_max_receive_count,
     )
 
-    service_discovery = create_service_discovery(
-        "dagster-discovery",
+    # Create Dagster infrastructure module
+    dagster = create_dagster_infrastructure(
+        "dagster",
         provider=provider,
         project_name=settings.project.name,
         environment=settings.project.environment,
+        region=settings.aws.region,
         vpc_id=network.vpc.id,
-    )
-
-    load_balancer = create_load_balancer(
-        "dagster-alb",
-        provider=provider,
-        project_name=settings.project.name,
-        environment=settings.project.environment,
         subnet_ids=network.subnets.ids,
-        security_group_ids=[security_group.security_group.id],
-        vpc_id=network.vpc.id,
+        container_image=settings.services.image,
+        aws_endpoint_url=settings.aws.endpoint,
+        database_endpoint=database.instance.endpoint,
+        queue_url=taskiq.queues.queue.id,
+        cluster_name=cluster.cluster.name,
+        execution_role_arn=execution_role.arn,
     )
+
+    # Create ECS services
+    security_group_output = pulumi.Output.from_input(dagster.security_group.id).apply(lambda sg: [sg])
 
     dagster_daemon_service = aws.ecs.Service(
         "dagster-daemon-service",
         aws.ecs.ServiceArgs(
             name=f"{settings.project.name}-daemon-{settings.project.environment}",
             cluster=cluster.cluster.id,
-            task_definition=tasks.dagster_daemon.arn,
+            task_definition=dagster.daemon_task_definition.arn,
             desired_count=settings.services.daemon_desired_count,
             launch_type="FARGATE",
             network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
@@ -149,7 +157,7 @@ def main() -> None:
                 assign_public_ip=True,
             ),
             service_registries=aws.ecs.ServiceServiceRegistriesArgs(
-                registry_arn=service_discovery.daemon_service.arn,
+                registry_arn=dagster.daemon_service_discovery.arn,
             ),
         ),
         opts=pulumi.ResourceOptions(provider=provider),
@@ -160,7 +168,7 @@ def main() -> None:
         aws.ecs.ServiceArgs(
             name=f"{settings.project.name}-webserver-{settings.project.environment}",
             cluster=cluster.cluster.id,
-            task_definition=tasks.dagster_webserver.arn,
+            task_definition=dagster.webserver_task_definition.arn,
             desired_count=settings.services.webserver_desired_count,
             launch_type="FARGATE",
             network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
@@ -170,16 +178,16 @@ def main() -> None:
             ),
             load_balancers=[
                 aws.ecs.ServiceLoadBalancerArgs(
-                    target_group_arn=load_balancer.target_group.arn,
+                    target_group_arn=dagster.target_group.arn,
                     container_name="dagster-webserver",
                     container_port=3000,
                 )
             ],
             service_registries=aws.ecs.ServiceServiceRegistriesArgs(
-                registry_arn=service_discovery.webserver_service.arn,
+                registry_arn=dagster.webserver_service_discovery.arn,
             ),
         ),
-        opts=pulumi.ResourceOptions(provider=provider, depends_on=[load_balancer.listener]),
+        opts=pulumi.ResourceOptions(provider=provider, depends_on=[dagster.listener]),
     )
 
     taskiq_worker_service = aws.ecs.Service(
@@ -187,7 +195,7 @@ def main() -> None:
         aws.ecs.ServiceArgs(
             name=f"{settings.project.name}-workers-{settings.project.environment}",
             cluster=cluster.cluster.id,
-            task_definition=tasks.taskiq_worker.arn,
+            task_definition=taskiq.worker_task_definition.arn,
             desired_count=settings.services.worker_desired_count,
             launch_type="FARGATE",
             network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
@@ -200,27 +208,28 @@ def main() -> None:
     )
 
     # Stack outputs to simplify debugging and downstream configuration.
-    pulumi.export("queue_url", queues.queue.id)
-    pulumi.export("queue_arn", queues.queue.arn)
-    pulumi.export("dlq_url", queues.dead_letter_queue.id)
-    pulumi.export("dlq_arn", queues.dead_letter_queue.arn)
+    pulumi.export("queue_url", taskiq.queues.queue.id)
+    pulumi.export("queue_arn", taskiq.queues.queue.arn)
+    pulumi.export("dlq_url", taskiq.queues.dead_letter_queue.id)
+    pulumi.export("dlq_arn", taskiq.queues.dead_letter_queue.arn)
     pulumi.export("cluster_arn", cluster.cluster.arn)
     pulumi.export("cluster_name", cluster.cluster.name)
-    pulumi.export("task_role_arn", iam_roles.task_role.arn)
-    pulumi.export("execution_role_arn", iam_roles.execution_role.arn)
-    pulumi.export("security_group_id", security_group.security_group.id)
+    pulumi.export("dagster_task_role_arn", dagster.task_role.arn)
+    pulumi.export("taskiq_task_role_arn", taskiq.task_role.arn)
+    pulumi.export("execution_role_arn", execution_role.arn)
+    pulumi.export("security_group_id", dagster.security_group.id)
     pulumi.export("vpc_id", network.vpc.id)
     pulumi.export("subnet_ids", network.subnets.ids)
     pulumi.export("rds_endpoint", database.instance.endpoint)
     pulumi.export("rds_port", database.instance.port)
     pulumi.export("rds_db_name", database.instance.db_name)
-    pulumi.export("alb_dns_name", load_balancer.load_balancer.dns_name)
-    pulumi.export("alb_zone_id", load_balancer.load_balancer.zone_id)
-    pulumi.export("service_discovery_namespace", service_discovery.namespace.name)
+    pulumi.export("alb_dns_name", dagster.load_balancer.dns_name)
+    pulumi.export("alb_zone_id", dagster.load_balancer.zone_id)
+    pulumi.export("service_discovery_namespace", dagster.service_discovery_namespace.name)
     pulumi.export("dagster_daemon_service_name", dagster_daemon_service.name)
     pulumi.export("dagster_webserver_service_name", dagster_webserver_service.name)
     pulumi.export("taskiq_worker_service_name", taskiq_worker_service.name)
-    pulumi.export("dagster_web_url", pulumi.Output.concat("http://", load_balancer.load_balancer.dns_name))
+    pulumi.export("dagster_web_url", pulumi.Output.concat("http://", dagster.load_balancer.dns_name))
 
 
 main()
