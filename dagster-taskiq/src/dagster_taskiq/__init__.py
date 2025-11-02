@@ -19,10 +19,11 @@ from dagster._core.execution.plan.objects import StepFailureData, StepSuccessDat
 from dagster._core.execution.plan.step import StepKind
 from dagster._core.executor.base import Executor
 from dagster._core.execution.retries import RetryMode
+from dagster._serdes import pack_value
 from dagster_shared.error import SerializableErrorInfo
 
-from .broker import SqsBroker
-from .models import IdempotencyStorage, get_idempotency_storage
+from .broker import LocalStackSqsBroker, SqsBroker
+from .models import IdempotencyStorage, PostgreSQLIdempotencyStorage, get_idempotency_storage
 from .task_payloads import ExecutionResult, IdempotencyRecord, OpExecutionTask, TaskState
 from .worker import TaskIQWorker
 
@@ -30,7 +31,9 @@ __all__ = [
     "ExecutionResult",
     "IdempotencyRecord",
     "IdempotencyStorage",
+    "LocalStackSqsBroker",
     "OpExecutionTask",
+    "PostgreSQLIdempotencyStorage",
     "SqsBroker",
     "TaskIQExecutor",
     "TaskIQWorker",
@@ -104,7 +107,7 @@ class TaskIQExecutor(Executor):
             step_keys_to_execute=[step_key],
             instance_ref_dict=plan_context.instance.get_ref().to_dict(),
             reconstructable_job_dict=plan_context.reconstructable_job.to_dict(),
-            retry_mode_dict=self.retries.to_dict(),
+            retry_mode_dict=pack_value(self.retries),
             known_state_dict=None,  # TODO: implement known state
         )
 
@@ -190,13 +193,28 @@ class TaskIQExecutor(Executor):
     def _yield_completion_events(self, plan_context: Any, step: Any, state: TaskState) -> Iterator[DagsterEvent]:
         """Yield completion events for a step."""
         step_context = plan_context.for_step(step)
+        idempotency_key = f"{plan_context.run_id}:{step.key}"
+        record = self._idempotency_storage.get_record(idempotency_key)
 
         if state == TaskState.COMPLETED:
-            yield DagsterEvent.step_success_event(step_context, StepSuccessData(duration_ms=0.0))
+            duration_ms = 0.0
+            if record and record.result_data:
+                try:
+                    result = ExecutionResult.from_json(record.result_data)
+                    duration_ms = (result.execution_time_seconds or 0.0) * 1000.0
+                except Exception:
+                    pass
+            yield DagsterEvent.step_success_event(step_context, StepSuccessData(duration_ms=duration_ms))
         elif state == TaskState.FAILED:
-            idempotency_key = f"{plan_context.run_id}:{step.key}"
-            record = self._idempotency_storage.get_record(idempotency_key)
-            error_msg = record.result_data if record and record.result_data else "Unknown error"
+            error_msg = "Unknown error"
+            if record and record.result_data:
+                try:
+                    result = ExecutionResult.from_json(record.result_data)
+                    error_msg = result.error or "Unknown error"
+                except Exception:
+                    error_msg = record.result_data
+            else:
+                error_msg = record.result_data if record and record.result_data else "Unknown error"
 
             yield DagsterEvent.step_failure_event(
                 step_context=step_context,

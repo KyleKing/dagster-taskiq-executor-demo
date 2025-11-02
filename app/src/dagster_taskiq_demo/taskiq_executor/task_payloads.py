@@ -20,16 +20,16 @@ class OpExecutionTask(BaseModel):
     """Task payload for executing a Dagster op."""
 
     run_id: str = Field(description="Dagster run ID")
-    step_key: str = Field(description="Dagster step key")
-    op_name: str = Field(description="Name of the op to execute")
-    op_config: dict[str, Any] = Field(default_factory=dict, description="Configuration for the op")
-    inputs: dict[str, Any] = Field(default_factory=dict, description="Input values for the op")
-    retry_count: int = Field(default=0, description="Number of retries attempted")
+    step_keys_to_execute: list[str] = Field(description="Step keys to execute")
+    instance_ref_dict: dict[str, Any] = Field(description="Serialized instance reference")
+    reconstructable_job_dict: dict[str, Any] = Field(description="Reconstructable job dict")
+    retry_mode_dict: dict[str, Any] = Field(description="Retry mode configuration")
+    known_state_dict: dict[str, Any] | None = Field(default=None, description="Known execution state")
 
     @property
     def idempotency_key(self) -> str:
         """Generate unique idempotency key for this task."""
-        return f"{self.run_id}:{self.step_key}"
+        return f"{self.run_id}:{','.join(self.step_keys_to_execute)}"
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
@@ -45,7 +45,7 @@ class ExecutionResult(BaseModel):
     """Result of task execution."""
 
     run_id: str = Field(description="Dagster run ID")
-    step_key: str = Field(description="Dagster step key")
+    step_keys: list[str] = Field(description="Dagster step keys executed")
     state: TaskState = Field(description="Final execution state")
     output: Any = Field(default=None, description="Op output value")
     error: str | None = Field(default=None, description="Error message if failed")
@@ -56,7 +56,7 @@ class ExecutionResult(BaseModel):
     @property
     def idempotency_key(self) -> str:
         """Generate unique idempotency key for this result."""
-        return f"{self.run_id}:{self.step_key}"
+        return f"{self.run_id}:{','.join(self.step_keys)}"
 
     def to_json(self) -> str:
         """Serialize to JSON string."""

@@ -37,7 +37,8 @@ class DagsterTaskiqApp:
         try:
             # Parse task
             task = OpExecutionTask.from_json(task_data)
-            self.logger.info("Processing task for step %s in run %s", task.step_key, task.run_id)
+            step_keys_str = ", ".join(task.step_keys_to_execute)
+            self.logger.info("Processing task for steps %s in run %s", step_keys_str, task.run_id)
 
             # Check idempotency - if already completed, skip
             if self.idempotency_storage.is_completed(task.idempotency_key):
@@ -65,39 +66,81 @@ class DagsterTaskiqApp:
                 self.logger.exception("Could not update idempotency state for failed task")
 
     async def _execute_step(self, task: OpExecutionTask) -> ExecutionResult:
-        """Execute a Dagster step and return the result."""
+        """Execute a Dagster step."""
+        from dagster import DagsterInstance
+        from dagster._core.definitions.reconstruct import ReconstructableJob
+        from dagster._core.execution.api import create_execution_plan, execute_plan_iterator
+        from dagster._serdes import unpack_value
+
         started_at = datetime.now(UTC)
 
         try:
-            # TODO: Implement proper step execution using Dagster APIs
-            # For now, we'll simulate execution since full reconstruction is complex
-            self.logger.info("Simulating execution of step %s for run %s", task.step_key, task.run_id)
+            # Reconstruct the instance
+            instance = DagsterInstance.from_ref(unpack_value(task.instance_ref_dict))
 
-            # Simulate some work
-            await asyncio.sleep(1.0)
+            # Reconstruct the job
+            recon_job = ReconstructableJob.from_dict(task.reconstructable_job_dict)
 
-            # Mock successful result
+            # Get the run
+            dagster_run = instance.get_run_by_id(task.run_id)
+            if not dagster_run:
+                raise ValueError(f"Could not load run {task.run_id}")
+
+            # Create execution plan
+            execution_plan = create_execution_plan(
+                recon_job,
+                dagster_run.run_config,
+                step_keys_to_execute=task.step_keys_to_execute,
+                known_state=unpack_value(task.known_state_dict) if task.known_state_dict else None,
+            )
+
+            # Execute the plan
+            step_keys_str = ", ".join(task.step_keys_to_execute)
+            self.logger.info("Executing steps %s in TaskIQ worker", step_keys_str)
+
+            # Report engine event
+            engine_event = instance.report_engine_event(
+                f"Executing steps {step_keys_str} in TaskIQ worker",
+                dagster_run,
+                None,  # EngineEventData
+                None,  # executor
+            )
+
+            # Execute and collect events
+            events = [engine_event]
+            for step_event in execute_plan_iterator(
+                execution_plan=execution_plan,
+                job=recon_job,
+                dagster_run=dagster_run,
+                instance=instance,
+                retry_mode=unpack_value(task.retry_mode_dict),
+                run_config=dagster_run.run_config,
+            ):
+                events.append(step_event)
+
             completed_at = datetime.now(UTC)
             execution_time = (completed_at - started_at).total_seconds()
 
+            self.logger.info("Completed execution of steps %s", step_keys_str)
+
             return ExecutionResult(
                 run_id=task.run_id,
-                step_key=task.step_key,
+                step_keys=task.step_keys_to_execute,
                 state=TaskState.COMPLETED,
-                output={"mock_output": "success"},
+                output={"events": [event.to_dict() for event in events]},
                 started_at=started_at,
                 completed_at=completed_at,
                 execution_time_seconds=execution_time,
             )
 
         except Exception as e:
-            self.logger.exception("Error executing step %s: %s", task.step_key, e)
+            self.logger.exception("Error executing steps %s: %s", ", ".join(task.step_keys_to_execute), e)
             completed_at = datetime.now(UTC)
             execution_time = (completed_at - started_at).total_seconds()
 
             return ExecutionResult(
                 run_id=task.run_id,
-                step_key=task.step_key,
+                step_keys=task.step_keys_to_execute,
                 state=TaskState.FAILED,
                 error=str(e),
                 started_at=started_at,
