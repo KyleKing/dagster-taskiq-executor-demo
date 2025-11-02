@@ -5,38 +5,40 @@
 - Provide operational entrypoints and container wiring so ECS services created by Pulumi can run workers.
 
 ## Current State
-- Stage 01 will expose payload contracts and the `DagsterTaskIQExecutor`.
-- `app/src/dagster_taskiq/taskiq_executor` lacks a worker implementation, CLI entrypoints, or feedback channel to Dagster.
-- Pulumi module `deploy/modules/taskiq.py` creates an ECS task definition but the container currently has no worker command or health endpoints.
+- ✅ Stage 01 exposes payload contracts and the `TaskIQExecutor`.
+- ✅ Worker application structure implemented in `app.py` with SQS message consumption.
+- ✅ CLI entrypoint implemented in `worker.py` for container execution.
+- ✅ ECS task definitions updated with worker command and health checks.
+- ✅ Graceful shutdown handling and health server implemented.
+- ✅ Basic worker tests implemented.
+- ❌ **Still needs work**: Actual Dagster step execution (currently simulated), result reporting via Dagster APIs.
 
-## Tasks
-1. **Implement TaskIQ application wiring**
-   - Create a module (e.g., `taskiq_executor/app.py`) defining a `TaskiqApp` bound to the LocalStack SQS broker wrapper.
-   - Register a consumer function (e.g., `@taskiq_app.task`) that accepts `OpExecutionTask`, rehydrates Dagster execution context, and invokes the target step.
-   - Reuse Dagster's `reconstructable` or `execute_step` APIs to execute work using the same repository code deployed in the container.
+## Remaining Tasks
 
-2. **Result reporting and acknowledgment**
-   - Upon success, write completion events back via Dagster instance APIs (`report_engine_event`, `handle_new_event`) and update idempotency state.
-   - On failure, capture traceback, increment retry counters, and decide whether to requeue, dead-letter, or mark as failed.
-   - Ensure the worker explicitly deletes the SQS message only after durable result persistence.
+1. **Implement actual Dagster step execution**
+    - Replace simulated execution in `_execute_step()` with real Dagster step execution.
+    - Use Dagster's `reconstructable` and `execute_step` APIs to run ops in the worker.
+    - Handle step context reconstruction and resource management properly.
 
-3. **Operational controls**
-   - Add graceful shutdown handling (catch `SIGTERM`/`SIGINT`, finish in-flight tasks, flush logs).
-   - Expose a lightweight HTTP/health check endpoint inside the container for ECS health probes (reuse `aiohttp` or `fastapi` if needed, otherwise simple `asyncio.start_server`).
-   - Respect settings such as `taskiq_worker_concurrency` and `taskiq_visibility_timeout`.
+2. **Add result reporting via Dagster APIs**
+    - Implement proper result reporting using `DagsterInstance.report_engine_event()`.
+    - Write completion/failure events back to Dagster's event log.
+    - Ensure idempotency state updates happen after successful event reporting.
 
-4. **Container & CLI integration**
-   - Provide an executable entrypoint (e.g., `python -m dagster_taskiq.taskiq_executor.worker` or a console script) that starts the TaskIQ worker loop.
-   - Update `app/Dockerfile` to include the new entrypoint and configure `CMD`/`ENTRYPOINT` overrides for worker vs. daemon tasks.
-   - Adjust Pulumi `create_taskiq_infrastructure` to set `command`/`entryPoint` for the ECS container, inject queue URLs via environment variables, and configure health check command to hit the new endpoint.
+3. **Implement retry and failure handling**
+    - Add logic to decide whether to requeue, dead-letter, or mark tasks as failed.
+    - Implement retry counters and exponential backoff for transient failures.
+    - Ensure SQS message deletion only after durable result persistence.
 
-5. **Testing**
-   - Add integration-style tests that invoke the worker task function directly with a fake Dagster instance and broker stub.
-   - Mock SQS interactions using `botocore.stub` or a purpose-built FIFO queue stub to keep tests fast.
-   - Validate graceful shutdown path via unit test (e.g., simulate cancel scopes).
+4. **Add graceful shutdown for in-flight tasks**
+    - Implement proper cancellation of in-flight step executions during shutdown.
+    - Wait for current tasks to complete or timeout before shutting down.
+    - Handle SIGTERM/SIGINT signals to allow clean worker termination.
 
 ## Exit Criteria
-- Worker code can execute Dagster ops dispatched by the executor and persist outcomes.
-- ECS worker task definition uses the new worker command and passes health checks.
-- Tests covering worker execution, result handling, and idempotency updates pass locally.
-- Documentation in `AGENTS.md`/`README.md` updated to explain how to run the worker service.
+- Worker executes actual Dagster ops using proper APIs, not simulation.
+- Results are reported back to Dagster via instance APIs and event log.
+- Worker handles failures with appropriate retry/dead-letter logic.
+- Graceful shutdown completes in-flight tasks before termination.
+- ECS worker services run successfully with health checks.
+- Integration tests validate end-to-end worker execution flow.

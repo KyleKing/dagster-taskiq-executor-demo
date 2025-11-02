@@ -43,6 +43,26 @@ The TaskIQ framework was evaluated but ultimately not used for the following rea
 
 The custom implementation provides the necessary control and integration points while maintaining compatibility with TaskIQ's naming conventions and overall architecture patterns.
 
+## Implementation Status
+
+### ✅ Completed Components
+- **Task Payloads & Idempotency**: JSON-serializable dataclasses with PostgreSQL persistence
+- **SQS Broker**: Custom aioboto3-based broker (not using TaskIQ framework)
+- **Basic Executor**: TaskIQExecutor with step dispatching and result polling
+- **Worker Application**: Async SQS consumer with health checks and graceful shutdown
+- **Container Integration**: ECS task definitions with worker commands and health probes
+- **Repository Configuration**: TaskIQ executor set as default
+
+### 🚧 In Progress / Next Steps
+- **Actual Step Execution**: Worker currently simulates execution; needs real Dagster `execute_step` integration
+- **Result Reporting**: Missing proper event reporting via `DagsterInstance.report_engine_event()`
+- **Reliability Features**: Exponential backoff, visibility timeout handling, retry logic
+- **API Compliance**: Executor uses internal `dagster._core` APIs instead of public ones
+- **Testing**: Convert from unit tests to interface-level end-to-end tests
+
+### 📋 Critical Path Forward
+Complete core execution functionality in `.ai/plans/stage-01-02-completion.md` before proceeding to auto-scaling (Stage 03) and load simulation (Stage 04).
+
 ## Development Setup
 
 > [!IMPORTANT]
