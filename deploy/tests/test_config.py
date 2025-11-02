@@ -9,14 +9,9 @@ import pytest
 from config import StackSettings
 
 
-class TestStackSettings:
-    """Test StackSettings configuration loading."""
-
-    @patch("pulumi.Config")
-    def test_load_with_full_config(self, mock_config_class: MagicMock, mock_pulumi_config: MagicMock) -> None:
-        """Arrange: Mock Pulumi config with all values provided."""
-        mock_config_class.return_value = mock_pulumi_config
-
+def test_load_with_full_config(mock_pulumi_config: MagicMock) -> None:
+    """Arrange: Mock Pulumi config with all values provided."""
+    with patch("pulumi.Config", return_value=mock_pulumi_config):
         # Act: Load stack settings
         settings = StackSettings.load()
 
@@ -39,28 +34,28 @@ class TestStackSettings:
         assert settings.database.password == "dagster"
         assert settings.database.db_name == "dagster"
         assert settings.database.backup_retention_period == 7
-        assert settings.database.deletion_protection is False
+        assert settings.database.deletion_protection is True  # From conftest fixture
         assert settings.database.publicly_accessible is True
         assert settings.services.daemon_desired_count == 1
         assert settings.services.webserver_desired_count == 1
         assert settings.services.worker_desired_count == 2
 
-    @patch("pulumi.Config")
-    @patch("pulumi.get_stack")
-    def test_load_with_defaults(self, mock_get_stack: MagicMock, mock_config_class: MagicMock) -> None:
-        """Arrange: Mock Pulumi config with minimal values."""
-        mock_get_stack.return_value = "local"
 
-        config = MagicMock(spec=pulumi.Config)
+@patch("pulumi.get_stack")
+def test_load_with_defaults(mock_get_stack: MagicMock) -> None:
+    """Arrange: Mock Pulumi config with minimal values."""
+    mock_get_stack.return_value = "local"
 
-        def mock_get_object(key: str) -> Mapping[str, Any] | None:
-            if key == "project":
-                return {}
+    config = MagicMock()
+
+    def mock_get_object(key: str) -> Mapping[str, Any] | None:
+        if key == "project":
             return {}
+        return {}
 
-        config.get_object = mock_get_object
-        mock_config_class.return_value = config
+    config.get_object = mock_get_object
 
+    with patch("pulumi.Config", return_value=config):
         # Act: Load stack settings
         settings = StackSettings.load()
 
@@ -86,34 +81,36 @@ class TestStackSettings:
         assert settings.services.webserver_desired_count == 1
         assert settings.services.worker_desired_count == 2
 
-    @patch("pulumi.Config")
-    def test_load_with_invalid_config_type(self, mock_config_class: MagicMock) -> None:
-        """Arrange: Mock Pulumi config returning invalid type."""
-        config = MagicMock(spec=pulumi.Config)
 
-        def mock_get_object(key: str) -> Mapping[str, Any] | None:
-            if key == "project":
-                return "invalid_string"  # Should be a mapping
-            return {}
+def test_load_with_invalid_config_type() -> None:
+    """Arrange: Mock Pulumi config returning invalid type."""
+    config = MagicMock()
 
-        config.get_object = mock_get_object
-        mock_config_class.return_value = config
+    def mock_get_object(key: str) -> Mapping[str, Any] | None:
+        if key == "project":
+            return "invalid_string"  # type: ignore[return-value]  # Should be a mapping
+        return {}
 
-        # Act & Assert: Should raise TypeError
-        with pytest.raises(TypeError, match="Pulumi config key 'project' must be an object."):
-            StackSettings.load()
+    config.get_object = mock_get_object
 
-    @patch("pulumi.Config")
-    def test_load_with_missing_config_sections(self, mock_config_class: MagicMock) -> None:
-        """Arrange: Mock Pulumi config returning None for missing sections."""
-        config = MagicMock(spec=pulumi.Config)
+    # Act & Assert: Should raise TypeError
+    with patch("pulumi.Config", return_value=config), pytest.raises(
+        TypeError,
+        match=r"Pulumi config key 'project' must be an object.",
+    ):
+        StackSettings.load()
 
-        def mock_get_object(key: str) -> Mapping[str, Any] | None:
-            return None  # All sections missing
 
-        config.get_object = mock_get_object
-        mock_config_class.return_value = config
+def test_load_with_missing_config_sections() -> None:
+    """Arrange: Mock Pulumi config returning None for missing sections."""
+    config = MagicMock()
 
+    def mock_get_object(key: str) -> Mapping[str, Any] | None:
+        return None  # All sections missing
+
+    config.get_object = mock_get_object
+
+    with patch("pulumi.Config", return_value=config), patch("pulumi.get_stack", return_value="local"):
         # Act: Load stack settings
         settings = StackSettings.load()
 
@@ -122,31 +119,29 @@ class TestStackSettings:
         assert settings.project.name == "dagster-taskiq-demo"
         assert settings.project.environment == "local"  # Default from get_stack()
 
-    @pytest.mark.parametrize(
-        ("config_key", "field_name", "expected_value"),
-        [
-            ("project", "name", "custom-project"),
-            ("aws", "region", "eu-west-1"),
-            ("queue", "messageRetentionSeconds", "864000"),
-            ("database", "engineVersion", "16"),
-            ("services", "daemonDesiredCount", "3"),
-        ],
-    )
-    @patch("pulumi.Config")
-    def test_load_individual_config_overrides(
-        self, mock_config_class: MagicMock, config_key: str, field_name: str, expected_value: str
-    ) -> None:
-        """Arrange: Mock Pulumi config with specific overrides."""
-        config = MagicMock(spec=pulumi.Config)
 
-        def mock_get_object(key: str) -> Mapping[str, Any] | None:
-            if key == config_key:
-                return {field_name: expected_value}
-            return {}
+@pytest.mark.parametrize(
+    ("config_key", "field_name", "expected_value"),
+    [
+        ("project", "name", "custom-project"),
+        ("aws", "region", "eu-west-1"),
+        ("queue", "messageRetentionSeconds", "864000"),
+        ("database", "engineVersion", "16"),
+        ("services", "daemonDesiredCount", "3"),
+    ],
+)
+def test_load_individual_config_overrides(config_key: str, field_name: str, expected_value: str) -> None:
+    """Arrange: Mock Pulumi config with specific overrides."""
+    config = MagicMock()
 
-        config.get_object = mock_get_object
-        mock_config_class.return_value = config
+    def mock_get_object(key: str) -> Mapping[str, Any] | None:
+        if key == config_key:
+            return {field_name: expected_value}
+        return {}
 
+    config.get_object = mock_get_object
+
+    with patch("pulumi.Config", return_value=config):
         # Act: Load stack settings
         settings = StackSettings.load()
 

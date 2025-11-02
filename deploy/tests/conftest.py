@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pulumi
 import pulumi_aws
@@ -21,7 +21,11 @@ from config import (
 
 @pytest.fixture
 def mock_pulumi_config() -> MagicMock:
-    """Mock Pulumi configuration for testing."""
+    """Mock Pulumi configuration for testing.
+
+    Returns:
+        MagicMock: Pulumi configuration stub with predefined values.
+    """
     config = MagicMock(spec=pulumi.Config)
 
     def mock_get_object(key: str) -> Mapping[str, str] | None:
@@ -67,13 +71,34 @@ def mock_pulumi_config() -> MagicMock:
 
 @pytest.fixture
 def mock_aws_provider() -> MagicMock:
-    """Mock AWS provider for testing."""
-    return MagicMock(spec=pulumi_aws.Provider)
+    """Mock AWS provider for testing.
+
+    Returns:
+        MagicMock: Provider mock with minimal Pulumi attributes.
+    """
+    provider = MagicMock(spec=pulumi_aws.Provider)
+    provider.package = "aws"
+
+    # Mock the urn property to be awaitable
+    mock_urn = AsyncMock()
+    mock_urn.future.return_value = AsyncMock()
+    provider.urn = mock_urn
+
+    # Mock the id property to be awaitable
+    mock_id = AsyncMock()
+    mock_id.future.return_value = AsyncMock()
+    provider.id = mock_id
+
+    return provider
 
 
 @pytest.fixture
 def sample_stack_settings() -> StackSettings:
-    """Sample StackSettings for testing."""
+    """Sample StackSettings for testing.
+
+    Returns:
+        StackSettings: Representative stack configuration.
+    """
     return StackSettings(
         project=ProjectSettings(name="dagster-taskiq-demo", environment="test"),
         aws=AwsSettings(
@@ -109,13 +134,21 @@ def sample_stack_settings() -> StackSettings:
 
 @pytest.fixture
 def pulumi_mock_stack() -> str:
-    """Mock Pulumi stack name."""
+    """Mock Pulumi stack name.
+
+    Returns:
+        str: Stub stack identifier.
+    """
     return "test"
 
 
 @pytest.fixture
 def sample_resource_args() -> dict[str, str | list[str]]:
-    """Sample arguments for resource creation functions."""
+    """Sample arguments for resource creation functions.
+
+    Returns:
+        dict[str, str | list[str]]: Minimal arguments for Dagster resources.
+    """
     return {
         "resource_name": "test-resource",
         "project_name": "dagster-taskiq-demo",
