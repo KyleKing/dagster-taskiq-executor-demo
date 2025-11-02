@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # ECS Configuration
     ecs_cluster_name: str = Field(default="dagster-taskiq-demo-dev", validation_alias="ECS_CLUSTER_NAME")
+    ecs_worker_service_name: str = Field(default="dagster-taskiq-demo-workers-dev", validation_alias="ECS_WORKER_SERVICE_NAME")
 
     # Dagster Configuration
     dagster_home: str = Field(default="/opt/dagster/dagster_home", validation_alias="DAGSTER_HOME")

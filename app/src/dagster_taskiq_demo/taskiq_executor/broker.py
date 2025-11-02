@@ -7,7 +7,7 @@ from typing import Any
 
 import aioboto3
 
-from dagster_taskiq.config.settings import Settings
+from dagster_taskiq_demo.config.settings import Settings
 
 
 class LocalStackSqsBroker:

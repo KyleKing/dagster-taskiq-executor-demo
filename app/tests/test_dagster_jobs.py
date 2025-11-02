@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from dagster import DagsterInstance, JobDefinition
 
-from dagster_taskiq.dagster_jobs.jobs import (
+from dagster_taskiq_demo.dagster_jobs.jobs import (
     fast_job,
     mixed_job,
     parallel_fast_job,

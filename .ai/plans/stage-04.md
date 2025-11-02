@@ -5,7 +5,7 @@
 - Finalise documentation and operational runbooks for the LocalStack demo.
 
 ## Current State
-- `app/src/dagster_taskiq/load_simulator/__init__.py` is empty; no scenario orchestration exists.
+- `app/src/dagster_taskiq_demo/load_simulator/__init__.py` is empty; no scenario orchestration exists.
 - Auto-scaler and worker services (Stages 02–03) will expose APIs/settings ready for exercise.
 - Documentation (`README.md`, `AGENTS.md`) still reflects the pre-TaskIQ implementation.
 - Pulumi stack exports resources but lacks dashboards/validation tooling.

@@ -4,6 +4,9 @@
 target "app" {
   context    = "./app"
   dockerfile = "./Dockerfile"
+  contexts   = {
+    "dagster-taskiq" = "./dagster-taskiq"
+  }
   tags       = ["dagster-taskiq-demo:latest"]
   platforms  = ["linux/amd64"]
 }

@@ -9,32 +9,35 @@ dev = [
   "pyright>=1.1.390",
   "mypy>=1.18.2",
   "pytest>=8.4.2",
-  "types-pyyaml>=6.0.12.20250915",
-  "pytest-postgresql>=7"
 ]
 
 [project]
-name = "dagster-taskiq-demo"
+name = "dagster-taskiq"
 version = "0.0.0"
-description = "Demo of Dagster with TaskIQ execution on LocalStack"
-requires-python = ">=3.13,<3.14"
+description = "Dagster TaskIQ Executor - A derivative of dagster-celery that replaces Celery with TaskIQ and SQS for distributed job execution"
+requires-python = ">=3.11.11"
+license = "Apache-2.0"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
-		  "dagster-taskiq",
-  "dagster>=1.5.0",
-  "dagster-webserver>=1.5.0",
-  "dagster-postgres>=0.21.0",
-  "taskiq>=0.11.0",
-  "taskiq-aio-sqs>=0.4.0",
-  "pydantic>=2.10.0,<=2.11.0", # base_dir is missing a type annotation
-  "pydantic-settings>=2.0.0",
-  "aioboto3>=13.0.0",
-   "sqlalchemy>=2.0.0",
-  "PyYAML>=6.0.0",
-  "structlog>=25.5.0"
+    "pydantic>=2.0.0",
+    "aioboto3>=13.0.0",
+    "dagster>=1.0.0",
 ]
 
+[project.scripts]
+dagster-taskiq = "dagster_taskiq.cli:main"
+
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_untyped_defs = true
@@ -53,7 +56,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [tool.pyright]
-pythonVersion = "3.13"
+pythonVersion = "3.11"
 include = ["src", "tests"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
@@ -67,7 +70,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py311"
 preview = true
 
 [tool.ruff.lint]
@@ -98,7 +101,7 @@ ignore = [
 unfixable = ["ERA001"] # Commented-out code
 
 [tool.ruff.lint.isort]
-known-first-party = ["dagster_taskiq_demo"]
+known-first-party = ["dagster_taskiq"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = [
@@ -122,6 +125,3 @@ known-first-party = ["dagster_taskiq_demo"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[tool.uv.sources]
-dagster-taskiq = { path = "../dagster-taskiq", editable = true }

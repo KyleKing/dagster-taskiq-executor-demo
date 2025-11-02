@@ -167,6 +167,8 @@ class RetryablePostgresStorage:
         raise DagsterDatabaseConnectionError(msg) from last_error
 
 
+# FIXME: manually create the file and track in git instead of doing so dynamically to simplify the
+#  implementation (here, entrypoint, etc.) and remove the PyYAML dependency
 def create_dagster_yaml_file(output_path: str | pathlib.Path = "dagster.yaml") -> None:
     """Create `dagster.yaml` configuration file on disk.
 

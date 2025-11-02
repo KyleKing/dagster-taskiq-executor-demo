@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime
 
-from dagster_taskiq.config.database import get_database_manager
-from dagster_taskiq.taskiq_executor.task_payloads import IdempotencyRecord, TaskState
+from dagster_taskiq_demo.config.database import get_database_manager
+from dagster_taskiq_demo.taskiq_executor.task_payloads import IdempotencyRecord, TaskState
 
 
 class IdempotencyStorage:

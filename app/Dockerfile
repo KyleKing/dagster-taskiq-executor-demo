@@ -15,6 +15,7 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    UV_NO_EDITABLE=1 \
     UV_NO_SYNC=1 \
     UV_PYTHON_DOWNLOADS=never \
     UV_TOOL_BIN_DIR=/usr/local/bin \
@@ -25,14 +26,18 @@ ENV DAGSTER_HOME=/opt/dagster/dagster_home
 RUN mkdir -p $DAGSTER_HOME \
     && chown -R nonroot:nonroot /opt/dagster
 
+COPY --from=dagster-taskiq uv.lock /dagster-taskiq/uv.lock
+COPY --from=dagster-taskiq pyproject.toml /dagster-taskiq/pyproject.toml
+COPY --from=dagster-taskiq src/dagster_taskiq/__init__.py /dagster-taskiq/src/dagster_taskiq/__init__.py
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock,readonly \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml,readonly \
-    uv sync --locked --no-dev --no-install-project --group=uv-build
+    uv sync --locked --no-dev --no-install-project
 
+COPY --from=dagster-taskiq . /dagster-taskiq/
 COPY --chown=nonroot:nonroot . /app
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-dev --offline
 
 # Copy and set up entrypoint script
 COPY --chown=nonroot:nonroot entrypoint.sh /app/entrypoint.sh
@@ -40,4 +45,4 @@ RUN chmod +x /app/entrypoint.sh
 
 USER nonroot
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["dagster-daemon", "run", "-m", "dagster_taskiq.main"]
+CMD ["dagster-daemon", "run", "-m", "dagster_taskiq_demo.main"]

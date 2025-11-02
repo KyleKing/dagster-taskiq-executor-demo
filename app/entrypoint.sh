@@ -4,7 +4,7 @@ set -euo pipefail
 # Initialize Dagster configuration
 echo "Initializing Dagster configuration..."
 python3 -c "
-from dagster_taskiq.config import create_dagster_yaml_file, settings
+from dagster_taskiq_demo.config import create_dagster_yaml_file, settings
 from pathlib import Path
 import structlog
 

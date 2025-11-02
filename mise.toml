@@ -15,7 +15,8 @@ node = "latest"
 python = "3.13"
 
 [env]
-_.file = { path = ".env", redact = true }
+# PLANNED: redact = true only works if the strings are actually secret tokens
+_.file = { path = ".env" }
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
 PROJECT_NAME = "dagster-taskiq-demo"

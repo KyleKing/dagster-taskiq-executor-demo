@@ -255,7 +255,7 @@ def test_worker_task_definition_configuration(mock_aws_provider: MagicMock) -> p
         assert env_vars["AWS_DEFAULT_REGION"] == "us-east-1"
         assert env_vars["DAGSTER_HOME"] == "/opt/dagster/dagster_home"
         assert env_vars["PYTHONPATH"] == "/opt/dagster/app"
-        assert env_vars["WORKER_CONCURRENCY"] == "2"
+        assert env_vars["TASKIQ_WORKER_CONCURRENCY"] == "4"
         assert env_vars["TASKIQ_WORKER_ID"] == "worker-${HOSTNAME}"
 
     return pulumi.Output.all(result.worker_task_definition.urn, result.worker_task_definition.__dict__).apply(

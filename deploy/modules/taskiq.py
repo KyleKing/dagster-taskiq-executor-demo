@@ -185,6 +185,7 @@ def create_taskiq_infrastructure(
                     "PYTHONPATH": "/opt/dagster/app",
                     "TASKIQ_QUEUE_NAME": queue_name,
                     "TASKIQ_DLQ_NAME": dlq_name,
+                    "TASKIQ_WORKER_CONCURRENCY": "4",
                     "TASKIQ_WORKER_HEALTH_PORT": "8080",
                     "TASKIQ_WORKER_ID": "worker-${HOSTNAME}",
                 },

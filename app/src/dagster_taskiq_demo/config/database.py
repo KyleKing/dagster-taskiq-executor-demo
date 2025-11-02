@@ -11,8 +11,7 @@ from typing import Any
 
 import structlog
 from dagster import DagsterInstance
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import OperationalError
 
 from .exceptions import DagsterDatabaseConnectionError

@@ -179,6 +179,7 @@ class ExecutionResult:
 - **Worker Application**: Async SQS consumer with health checks and graceful shutdown
 - **Container Integration**: ECS task definitions with worker commands and health probes
 - **Repository Configuration**: TaskIQ executor set as default
+- **Auto-Scaler**: Dynamic worker scaling based on queue depth with failure simulation
 
 ### 🚧 In Progress / Next Steps
 - **Actual Step Execution**: Worker currently simulates execution; needs real Dagster `execute_step` integration
@@ -188,7 +189,7 @@ class ExecutionResult:
 - **Testing**: Convert from unit tests to interface-level end-to-end tests
 
 ### 📋 Critical Path Forward
-Complete core execution functionality in `.ai/plans/stage-01-02-completion.md` before proceeding to auto-scaling (Stage 03) and load simulation (Stage 04).
+Complete core execution functionality in `.ai/plans/stage-01-02-completion.md` before proceeding to load simulation (Stage 04).
 
 ### Testing Strategy
 
@@ -309,6 +310,10 @@ mise run format ::: lint ::: typecheck
 
 - Follow best practices for DRY, YAGNI, and functional code for Python 3.13
 - Ensure that ruff, mypy, pyright, and pytest all pass as described above after making changes
+- Use SQLAlchemy v2 style for all database operations:
+    - Import directly from `sqlalchemy` (e.g., `from sqlalchemy import Engine, create_engine, text`)
+    - Use `text()` for SQL strings to ensure proper parameterization
+    - Handle Result objects appropriately (e.g., use `.scalar()` for single values, `.scalars()` for column values, `.mappings()` for row dictionaries)
 - For testing:
     - Use `pytest.mark.parametrize` to keep tests easy to maintain and follow the AAA pattern
     - Only test at the interface level (e.g. Dagster Job) and avoid writing low-level unit tests unless there is critical logic that can't be easily tested easily at the interface

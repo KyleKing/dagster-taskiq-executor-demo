@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for dagster-taskiq tests."""
+"""Pytest configuration and fixtures for dagster-taskiq-demo tests."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 from dagster import DagsterInstance
 from dagster.core.test_utils import instance_for_test  # type: ignore[import-not-found]
 
-from dagster_taskiq.config.settings import Settings
+from dagster_taskiq_demo.config.settings import Settings
 
 # Configure pytest-postgresql to use mise-installed system Postgres
 os.environ.setdefault("POSTGRESQL_HOST", "localhost")

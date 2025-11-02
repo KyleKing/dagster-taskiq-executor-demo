@@ -1,17 +1,17 @@
 # Stage 02 – TaskIQ Worker Runtime
 
 ## Goals
-- Build the TaskIQ worker service that consumes executor payloads, runs Dagster ops, and reports results.
+- Build the TaskIQ worker service (shipped with the demo app) that consumes executor payloads from the standalone `dagster-taskiq` package, runs Dagster ops, and reports results.
 - Provide operational entrypoints and container wiring so ECS services created by Pulumi can run workers.
 
 ## Current State
-- ✅ Stage 01 exposes payload contracts and the `TaskIQExecutor`.
-- ✅ Worker application structure implemented in `app.py` with SQS message consumption.
+- ✅ Stage 01 exposes payload contracts and the `TaskIQExecutor` within `dagster_taskiq`.
+- ✅ Worker application structure implemented in `app/src/dagster_taskiq_demo/taskiq_executor/app.py` with SQS message consumption.
 - ✅ CLI entrypoint implemented in `worker.py` for container execution.
 - ✅ ECS task definitions updated with worker command and health checks.
 - ✅ Graceful shutdown handling and health server implemented.
 - ✅ Basic worker tests implemented.
-- ❌ **Still needs work**: Actual Dagster step execution (currently simulated), result reporting via Dagster APIs.
+- ❌ **Still needs work**: Actual Dagster step execution (currently simulated), result reporting via Dagster APIs, clean dependency on the new package APIs.
 
 ## Remaining Tasks
 
@@ -36,9 +36,9 @@
     - Handle SIGTERM/SIGINT signals to allow clean worker termination.
 
 ## Exit Criteria
-- Worker executes actual Dagster ops using proper APIs, not simulation.
+- Worker executes actual Dagster ops using proper APIs from `dagster_taskiq`, not the legacy simulation.
 - Results are reported back to Dagster via instance APIs and event log.
 - Worker handles failures with appropriate retry/dead-letter logic.
 - Graceful shutdown completes in-flight tasks before termination.
 - ECS worker services run successfully with health checks.
-- Integration tests validate end-to-end worker execution flow.
+- Integration tests validate end-to-end worker execution flow across the packaged executor and demo worker.

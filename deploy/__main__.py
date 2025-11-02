@@ -14,6 +14,7 @@ from components.ecs_cluster import create_ecs_cluster
 from components.network import fetch_default_network
 from components.provider import LocalStackProviderConfig, create_localstack_provider
 from config import StackSettings
+from modules.auto_scaler import create_auto_scaler_infrastructure
 from modules.dagster import create_dagster_infrastructure
 from modules.taskiq import create_taskiq_infrastructure
 
@@ -140,6 +141,23 @@ def main() -> None:
         redrive_max_receive_count=settings.queue.redrive_max_receive_count,
     )
 
+    # Create auto-scaler infrastructure module
+    worker_service_name = f"{settings.project.name}-workers-{settings.project.environment}"
+    auto_scaler = create_auto_scaler_infrastructure(
+        "auto-scaler",
+        provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        region=settings.aws.region,
+        container_image=ecr_repo.repository_uri,
+        aws_endpoint_url=settings.aws.endpoint,
+        database_endpoint=database_endpoint_with_port,
+        queue_url=taskiq.queues.queue.id,
+        cluster_name=cluster.cluster.name,
+        worker_service_name=worker_service_name,
+        execution_role_arn=execution_role.arn,
+    )
+
     # Create Dagster infrastructure module
     dagster = create_dagster_infrastructure(
         "dagster",
@@ -251,6 +269,32 @@ def main() -> None:
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
+    auto_scaler_service = aws.ecs.Service(
+        "auto-scaler-service",
+        aws.ecs.ServiceArgs(
+            name=f"{settings.project.name}-auto-scaler-{settings.project.environment}",
+            cluster=cluster.cluster.id,
+            task_definition=auto_scaler.task_definition.arn,
+            desired_count=1,  # Always run one auto-scaler instance
+            launch_type="FARGATE",
+            network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
+                subnets=network.subnets.ids,
+                security_groups=security_group_output,
+                assign_public_ip=True,
+            ),
+            deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                enable=True,
+                rollback=True,
+            ),
+            deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                type="ECS",
+            ),
+            health_check_grace_period_seconds=60,
+            force_new_deployment=True,
+        ),
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
     # Stack outputs to simplify debugging and downstream configuration.
     pulumi.export("container_image_uri", ecr_repo.repository_uri)
     pulumi.export("ecr_repository_url", ecr_repo.repository.repository_url)
@@ -276,6 +320,7 @@ def main() -> None:
     pulumi.export("dagster_daemon_service_name", dagster_daemon_service.name)
     pulumi.export("dagster_webserver_service_name", dagster_webserver_service.name)
     pulumi.export("taskiq_worker_service_name", taskiq_worker_service.name)
+    pulumi.export("auto_scaler_service_name", auto_scaler_service.name)
     pulumi.export("dagster_web_url", pulumi.Output.concat("http://", dagster.load_balancer.dns_name))
 
 

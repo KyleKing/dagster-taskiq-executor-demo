@@ -9,14 +9,14 @@ from unittest.mock import Mock, patch
 import pytest
 import yaml
 
-from dagster_taskiq.config.dagster import (
+from dagster_taskiq_demo.config.dagster import (
     DagsterPostgreSQLConfig,
     RetryablePostgresStorage,
     create_dagster_yaml_file,
     get_dagster_instance_config,
 )
-from dagster_taskiq.config.exceptions import DagsterDatabaseConnectionError
-from dagster_taskiq.config.settings import Settings
+from dagster_taskiq_demo.config.exceptions import DagsterDatabaseConnectionError
+from dagster_taskiq_demo.config.settings import Settings
 
 
 def test_settings_from_env_test(test_settings: Settings) -> None:
@@ -54,7 +54,7 @@ def test_dagster_postgres_url_property(test_settings: Settings) -> None:
 
 def test_get_postgres_storage_config(test_settings: Settings) -> None:
     """PostgreSQL storage configuration generation."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = DagsterPostgreSQLConfig.get_postgres_storage_config()
 
     assert "postgres_url" in config
@@ -64,7 +64,7 @@ def test_get_postgres_storage_config(test_settings: Settings) -> None:
 
 def test_get_run_storage_config(test_settings: Settings) -> None:
     """Run storage configuration generation."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = DagsterPostgreSQLConfig.get_run_storage_config()
 
     assert config["module"] == "dagster_postgres.run_storage"
@@ -75,7 +75,7 @@ def test_get_run_storage_config(test_settings: Settings) -> None:
 
 def test_get_event_log_storage_config(test_settings: Settings) -> None:
     """Event log storage configuration generation."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = DagsterPostgreSQLConfig.get_event_log_storage_config()
 
     assert config["module"] == "dagster_postgres.event_log"
@@ -86,7 +86,7 @@ def test_get_event_log_storage_config(test_settings: Settings) -> None:
 
 def test_get_schedule_storage_config(test_settings: Settings) -> None:
     """Schedule storage configuration generation."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = DagsterPostgreSQLConfig.get_schedule_storage_config()
 
     assert config["module"] == "dagster_postgres.schedule_storage"
@@ -105,7 +105,7 @@ def test_get_compute_log_storage_config() -> None:
 
 def test_get_dagster_yaml_config(test_settings: Settings) -> None:
     """Complete Dagster YAML configuration generation."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = DagsterPostgreSQLConfig.get_dagster_yaml_config()
 
     # Check top-level structure
@@ -132,7 +132,7 @@ def test_create_storage_success_first_try() -> None:
     postgres_url = "postgresql://test:test@localhost:5432/test"
     storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.1)
 
-    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+    with patch("dagster_taskiq_demo.config.dagster.DagsterPostgresStorage") as mock_storage_class:
         mock_instance = Mock()
         mock_storage_class.return_value = mock_instance
 
@@ -150,7 +150,7 @@ def test_create_storage_success_after_retries() -> None:
     postgres_url = "postgresql://test:test@localhost:5432/test"
     storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.01)
 
-    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+    with patch("dagster_taskiq_demo.config.dagster.DagsterPostgresStorage") as mock_storage_class:
         mock_instance = Mock()
         # Fail twice, then succeed
         mock_storage_class.side_effect = [
@@ -172,7 +172,7 @@ def test_create_storage_failure_after_max_retries() -> None:
     postgres_url = "postgresql://test:test@localhost:5432/test"
     storage = RetryablePostgresStorage(postgres_url, max_retries=2, retry_delay=0.01)
 
-    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+    with patch("dagster_taskiq_demo.config.dagster.DagsterPostgresStorage") as mock_storage_class:
         mock_storage_class.side_effect = ConnectionError("Connection failed")
 
         with patch("time.sleep"), pytest.raises(DagsterDatabaseConnectionError) as exc_info:
@@ -184,7 +184,7 @@ def test_create_storage_failure_after_max_retries() -> None:
 
 def test_create_dagster_yaml_file(test_settings: Settings) -> None:
     """Creation of dagster.yaml file."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings), tempfile.TemporaryDirectory() as temp_dir:
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings), tempfile.TemporaryDirectory() as temp_dir:
         output_path = pathlib.Path(temp_dir) / "test_dagster.yaml"
 
         create_dagster_yaml_file(output_path)
@@ -201,7 +201,7 @@ def test_create_dagster_yaml_file(test_settings: Settings) -> None:
 
 def test_get_dagster_instance_config(test_settings: Settings) -> None:
     """Programmatic Dagster instance configuration."""
-    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings):
         config = get_dagster_instance_config()
 
     # Should have same structure as YAML config

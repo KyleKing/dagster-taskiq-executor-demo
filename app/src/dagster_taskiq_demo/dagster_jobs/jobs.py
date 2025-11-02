@@ -2,7 +2,7 @@
 
 from dagster import job
 
-from dagster_taskiq.taskiq_executor import taskiq_executor
+from dagster_taskiq_demo.taskiq_executor import taskiq_executor
 
 from .ops import aggregation_op, data_processing_op, fast_async_op, slow_async_op
 

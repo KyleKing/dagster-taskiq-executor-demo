@@ -7,7 +7,7 @@ from typing import cast
 import pytest
 from dagster import JobDefinition, ScheduleDefinition
 
-from dagster_taskiq.dagster_jobs.repository import defs
+from dagster_taskiq_demo.dagster_jobs.repository import defs
 
 
 def _job_defs() -> tuple[JobDefinition, ...]:

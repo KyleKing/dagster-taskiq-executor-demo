@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch
 import pytest
 from dagster import DagsterEventType
 
-from dagster_taskiq.config.settings import Settings
-from dagster_taskiq.taskiq_executor import TaskIQExecutor
-from dagster_taskiq.taskiq_executor.task_payloads import TaskState
+from dagster_taskiq_demo.config.settings import Settings
+from dagster_taskiq_demo.taskiq_executor import TaskIQExecutor
+from dagster_taskiq_demo.taskiq_executor.task_payloads import TaskState
 
 
 @pytest.fixture
@@ -19,8 +19,8 @@ def mock_settings() -> Settings:
     return settings
 
 
-@patch("dagster_taskiq.taskiq_executor.get_idempotency_storage")
-@patch("dagster_taskiq.taskiq_executor.LocalStackSqsBroker")
+@patch("dagster_taskiq_demo.taskiq_executor.get_idempotency_storage")
+@patch("dagster_taskiq_demo.taskiq_executor.LocalStackSqsBroker")
 def test_executor_initialization(mock_broker_class: Mock, mock_storage_func: Mock, mock_settings: Settings) -> None:
     """Test executor initialization."""
     mock_broker = Mock()
@@ -35,9 +35,9 @@ def test_executor_initialization(mock_broker_class: Mock, mock_storage_func: Moc
     mock_storage_func.assert_called_once()
 
 
-@patch("dagster_taskiq.taskiq_executor.get_idempotency_storage")
-@patch("dagster_taskiq.taskiq_executor.LocalStackSqsBroker")
-@patch("dagster_taskiq.taskiq_executor.DagsterEvent")
+@patch("dagster_taskiq_demo.taskiq_executor.get_idempotency_storage")
+@patch("dagster_taskiq_demo.taskiq_executor.LocalStackSqsBroker")
+@patch("dagster_taskiq_demo.taskiq_executor.DagsterEvent")
 def test_executor_skips_completed_steps(
     mock_event_class: Mock, mock_broker_class: Mock, mock_storage_func: Mock, mock_settings: Settings
 ) -> None:
@@ -76,9 +76,9 @@ def test_executor_skips_completed_steps(
     mock_storage.is_completed.assert_called_once_with("test-run:test-step")
 
 
-@patch("dagster_taskiq.taskiq_executor.get_idempotency_storage")
-@patch("dagster_taskiq.taskiq_executor.LocalStackSqsBroker")
-@patch("dagster_taskiq.taskiq_executor.DagsterEvent")
+@patch("dagster_taskiq_demo.taskiq_executor.get_idempotency_storage")
+@patch("dagster_taskiq_demo.taskiq_executor.LocalStackSqsBroker")
+@patch("dagster_taskiq_demo.taskiq_executor.DagsterEvent")
 def test_executor_submits_new_steps(
     mock_event_class: Mock, mock_broker_class: Mock, mock_storage_func: Mock, mock_settings: Settings
 ) -> None:
@@ -118,9 +118,9 @@ def test_executor_submits_new_steps(
     mock_storage.update_state.assert_called_once_with("test-run:test-step", TaskState.RUNNING)
 
 
-@patch("dagster_taskiq.taskiq_executor.get_idempotency_storage")
-@patch("dagster_taskiq.taskiq_executor.LocalStackSqsBroker")
-@patch("dagster_taskiq.taskiq_executor.DagsterEvent")
+@patch("dagster_taskiq_demo.taskiq_executor.get_idempotency_storage")
+@patch("dagster_taskiq_demo.taskiq_executor.LocalStackSqsBroker")
+@patch("dagster_taskiq_demo.taskiq_executor.DagsterEvent")
 def test_executor_handles_submission_failure(
     mock_event_class: Mock, mock_broker_class: Mock, mock_storage_func: Mock, mock_settings: Settings
 ) -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from dagster import DefaultScheduleStatus, JobDefinition, ScheduleDefinition
 
-from dagster_taskiq.dagster_jobs.schedules import get_all_schedules, get_testing_schedules
+from dagster_taskiq_demo.dagster_jobs.schedules import get_all_schedules, get_testing_schedules
 
 
 def _production_schedules() -> tuple[ScheduleDefinition, ...]:

@@ -5,7 +5,9 @@
 - Ensure the executor and worker can reliably execute Dagster ops with proper error handling and exactly-once semantics.
 
 ## Current State
-- ✅ Basic executor and worker scaffolding implemented
+- ✅ Basic executor and worker scaffolding implemented (demo code under `dagster_taskiq_demo`)
+- ✅ Standalone `dagster-taskiq` package scaffolded with basic structure and licensing
+- ✅ Task payloads, broker, models, and worker ported to standalone package
 - ✅ SQS message passing and idempotency storage working
 - ✅ Container and ECS integration ready
 - ❌ Worker simulates execution instead of running actual Dagster steps
@@ -27,22 +29,28 @@
     - Update idempotency state only after successful event reporting
     - Handle partial failures and retries appropriately
 
-3. **Implement exponential backoff and visibility timeout handling**
+3. **Port executor logic into standalone package**
+    - Move payloads, broker, and polling utilities from `dagster_taskiq_demo` into `dagster_taskiq`.
+    - Provide shim imports for the demo until the migration is complete.
+    - Ensure packaging metadata exports `TaskIQExecutor` and supporting utilities.
+    - Update demo app to consume the packaged executor instead of local modules.
+
+4. **Implement exponential backoff and visibility timeout handling**
     - Add jittered exponential backoff to broker reconnection logic
     - Implement background task to detect and recover stuck RUNNING tasks
-    - Add configurable retry parameters to settings
+    - Add configurable retry parameters to settings shared between package and demo
 
-4. **Replace internal API usage with public APIs**
+5. **Replace internal API usage with public APIs**
     - Remove all `dagster._core` imports from executor
     - Find public alternatives to `StepFailureData`, `StepSuccessData`, `StepKind`
     - Ensure executor only uses documented public APIs
 
-5. **Add comprehensive error handling and recovery**
+6. **Add comprehensive error handling and recovery**
     - Implement proper retry logic for transient failures
     - Add dead-letter queue handling for permanent failures
     - Ensure SQS messages are only deleted after durable result persistence
 
-6. **Convert to interface-level testing**
+7. **Convert to interface-level testing**
     - Replace unit tests with end-to-end job execution tests
     - Focus on testing complete Dagster job runs rather than internal components
     - Use broker stubs to avoid LocalStack dependencies in tests

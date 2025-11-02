@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 
 import aioboto3
 
-from dagster_taskiq.config.settings import Settings
-from dagster_taskiq.taskiq_executor.models import get_idempotency_storage
-from dagster_taskiq.taskiq_executor.task_payloads import ExecutionResult, OpExecutionTask, TaskState
+from dagster_taskiq_demo.config.settings import Settings
+from dagster_taskiq_demo.taskiq_executor.models import get_idempotency_storage
+from dagster_taskiq_demo.taskiq_executor.task_payloads import ExecutionResult, OpExecutionTask, TaskState
 
 
 class DagsterTaskiqApp:
