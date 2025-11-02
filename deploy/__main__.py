@@ -8,11 +8,11 @@ import pulumi
 import pulumi_aws as aws
 from pulumi_aws import ec2, iam
 
+from components.aurora_postgres import create_postgres_database
 from components.container_image import create_container_image
 from components.ecs_cluster import create_ecs_cluster
 from components.network import fetch_default_network
 from components.provider import LocalStackProviderConfig, create_localstack_provider
-from components.rds_postgres import create_postgres_database
 from config import StackSettings
 from modules.dagster import create_dagster_infrastructure
 from modules.taskiq import create_taskiq_infrastructure
@@ -110,12 +110,14 @@ def main() -> None:
         db_name=settings.database.db_name,
         username=settings.database.username,
         password=settings.database.password,
-        instance_class=settings.database.instance_class,
-        allocated_storage=settings.database.allocated_storage,
-        max_allocated_storage=settings.database.max_allocated_storage,
-        engine_version=settings.database.engine_version,
         project_name=settings.project.name,
         environment=settings.project.environment,
+        engine_version=settings.database.engine_version,
+        min_capacity=settings.database.min_capacity,
+        max_capacity=settings.database.max_capacity,
+        publicly_accessible=settings.database.publicly_accessible,
+        deletion_protection=settings.database.deletion_protection,
+        backup_retention_period=settings.database.backup_retention_period,
     )
 
     # Create TaskIQ infrastructure module
@@ -127,7 +129,7 @@ def main() -> None:
         region=settings.aws.region,
         container_image=container_image.image_uri,
         aws_endpoint_url=settings.aws.endpoint,
-        database_endpoint=database.instance.endpoint,
+        database_endpoint=database.cluster.endpoint,
         execution_role_arn=execution_role.arn,
         message_retention_seconds=settings.queue.message_retention_seconds,
         queue_visibility_timeout=settings.queue.visibility_timeout,
@@ -146,7 +148,7 @@ def main() -> None:
         subnet_ids=network.subnets.ids,
         container_image=container_image.image_uri,
         aws_endpoint_url=settings.aws.endpoint,
-        database_endpoint=database.instance.endpoint,
+        database_endpoint=database.cluster.endpoint,
         queue_url=taskiq.queues.queue.id,
         cluster_name=cluster.cluster.name,
         execution_role_arn=execution_role.arn,
@@ -234,9 +236,10 @@ def main() -> None:
     pulumi.export("security_group_id", dagster.security_group.id)
     pulumi.export("vpc_id", network.vpc.id)
     pulumi.export("subnet_ids", network.subnets.ids)
-    pulumi.export("rds_endpoint", database.instance.endpoint)
-    pulumi.export("rds_port", database.instance.port)
-    pulumi.export("rds_db_name", database.instance.db_name)
+    pulumi.export("aurora_cluster_endpoint", database.cluster.endpoint)
+    pulumi.export("aurora_reader_endpoint", database.cluster.reader_endpoint)
+    pulumi.export("aurora_port", database.cluster.port)
+    pulumi.export("aurora_db_name", database.cluster.database_name)
     pulumi.export("alb_dns_name", dagster.load_balancer.dns_name)
     pulumi.export("alb_zone_id", dagster.load_balancer.zone_id)
     pulumi.export("service_discovery_namespace", dagster.service_discovery_namespace.name)

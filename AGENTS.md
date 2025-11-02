@@ -25,6 +25,9 @@ This project demonstrates a production-like AWS deployment of Dagster with TaskI
 
 ## Development Setup
 
+> [!IMPORTANT]
+> Always run commands from a `zsh` shell so that `mise` automatically loads the configured tool versions. Launch `zsh` explicitly if your environment defaults to another shell.
+
 The project uses:
 - `uv` for Python package management
 - `mise` (jdx/mise) for tool version management

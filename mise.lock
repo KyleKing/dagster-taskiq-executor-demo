@@ -3,5 +3,5 @@ version = "25.1.0"
 backend = "core:node"
 
 [[tools.python]]
-version = "3.14.0"
+version = "3.13.7"
 backend = "core:python"

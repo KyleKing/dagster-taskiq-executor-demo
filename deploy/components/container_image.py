@@ -60,11 +60,18 @@ def create_container_image(
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
-    # Get ECR authorization token
-    auth_token = ecr.get_authorization_token_output(
-        registry_id=repository.registry_id,
-        opts=pulumi.InvokeOptions(provider=provider),
+    # Get ECR authorization token after the repository has been created.
+    # LocalStack returns an empty authorization data set when no repository exists,
+    # so defer the lookup until the registry ID is available.
+    auth_token = repository.registry_id.apply(
+        lambda registry_id: ecr.get_authorization_token(
+            registry_id=registry_id,
+            opts=pulumi.InvokeOptions(provider=provider),
+        )
     )
+    username = auth_token.apply(lambda token: token.user_name)
+    raw_password = auth_token.apply(lambda token: token.password)
+    password = pulumi.Output.secret(raw_password)
 
     # Build tags with repository URL
     image_tag = repository.repository_url.apply(lambda url: f"{url}:latest")
@@ -88,8 +95,8 @@ def create_container_image(
         registries=[
             docker_build.RegistryArgs(
                 address=repository.repository_url,
-                username=auth_token.user_name,
-                password=auth_token.password,
+                username=username,
+                password=password,
             )
         ],
         # Cache configuration - best practice from documentation

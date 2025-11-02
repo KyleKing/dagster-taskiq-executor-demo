@@ -39,15 +39,17 @@ class QueueSettings:
 
 @dataclass
 class DatabaseSettings:
-    """PostgreSQL configuration for Dagster metadata storage."""
+    """Aurora PostgreSQL Serverless v2 configuration for Dagster metadata storage."""
 
     engine_version: str
-    instance_class: str
-    allocated_storage: int
-    max_allocated_storage: int
+    min_capacity: float
+    max_capacity: float
     username: str
     password: str
     db_name: str
+    backup_retention_period: int
+    deletion_protection: bool
+    publicly_accessible: bool
 
 
 @dataclass
@@ -111,13 +113,15 @@ class StackSettings:
 
         database_cfg = _get_mapping("database")
         database = DatabaseSettings(
-            engine_version=str(database_cfg.get("engineVersion", "17.4")),
-            instance_class=str(database_cfg.get("instanceClass", "db.t3.micro")),
-            allocated_storage=int(database_cfg.get("allocatedStorage", 20)),
-            max_allocated_storage=int(database_cfg.get("maxAllocatedStorage", 100)),
+            engine_version=str(database_cfg.get("engineVersion", "17")),
+            min_capacity=float(database_cfg.get("minCapacity", 0.5)),
+            max_capacity=float(database_cfg.get("maxCapacity", 1.0)),
             username=str(database_cfg.get("username", "dagster")),
             password=str(database_cfg.get("password", "dagster")),
             db_name=str(database_cfg.get("dbName", "dagster")),
+            backup_retention_period=int(database_cfg.get("backupRetentionPeriod", 7)),
+            deletion_protection=bool(database_cfg.get("deletionProtection", False)),
+            publicly_accessible=bool(database_cfg.get("publiclyAccessible", True)),
         )
 
         services_cfg = _get_mapping("services")

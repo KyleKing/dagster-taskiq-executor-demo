@@ -1,11 +1,11 @@
 services:
   localstack:
     container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
-    image: localstack/localstack-pro:4.1.0  # required for Pro
+    image: localstack/localstack-pro  # required for Pro
     ports:
-      - "127.0.0.1:4566:4566"            # LocalStack Gateway
-      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
-      - "127.0.0.1:443:443"              # LocalStack HTTPS Gateway (Pro)
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # external services port range
+      - "443:443"              # LocalStack HTTPS Gateway (Pro)
     environment:
       # Activate LocalStack Pro: https://docs.localstack.cloud/getting-started/auth-token/
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:?}  # required for Pro (RDS, etc.)
@@ -13,12 +13,10 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
       - DEBUG=${DEBUG:-0}
       - PERSISTENCE=${PERSISTENCE:-0}
-      - SERVICES=sqs,ecs,ec2,ecr,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53
-      # HACK: May or may not be required?
-      # - DOCKER_HOST=unix:///var/run/docker.sock
-      # - ECS_BACKEND=docker
-      # - HOSTNAME_EXTERNAL=localstack
-      # - LOCALSTACK_HOST=localstack
+      - SERVICES=sqs,ecs,ec2,ecr,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53,kms
+      # Advertise host.docker.internal so containerized clients (BuildKit) can reach ECR endpoints
+      - HOSTNAME_EXTERNAL=host.docker.internal
+      - LOCALSTACK_HOST=host.docker.internal
     volumes:
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
