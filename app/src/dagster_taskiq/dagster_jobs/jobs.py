@@ -1,8 +1,8 @@
 """Dagster job definitions for fast and slow operations."""
 
-from __future__ import annotations
-
 from dagster import job
+
+from dagster_taskiq.taskiq_executor import taskiq_executor
 
 from .ops import aggregation_op, data_processing_op, fast_async_op, slow_async_op
 
@@ -10,6 +10,7 @@ from .ops import aggregation_op, data_processing_op, fast_async_op, slow_async_o
 @job(
     name="fast_job",
     description="Job with fast async operations (20±10 seconds)",
+    executor_def=taskiq_executor,
 )
 def fast_job() -> None:
     """Job that executes fast async operations."""

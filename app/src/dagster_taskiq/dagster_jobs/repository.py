@@ -1,8 +1,8 @@
 """Dagster repository definitions."""
 
-from __future__ import annotations
-
 from dagster import Definitions
+
+from dagster_taskiq.taskiq_executor import taskiq_executor
 
 from .jobs import fast_job, mixed_job, parallel_fast_job, sequential_slow_job, slow_job
 from .schedules import get_all_schedules
@@ -17,4 +17,5 @@ defs = Definitions(
         sequential_slow_job,
     ],
     schedules=get_all_schedules(),
+    executors=[taskiq_executor],
 )

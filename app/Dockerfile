@@ -34,6 +34,10 @@ COPY --chown=nonroot:nonroot . /app
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
+# Copy and set up entrypoint script
+COPY --chown=nonroot:nonroot entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 USER nonroot
-ENTRYPOINT []
-CMD ["dagster-daemon", "run"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["dagster-daemon", "run", "-m", "dagster_taskiq.main"]
