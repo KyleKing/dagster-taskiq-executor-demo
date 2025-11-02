@@ -47,8 +47,8 @@ def create_fifo_queue_with_dlq(
     )
 
     redrive_policy = pulumi.Output.all(dead_letter_queue.arn).apply(
-        lambda args: json.dumps({
-            "deadLetterTargetArn": args[0],
+        lambda dql_arn: json.dumps({
+            "deadLetterTargetArn": dql_arn,
             "maxReceiveCount": redrive_max_receive_count,
         })
     )
@@ -101,7 +101,7 @@ def attach_queue_access_policy(
         })
 
     formatted_policy = pulumi.Output.all(queues.queue.arn, principal_arns).apply(
-        lambda args: _policy_doc(args[0], args[1])
+        lambda args: _policy_doc(*args)
     )
 
     sqs.QueuePolicy(
@@ -112,7 +112,7 @@ def attach_queue_access_policy(
     )
 
     formatted_dlq_policy = pulumi.Output.all(queues.dead_letter_queue.arn, principal_arns).apply(
-        lambda args: _policy_doc(args[0], args[1])
+        lambda args: _policy_doc(*args)
     )
 
     sqs.QueuePolicy(

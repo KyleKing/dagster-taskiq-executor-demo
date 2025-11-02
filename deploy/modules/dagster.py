@@ -43,7 +43,7 @@ def create_dagster_infrastructure(
     region: str,
     vpc_id: str,
     subnet_ids: Sequence[str],
-    container_image: str,
+    container_image: pulumi.Input[str],
     aws_endpoint_url: str,
     database_endpoint: pulumi.Input[str],
     queue_url: pulumi.Input[str],
@@ -183,14 +183,14 @@ def create_dagster_infrastructure(
     )
 
     # Create task definitions
-    def create_daemon_container(args: tuple[str, str, str]) -> list[ContainerDefinition]:
-        db_endpoint, queue_url_val, cluster = args
+    def create_daemon_container(args: tuple[str, str, str, str]) -> list[ContainerDefinition]:
+        db_endpoint, queue_url_val, cluster, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
         return [
             ContainerDefinition(
                 name="dagster-daemon",
-                image=container_image,
+                image=image,
                 environment={
                     "POSTGRES_HOST": host,
                     "POSTGRES_PORT": "5432",
@@ -212,8 +212,8 @@ def create_dagster_infrastructure(
             )
         ]
 
-    daemon_container_defs_json = pulumi.Output.all(database_endpoint, queue_url, cluster_name).apply(
-        lambda args: json.dumps([c.to_dict() for c in create_daemon_container((args[0], args[1], args[2]))])
+    daemon_container_defs_json = pulumi.Output.all(database_endpoint, queue_url, cluster_name, container_image).apply(
+        lambda args: json.dumps([c.to_dict() for c in create_daemon_container(*args)])
     )
 
     daemon_task_definition = create_fargate_task_definition(
@@ -227,13 +227,14 @@ def create_dagster_infrastructure(
         memory="1024",
     )
 
-    def create_webserver_container(db_endpoint: str) -> list[ContainerDefinition]:
+    def create_webserver_container(args: tuple[str, str]) -> list[ContainerDefinition]:
+        db_endpoint, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
         return [
             ContainerDefinition(
                 name="dagster-webserver",
-                image=container_image,
+                image=image,
                 environment={
                     "POSTGRES_HOST": host,
                     "POSTGRES_PORT": "5432",
@@ -254,8 +255,8 @@ def create_dagster_infrastructure(
             )
         ]
 
-    webserver_container_defs_json = pulumi.Output.from_input(database_endpoint).apply(
-        lambda endpoint: json.dumps([c.to_dict() for c in create_webserver_container(endpoint)])
+    webserver_container_defs_json = pulumi.Output.all(database_endpoint, container_image).apply(
+        lambda args: json.dumps([c.to_dict() for c in create_webserver_container(*args)])
     )
 
     webserver_task_definition = create_fargate_task_definition(

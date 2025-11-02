@@ -17,13 +17,7 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
    ```bash
    docker compose up --build
    ```
-3. On the first startup LocalStack runs `localstack/init/10_init_resources.sh`, which creates:
-   - An SQS queue (defaults to `demo-queue`)
-   - An ECS cluster (defaults to `demo-cluster`)
-
-   Repeat starts are idempotent; existing resources are left in place.
-
-4. Interact with the emulated services
+3. The LocalStack web UI is now available at: <https://app.localstack.cloud>. Interact with the emulated services
    ```bash
    awslocal sqs list-queues
    awslocal ecs list-clusters

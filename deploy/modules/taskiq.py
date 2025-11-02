@@ -33,7 +33,7 @@ def create_taskiq_infrastructure(
     project_name: str,
     environment: str,
     region: str,
-    container_image: str,
+    container_image: pulumi.Input[str],
     aws_endpoint_url: str,
     database_endpoint: pulumi.Input[str],
     execution_role_arn: pulumi.Input[str],
@@ -153,14 +153,14 @@ def create_taskiq_infrastructure(
     )
 
     # Create worker task definition
-    def create_worker_container(args: tuple[str, str, str]) -> list[ContainerDefinition]:
-        db_endpoint, queue_url, dlq_url = args
+    def create_worker_container(args: tuple[str, str, str, str]) -> list[ContainerDefinition]:
+        db_endpoint, queue_url, dlq_url, image = args
         host = db_endpoint.split(":", maxsplit=1)[0]
 
         return [
             ContainerDefinition(
                 name="taskiq-worker",
-                image=container_image,
+                image=image,
                 environment={
                     "POSTGRES_HOST": host,
                     "POSTGRES_PORT": "5432",
@@ -184,8 +184,8 @@ def create_taskiq_infrastructure(
             )
         ]
 
-    container_defs_json = pulumi.Output.all(database_endpoint, queues.queue.id, queues.dead_letter_queue.id).apply(
-        lambda args: json.dumps([c.to_dict() for c in create_worker_container((args[0], args[1], args[2]))])
+    container_defs_json = pulumi.Output.all(database_endpoint, queues.queue.id, queues.dead_letter_queue.id, container_image).apply(
+        lambda args: json.dumps([c.to_dict() for c in create_worker_container(*args)])
     )
 
     worker_task_definition = create_fargate_task_definition(
