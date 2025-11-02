@@ -18,6 +18,19 @@ class ContainerImage:
     image_uri: pulumi.Output[str]
 
 
+def create_buildkit_config() -> str:
+    """Create BuildKit TOML config for insecure registry.
+
+    This allows BuildKit to push to LocalStack ECR over HTTP without TLS.
+    """
+    return """
+# Allow insecure (HTTP) registry for LocalStack
+[registry."host.docker.internal:4566"]
+  http = true
+  insecure = true
+"""
+
+
 def create_container_image(
     resource_name: str,
     *,
@@ -60,12 +73,11 @@ def create_container_image(
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
-    # Get ECR authorization token after the repository has been created.
-    # LocalStack returns an empty authorization data set when no repository exists,
-    # so defer the lookup until the registry ID is available.
+    # Get ECR authorization token for LocalStack.
+    # LocalStack doesn't properly handle registry_id parameter, so we call without it.
+    # We still defer until after repository creation to ensure ECR service is initialized.
     auth_token = repository.registry_id.apply(
-        lambda registry_id: ecr.get_authorization_token(
-            registry_id=registry_id,
+        lambda _: ecr.get_authorization_token(
             opts=pulumi.InvokeOptions(provider=provider),
         )
     )
@@ -73,9 +85,12 @@ def create_container_image(
     raw_password = auth_token.apply(lambda token: token.password)
     password = pulumi.Output.secret(raw_password)
 
-    # Build tags with repository URL
-    image_tag = repository.repository_url.apply(lambda url: f"{url}:latest")
-    cache_tag = repository.repository_url.apply(lambda url: f"{url}:cache")
+    # For LocalStack, we need to use host.docker.internal:4566 for all registry operations since
+    # docker-build runs in a BuildKit container. The host.docker.internal hostname allows containers
+    # to reach the host's network where LocalStack is running.
+    # Use http:// explicitly to avoid TLS/HTTPS issues with LocalStack's self-signed certificate
+    registry_address = pulumi.Output.concat("http://host.docker.internal:4566")
+    image_tag = pulumi.Output.concat(f"host.docker.internal:4566/{project_name}-{environment}:latest")
 
     # Build and push image with caching
     image = docker_build.Image(
@@ -92,37 +107,43 @@ def create_container_image(
         push=True,
         tags=[image_tag],
         # Registry authentication for LocalStack ECR
+        # Use localhost:4566 as the actual registry address for network connectivity
         registries=[
             docker_build.RegistryArgs(
-                address=repository.repository_url,
+                address=registry_address,
                 username=username,
                 password=password,
             )
         ],
         # Cache configuration - best practice from documentation
         # Use registry-based cache for better performance
-        cache_to=[
-            docker_build.CacheToArgs(
-                registry=docker_build.CacheToRegistryArgs(
-                    ref=cache_tag,
-                    image_manifest=True,
-                    oci_media_types=True,
-                )
-            )
-        ],
-        # Reference the previously pushed cache image
-        cache_from=[
-            docker_build.CacheFromArgs(
-                registry=docker_build.CacheFromRegistryArgs(
-                    ref=cache_tag,
-                )
-            )
-        ],
+        # Disable cache for now due to LocalStack networking issues
+        # cache_to=[
+        #     docker_build.CacheToArgs(
+        #         registry=docker_build.CacheToRegistryArgs(
+        #             ref=pulumi.Output.concat(f"host.docker.internal:4566/{project_name}-{environment}:cache"),
+        #             image_manifest=True,
+        #             oci_media_types=True,
+        #         )
+        #     )
+        # ],
+        # cache_from=[
+        #     docker_build.CacheFromArgs(
+        #         registry=docker_build.CacheFromRegistryArgs(
+        #             ref=pulumi.Output.concat(f"host.docker.internal:4566/{project_name}-{environment}:cache"),
+        #         )
+        #     )
+        # ],
         opts=pulumi.ResourceOptions(provider=provider, depends_on=[repository]),
     )
 
-    # Extract the image URI (digest-based reference)
-    image_uri = image.ref
+    # Extract the image digest and construct the proper ECR URI
+    # We pushed using localhost:4566, but ECS tasks need to reference the ECR repository URL
+    # So we construct a URI using the repository URL + the digest from the pushed image
+    image_digest = image.digest
+    image_uri = pulumi.Output.all(repository.repository_url, image_digest).apply(
+        lambda args: f"{args[0]}@{args[1]}"
+    )
 
     return ContainerImage(
         repository=repository,

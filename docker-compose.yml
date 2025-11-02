@@ -14,9 +14,29 @@ services:
       - DEBUG=${DEBUG:-0}
       - PERSISTENCE=${PERSISTENCE:-0}
       - SERVICES=sqs,ecs,ec2,ecr,rds,iam,cloudwatch,logs,sts,s3,servicediscovery,elasticloadbalancing,elbv2,route53,kms
-      # Advertise host.docker.internal so containerized clients (BuildKit) can reach ECR endpoints
-      - HOSTNAME_EXTERNAL=host.docker.internal
-      - LOCALSTACK_HOST=host.docker.internal
+      # Use 'localstack' service name for internal Docker network communication
+      - HOSTNAME_EXTERNAL=localstack
+      - LOCALSTACK_HOST=localstack
     volumes:
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+
+  pulumi:
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.pulumi
+    container_name: pulumi-deploy
+    depends_on:
+      - localstack
+    environment:
+      - PULUMI_CONFIG_PASSPHRASE=${PULUMI_CONFIG_PASSPHRASE:-localstack}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
+    volumes:
+      - ./deploy:/workspace
+      - ./app:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.pulumi:/root/.pulumi
+    working_dir: /workspace
+    # Keep container running for interactive use
+    command: tail -f /dev/null
