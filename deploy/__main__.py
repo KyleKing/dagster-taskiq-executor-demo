@@ -178,7 +178,7 @@ def main() -> None:
             deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
                 type="ECS",
             ),
-            health_check_grace_period_seconds=0,
+            health_check_grace_period_seconds=300,
             force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider),
@@ -214,7 +214,7 @@ def main() -> None:
             deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
                 type="ECS",
             ),
-            health_check_grace_period_seconds=0,
+            health_check_grace_period_seconds=180,
             force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider, depends_on=[dagster.listener]),
@@ -226,7 +226,7 @@ def main() -> None:
             name=f"{settings.project.name}-workers-{settings.project.environment}",
             cluster=cluster.cluster.id,
             task_definition=taskiq.worker_task_definition.arn,
-            desired_count=0,
+            desired_count=settings.services.worker_desired_count,
             launch_type="FARGATE",
             network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
                 subnets=network.subnets.ids,
@@ -234,13 +234,13 @@ def main() -> None:
                 assign_public_ip=True,
             ),
             deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
-                enable=False,
-                rollback=False,
+                enable=True,
+                rollback=True,
             ),
             deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
                 type="ECS",
             ),
-            health_check_grace_period_seconds=0,
+            health_check_grace_period_seconds=120,
             force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider),

@@ -211,7 +211,7 @@ def create_dagster_infrastructure(
                 image=image,
                 environment={
                     "POSTGRES_HOST": host,
-                    "POSTGRES_PORT": "4510",
+                    "POSTGRES_PORT": "5432",
                     "POSTGRES_USER": "dagster",
                     "POSTGRES_PASSWORD": "dagster",
                     "POSTGRES_DB": "dagster",
@@ -259,7 +259,7 @@ def create_dagster_infrastructure(
                 image=image,
                 environment={
                     "POSTGRES_HOST": host,
-                    "POSTGRES_PORT": "4510",
+                    "POSTGRES_PORT": "5432",
                     "POSTGRES_USER": "dagster",
                     "POSTGRES_PASSWORD": "dagster",
                     "POSTGRES_DB": "dagster",
