@@ -15,15 +15,18 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
         get_database_manager,
         wait_for_database_ready,
     )
+    from .metrics import MetricsCollector, get_metrics_collector
 
 __all__ = [
     "DagsterPostgreSQLConfig",
     "DatabaseConnectionManager",
+    "MetricsCollector",
     "Settings",
     "create_dagster_instance_with_retry",
     "create_dagster_yaml_file",
     "get_dagster_instance_config",
     "get_database_manager",
+    "get_metrics_collector",
     "settings",
     "wait_for_database_ready",
 ]
@@ -37,6 +40,8 @@ _LAZY_IMPORTS = {
     "create_dagster_instance_with_retry": ("database", "create_dagster_instance_with_retry"),
     "get_database_manager": ("database", "get_database_manager"),
     "wait_for_database_ready": ("database", "wait_for_database_ready"),
+    "MetricsCollector": ("metrics", "MetricsCollector"),
+    "get_metrics_collector": ("metrics", "get_metrics_collector"),
 }
 
 

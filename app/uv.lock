@@ -397,6 +397,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aioboto3" },
     { name = "dagster" },
+    { name = "dagster-graphql" },
     { name = "dagster-postgres" },
     { name = "dagster-taskiq" },
     { name = "dagster-webserver" },
@@ -424,6 +425,7 @@ dev = [
 requires-dist = [
     { name = "aioboto3", specifier = ">=13.0.0" },
     { name = "dagster", specifier = ">=1.5.0" },
+    { name = "dagster-graphql", specifier = ">=0.21.0" },
     { name = "dagster-postgres", specifier = ">=0.21.0" },
     { name = "dagster-taskiq", editable = "../dagster-taskiq" },
     { name = "dagster-webserver", specifier = ">=1.5.0" },
