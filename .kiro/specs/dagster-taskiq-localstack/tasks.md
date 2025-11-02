@@ -27,12 +27,14 @@
 
 - [ ] 3. Implement core Dagster configuration and storage
   - [x] 3.1 Configure Dagster with PostgreSQL storage backend
+    - FYI: this was partially completed and required fixes to resolve numerous typing errors. Please verify the implementation against the requirements
     - Set up Dagster workspace configuration with RDS connection
     - Configure run storage, event log storage, and schedule storage
     - Implement database connection management and retry logic
     - _Requirements: 1.2, 3.4, 5.4_
   
   - [x] 3.2 Create Dagster repository with sample jobs
+    - FYI: this was partially completed and required fixes to resolve numerous typing errors. Please verify the implementation against the requirements
     - Implement "fast" jobs with 20±10 second async ops using asyncio.sleep
     - Implement "slow" jobs with 5±2 minute async ops using asyncio.sleep
     - Configure job schedules to run every ten minutes

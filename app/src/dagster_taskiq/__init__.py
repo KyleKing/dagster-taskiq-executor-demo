@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING, Any
 from .config import settings
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    repository = Any
+    defs = Any
     main = Any
 
-__all__ = ["main", "repository", "settings"]
+__all__ = ["defs", "main", "settings"]
 
 __version__ = "0.0.0"
 
 _LAZY_IMPORTS = {
-    "repository": ("dagster_jobs", "repository"),
+    "defs": ("dagster_jobs", "defs"),
     "main": ("main", "main"),
 }
 
