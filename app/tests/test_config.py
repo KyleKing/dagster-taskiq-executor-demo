@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import pathlib
 import tempfile
 from unittest.mock import Mock, patch
@@ -20,202 +19,196 @@ from dagster_taskiq.config.exceptions import DagsterDatabaseConnectionError
 from dagster_taskiq.config.settings import Settings
 
 
-class TestSettings:
-    """Test settings configuration."""
+def test_settings_from_env_test(test_settings: Settings) -> None:
+    """Settings load correctly from .env.test."""
+    # AWS settings from .env.test
+    assert test_settings.aws_region == "us-east-1"
+    assert test_settings.aws_endpoint_url == "http://localhost:4566"
+    assert test_settings.aws_access_key_id == "test"
+    assert test_settings.aws_secret_access_key == "test"
 
-    def test_settings_from_env_test(self, test_settings: Settings):
-        """Test that settings load correctly from .env.test file."""
-        # AWS settings from .env.test
-        assert test_settings.aws_region == "us-east-1"
-        assert test_settings.aws_endpoint_url == "http://localhost:4566"
-        assert test_settings.aws_access_key_id == "test"
-        assert test_settings.aws_secret_access_key == "test"
+    # Database settings from .env.test
+    assert test_settings.postgres_host == "localhost"
+    assert test_settings.postgres_port == 5432
+    assert test_settings.postgres_user == "test"
+    assert test_settings.postgres_password == "test"
+    assert test_settings.postgres_db == "test"
 
-        # Database settings from .env.test
-        assert test_settings.postgres_host == "localhost"
-        assert test_settings.postgres_port == 5432
-        assert test_settings.postgres_user == "test"
-        assert test_settings.postgres_password == "test"
-        assert test_settings.postgres_db == "test"
-
-        # Dagster settings from .env.test
-        assert test_settings.dagster_home == "/tmp/dagster_test"
-        assert test_settings.dagster_webserver_host == "localhost"
-        assert test_settings.dagster_webserver_port == 3001
-
-    def test_postgres_url_property(self, test_settings: Settings):
-        """Test postgres_url property construction."""
-        expected_url = "postgresql://test:test@localhost:5432/test"
-        assert test_settings.postgres_url == expected_url
-
-    def test_dagster_postgres_url_property(self, test_settings: Settings):
-        """Test dagster_postgres_url property construction."""
-        expected_url = "postgresql+psycopg2://test:test@localhost:5432/test"
-        assert test_settings.dagster_postgres_url == expected_url
+    # Dagster settings from .env.test
+    assert test_settings.dagster_home == "/tmp/dagster_test"
+    assert test_settings.dagster_webserver_host == "localhost"
+    assert test_settings.dagster_webserver_port == 3001
 
 
-
-class TestDagsterPostgreSQLConfig:
-    """Test Dagster PostgreSQL configuration helpers."""
-
-    def test_get_postgres_storage_config(self, test_settings: Settings):
-        """Test PostgreSQL storage configuration generation."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = DagsterPostgreSQLConfig.get_postgres_storage_config()
-
-            assert "postgres_url" in config
-            assert config["postgres_url"] == test_settings.dagster_postgres_url
-            assert config["should_autocreate_tables"] is True
-
-    def test_get_run_storage_config(self, test_settings: Settings):
-        """Test run storage configuration generation."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = DagsterPostgreSQLConfig.get_run_storage_config()
-
-            assert config["module"] == "dagster_postgres.run_storage"
-            assert config["class"] == "DagsterPostgresRunStorage"
-            assert "config" in config
-            assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
-
-    def test_get_event_log_storage_config(self, test_settings: Settings):
-        """Test event log storage configuration generation."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = DagsterPostgreSQLConfig.get_event_log_storage_config()
-
-            assert config["module"] == "dagster_postgres.event_log"
-            assert config["class"] == "DagsterPostgresEventLogStorage"
-            assert "config" in config
-            assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
-
-    def test_get_schedule_storage_config(self, test_settings: Settings):
-        """Test schedule storage configuration generation."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = DagsterPostgreSQLConfig.get_schedule_storage_config()
-
-            assert config["module"] == "dagster_postgres.schedule_storage"
-            assert config["class"] == "DagsterPostgresScheduleStorage"
-            assert "config" in config
-            assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
-
-    def test_get_compute_log_storage_config(self):
-        """Test compute log storage configuration generation."""
-        config = DagsterPostgreSQLConfig.get_compute_log_storage_config()
-
-        assert config["module"] == "dagster._core.storage.noop_compute_log_manager"
-        assert config["class"] == "NoOpComputeLogManager"
-
-    def test_get_dagster_yaml_config(self, test_settings: Settings):
-        """Test complete Dagster YAML configuration generation."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = DagsterPostgreSQLConfig.get_dagster_yaml_config()
-
-            # Check top-level structure
-            assert "storage" in config
-            assert "run_coordinator" in config
-            assert "run_launcher" in config
-            assert "compute_logs" in config
-
-            # Check storage configuration
-            storage = config["storage"]
-            assert "postgres" in storage
-            assert storage["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
-            assert storage["postgres"]["should_autocreate_tables"] is True
-
-            # Check run coordinator
-            assert config["run_coordinator"]["class"] == "DefaultRunCoordinator"
-
-            # Check run launcher
-            assert config["run_launcher"]["class"] == "DefaultRunLauncher"
+def test_postgres_url_property(test_settings: Settings) -> None:
+    """postgres_url property construction."""
+    expected_url = "postgresql://test:test@localhost:5432/test"
+    assert test_settings.postgres_url == expected_url
 
 
-class TestRetryablePostgresStorage:
-    """Test retryable PostgreSQL storage."""
+def test_dagster_postgres_url_property(test_settings: Settings) -> None:
+    """dagster_postgres_url property construction."""
+    expected_url = "postgresql+psycopg2://test:test@localhost:5432/test"
+    assert test_settings.dagster_postgres_url == expected_url
 
-    def test_create_storage_success_first_try(self):
-        """Test successful storage creation on first attempt."""
-        postgres_url = "postgresql://test:test@localhost:5432/test"
-        storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.1)
 
-        with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
-            mock_instance = Mock()
-            mock_storage_class.return_value = mock_instance
+def test_get_postgres_storage_config(test_settings: Settings) -> None:
+    """PostgreSQL storage configuration generation."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = DagsterPostgreSQLConfig.get_postgres_storage_config()
 
+    assert "postgres_url" in config
+    assert config["postgres_url"] == test_settings.dagster_postgres_url
+    assert config["should_autocreate_tables"] is True
+
+
+def test_get_run_storage_config(test_settings: Settings) -> None:
+    """Run storage configuration generation."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = DagsterPostgreSQLConfig.get_run_storage_config()
+
+    assert config["module"] == "dagster_postgres.run_storage"
+    assert config["class"] == "DagsterPostgresRunStorage"
+    assert "config" in config
+    assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
+
+
+def test_get_event_log_storage_config(test_settings: Settings) -> None:
+    """Event log storage configuration generation."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = DagsterPostgreSQLConfig.get_event_log_storage_config()
+
+    assert config["module"] == "dagster_postgres.event_log"
+    assert config["class"] == "DagsterPostgresEventLogStorage"
+    assert "config" in config
+    assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
+
+
+def test_get_schedule_storage_config(test_settings: Settings) -> None:
+    """Schedule storage configuration generation."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = DagsterPostgreSQLConfig.get_schedule_storage_config()
+
+    assert config["module"] == "dagster_postgres.schedule_storage"
+    assert config["class"] == "DagsterPostgresScheduleStorage"
+    assert "config" in config
+    assert config["config"]["postgres_url"] == test_settings.dagster_postgres_url
+
+
+def test_get_compute_log_storage_config() -> None:
+    """Compute log storage configuration generation."""
+    config = DagsterPostgreSQLConfig.get_compute_log_storage_config()
+
+    assert config["module"] == "dagster._core.storage.noop_compute_log_manager"
+    assert config["class"] == "NoOpComputeLogManager"
+
+
+def test_get_dagster_yaml_config(test_settings: Settings) -> None:
+    """Complete Dagster YAML configuration generation."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = DagsterPostgreSQLConfig.get_dagster_yaml_config()
+
+    # Check top-level structure
+    assert "storage" in config
+    assert "run_coordinator" in config
+    assert "run_launcher" in config
+    assert "compute_logs" in config
+
+    # Check storage configuration
+    storage = config["storage"]
+    assert "postgres" in storage
+    assert storage["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
+    assert storage["postgres"]["should_autocreate_tables"] is True
+
+    # Check run coordinator
+    assert config["run_coordinator"]["class"] == "DefaultRunCoordinator"
+
+    # Check run launcher
+    assert config["run_launcher"]["class"] == "DefaultRunLauncher"
+
+
+def test_create_storage_success_first_try() -> None:
+    """Successful storage creation on first attempt."""
+    postgres_url = "postgresql://test:test@localhost:5432/test"
+    storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.1)
+
+    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+        mock_instance = Mock()
+        mock_storage_class.return_value = mock_instance
+
+        result = storage.create_storage()
+
+    assert result == mock_instance
+    mock_storage_class.assert_called_once_with(
+        postgres_url=postgres_url,
+        should_autocreate_tables=True,
+    )
+
+
+def test_create_storage_success_after_retries() -> None:
+    """Successful storage creation after retries."""
+    postgres_url = "postgresql://test:test@localhost:5432/test"
+    storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.01)
+
+    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+        mock_instance = Mock()
+        # Fail twice, then succeed
+        mock_storage_class.side_effect = [
+            ConnectionError("Connection failed"),
+            ConnectionError("Connection failed"),
+            mock_instance,
+        ]
+
+        with patch("time.sleep") as mock_sleep:
             result = storage.create_storage()
 
-            assert result == mock_instance
-            mock_storage_class.assert_called_once_with(
-                postgres_url=postgres_url,
-                should_autocreate_tables=True,
-            )
-
-    def test_create_storage_success_after_retries(self):
-        """Test successful storage creation after retries."""
-        postgres_url = "postgresql://test:test@localhost:5432/test"
-        storage = RetryablePostgresStorage(postgres_url, max_retries=3, retry_delay=0.01)
-
-        with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
-            mock_instance = Mock()
-            # Fail twice, then succeed
-            mock_storage_class.side_effect = [
-                ConnectionError("Connection failed"),
-                ConnectionError("Connection failed"),
-                mock_instance,
-            ]
-
-            with patch("time.sleep") as mock_sleep:
-                result = storage.create_storage()
-
-                assert result == mock_instance
-                assert mock_storage_class.call_count == 3
-                assert mock_sleep.call_count == 2  # Sleep after first two failures
-
-    def test_create_storage_failure_after_max_retries(self):
-        """Test storage creation failure after max retries."""
-        postgres_url = "postgresql://test:test@localhost:5432/test"
-        storage = RetryablePostgresStorage(postgres_url, max_retries=2, retry_delay=0.01)
-
-        with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
-            mock_storage_class.side_effect = ConnectionError("Connection failed")
-
-            with patch("time.sleep"):
-                with pytest.raises(DagsterDatabaseConnectionError) as exc_info:
-                    storage.create_storage()
-
-                assert "Failed to connect to PostgreSQL after 2 attempts" in str(exc_info.value)
-                assert mock_storage_class.call_count == 2
+    assert result == mock_instance
+    assert mock_storage_class.call_count == 3
+    assert mock_sleep.call_count == 2  # Sleep after first two failures
 
 
-class TestConfigurationFiles:
-    """Test configuration file generation."""
+def test_create_storage_failure_after_max_retries() -> None:
+    """Storage creation failure after max retries."""
+    postgres_url = "postgresql://test:test@localhost:5432/test"
+    storage = RetryablePostgresStorage(postgres_url, max_retries=2, retry_delay=0.01)
 
-    def test_create_dagster_yaml_file(self, test_settings: Settings):
-        """Test creation of dagster.yaml file."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            with tempfile.TemporaryDirectory() as temp_dir:
-                output_path = pathlib.Path(temp_dir) / "test_dagster.yaml"
+    with patch("dagster_taskiq.config.dagster.DagsterPostgresStorage") as mock_storage_class:
+        mock_storage_class.side_effect = ConnectionError("Connection failed")
 
-                create_dagster_yaml_file(output_path)
+        with patch("time.sleep"), pytest.raises(DagsterDatabaseConnectionError) as exc_info:
+            storage.create_storage()
 
-                assert output_path.exists()
+    assert "Failed to connect to PostgreSQL after 2 attempts" in str(exc_info.value)
+    assert mock_storage_class.call_count == 2
 
-                # Verify file contents
-                with output_path.open("r", encoding="utf-8") as file:
-                    config = yaml.safe_load(file)
 
-                assert "storage" in config
-                assert "postgres" in config["storage"]
-                assert config["storage"]["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
+def test_create_dagster_yaml_file(test_settings: Settings) -> None:
+    """Creation of dagster.yaml file."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings), tempfile.TemporaryDirectory() as temp_dir:
+        output_path = pathlib.Path(temp_dir) / "test_dagster.yaml"
 
-    def test_get_dagster_instance_config(self, test_settings: Settings):
-        """Test programmatic Dagster instance configuration."""
-        with patch("dagster_taskiq.config.dagster.settings", test_settings):
-            config = get_dagster_instance_config()
+        create_dagster_yaml_file(output_path)
 
-            # Should have same structure as YAML config
-            assert "storage" in config
-            assert "run_coordinator" in config
-            assert "run_launcher" in config
-            assert "compute_logs" in config
+        assert output_path.exists()
 
-            # Should use test settings
-            assert config["storage"]["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
+        with output_path.open("r", encoding="utf-8") as file:
+            config = yaml.safe_load(file)
+
+    assert "storage" in config
+    assert "postgres" in config["storage"]
+    assert config["storage"]["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
+
+
+def test_get_dagster_instance_config(test_settings: Settings) -> None:
+    """Programmatic Dagster instance configuration."""
+    with patch("dagster_taskiq.config.dagster.settings", test_settings):
+        config = get_dagster_instance_config()
+
+    # Should have same structure as YAML config
+    assert "storage" in config
+    assert "run_coordinator" in config
+    assert "run_launcher" in config
+    assert "compute_logs" in config
+
+    # Should use test settings
+    assert config["storage"]["postgres"]["postgres_url"] == test_settings.dagster_postgres_url

@@ -22,6 +22,11 @@ class FastOpConfig(Config):
     base_duration: int = Field(default=20, description="Base duration in seconds")
     variance: int = Field(default=10, description="Duration variance in seconds")
     data_size: int = Field(default=1000, description="Size of data to process")
+    sleep_interval: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Seconds to sleep between progress updates",
+    )
 
 
 class SlowOpConfig(Config):
@@ -30,6 +35,12 @@ class SlowOpConfig(Config):
     base_duration: int = Field(default=300, description="Base duration in seconds (5 minutes)")
     variance: int = Field(default=120, description="Duration variance in seconds (2 minutes)")
     data_size: int = Field(default=10000, description="Size of data to process")
+    min_duration: int = Field(default=60, ge=1, description="Minimum total duration in seconds")
+    sleep_interval: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Seconds to sleep between progress updates",
+    )
 
 
 @op
@@ -55,7 +66,7 @@ async def fast_async_op(context: OpExecutionContext, config: FastOpConfig) -> di
     progress_interval = max(1, duration // 3)  # Update progress 3 times during execution
 
     for i in range(duration):
-        await asyncio.sleep(1)
+        await asyncio.sleep(config.sleep_interval)
         if i % progress_interval == 0:
             progress = (i / duration) * 100
             context.log.info("Fast op progress: %.1f%%", progress)
@@ -92,7 +103,7 @@ async def slow_async_op(context: OpExecutionContext, config: SlowOpConfig) -> di
     """
     # Calculate actual duration with variance
     variance = secrets.randbelow(2 * config.variance + 1) - config.variance
-    duration = max(60, config.base_duration + variance)
+    duration = max(config.min_duration, config.base_duration + variance)
 
     context.log.info("Starting slow async op with duration: %ss (%.1f minutes)", duration, duration / 60)
     logger.info("slow_op_started", duration=duration, data_size=config.data_size)
@@ -102,7 +113,7 @@ async def slow_async_op(context: OpExecutionContext, config: SlowOpConfig) -> di
     progress_interval = max(10, duration // 10)  # Update progress 10 times during execution
 
     for i in range(duration):
-        await asyncio.sleep(1)
+        await asyncio.sleep(config.sleep_interval)
         if i % progress_interval == 0:
             progress = (i / duration) * 100
             context.log.info("Slow op progress: %.1f%%", progress)
