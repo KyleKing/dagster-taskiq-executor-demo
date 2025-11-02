@@ -3,8 +3,9 @@
 This repository bootstraps a LocalStack container preconfigured with ECS and SQS so you can prototype AWS integrations locally.
 
 ## Prerequisites
+- `mise` (`brew install mise` and `mise install`) - manages tool versions (pulumi, uv, etc.)
 - Docker Desktop (or compatible Docker engine)
-- Optional: `awslocal` (`pip install awscli-local`) for interacting with LocalStack from the host
+- `awslocal` CLI (`uvx awscli-local` or `mise use pipx:awscli-local`) - **required** for pushing Docker images to LocalStack ECR
 - LocalStack Pro API key (`LOCALSTACK_AUTH_TOKEN`) to unlock ECS, RDS, Cloud Map, and ALB emulation
 
 ## Usage
@@ -13,39 +14,64 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
    cp .env.example .env
    nvim .env
    ```
-2. Build and start LocalStack plus the Pulumi workspace container
+2. Start LocalStack
    ```bash
-   docker compose up --build localstack pulumi
+   docker compose up -d localstack
    ```
-   The Pulumi container (_pulumi-deploy_) stays running so you can execute `uv` and `pulumi` commands inside a consistent environment.
+
 3. The LocalStack web UI is now available at: <https://app.localstack.cloud>. Interact with the emulated services
    ```bash
    awslocal sqs list-queues
    awslocal ecs list-clusters
    ```
 
-5. Stop and clean up
+4. Stop and clean up
    ```bash
    docker compose down
    ```
 
 ## Pulumi Deployment
-1. Ensure the `localstack` and `pulumi` services are running:
-   ```bash
-   docker compose up -d localstack pulumi
-   ```
-2. Preview or apply the stack from inside the Pulumi container:
-   ```bash
-   docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local
-   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
-   ```
-   The container already has dependencies installed through `uv sync`, and the stack configuration (`Pulumi.local.yaml`) targets LocalStack at `http://localstack:4566`.
 
-3. Update configuration as needed, for example:
+### Initial Setup
+
+1. Ensure LocalStack is running:
    ```bash
-   docker compose exec pulumi uv run pulumi config set queueName my-queue --stack local
-   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
+   docker compose up -d localstack
    ```
+
+2. Deploy the infrastructure:
+   ```bash
+   cd deploy
+   uv run pulumi up --yes --stack local
+   ```
+   This creates the ECR repository and other AWS resources. The stack configuration (`Pulumi.local.yaml`) targets LocalStack at `http://localstack:4566`.
+
+3. Build and push the application Docker image to LocalStack ECR:
+   ```bash
+   ./scripts/build-and-push.sh
+   ```
+   This uses Docker Bake to build the application image and pushes it to the ECR repository created in step 2.
+
+### Development Workflow
+
+**Application code changes:**
+```bash
+./scripts/build-and-push.sh  # Rebuild and push the image with Docker Bake
+# Update ECS services to pull the new image (manual restart or update task definition)
+```
+
+**Infrastructure changes:**
+```bash
+cd deploy
+uv run pulumi up --yes --stack local
+```
+
+**Configuration updates:**
+```bash
+cd deploy
+uv run pulumi config set queueName my-queue --stack local
+uv run pulumi up --yes --stack local
+```
 
 ## Configuration
 - `AWS_DEFAULT_REGION` (default `us-east-1`) controls the region used by LocalStack.
@@ -56,5 +82,8 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
 Update these variables in your shell environment or in a `.env` file that Docker Compose can load.
 
 ## Notes
+- **Docker Bake**: Uses Docker Bake (see `docker-bake.hcl`) for declarative, reproducible container image builds
+- **Image Build Separation**: Docker images are built and pushed separately from Pulumi using `./scripts/build-and-push.sh` and the `awslocal` CLI. This avoids networking complexity with Pulumi's docker-build provider and uses LocalStack's well-tested workflow.
+- **Local Pulumi**: Pulumi runs directly on your machine (no Docker container needed) - just use `cd deploy && uv run pulumi <command>`
 - ECS support requires Docker access inside the LocalStack container. The compose file mounts the host Docker socket for this purpose.
 - LocalStack Pro is required for all ECS, RDS, Service Discovery, and Application Load Balancer APIs used in this demo. Without a valid `LOCALSTACK_AUTH_TOKEN` Pulumi will fail with `InvalidClientTokenId` or `InternalFailure` responses from LocalStack.

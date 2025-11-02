@@ -53,20 +53,37 @@ The project uses:
 
 ## Getting Started
 
-1. Build and launch LocalStack plus the Pulumi workspace container:
+### Initial Setup
+
+1. Launch LocalStack:
    ```sh
-   docker compose up --build localstack pulumi
+   docker compose up -d localstack
    ```
-   The `pulumi` service keeps a uv-managed environment running so all commands execute in a consistent container.
-2. Preview the stack from inside the Pulumi container:
+
+2. Deploy the infrastructure with Pulumi:
    ```sh
-   docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local
+   cd deploy
+   uv run pulumi up --yes --stack local
    ```
-3. Do not auto-apply and instead inform the user they can run:
+   This creates the ECR repository and other AWS resources in LocalStack.
+
+3. Build and push the application Docker image to LocalStack ECR:
    ```sh
-   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
+   ./scripts/build-and-push.sh
    ```
+   This script uses Docker Bake to build the application image and pushes it to LocalStack ECR using `awslocal`.
+
 4. Run Dagster services as described in the application README once infrastructure is provisioned.
+
+### Development Workflow
+
+**Application code changes:**
+1. Rebuild and push the image: `./scripts/build-and-push.sh`
+2. Update ECS services to use the new image (Pulumi doesn't need to run again unless infrastructure changes)
+
+**Infrastructure changes:**
+1. Update Pulumi code
+2. Run: `cd deploy && uv run pulumi up --yes --stack local`
 
 See individual component READMEs for detailed setup instructions.
 
@@ -130,7 +147,24 @@ Keep this file up to date as major changes are made or errors in implementation 
 
 ## Automation Notes
 
-- When validating changes, run `docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local`
-- Always execute Pulumi via the container: `docker compose exec pulumi uv run pulumi <command> --yes --non-interactive --stack local`
-- If Pulumi doesn't stop and is running for more than 10 minutes, that likely means there was a failure and the logs from Docker Compose LocalStack need to be inspected. Do not let Pulumi run for more than 10 minutes. If Pulumi is stopped (Ctrl-C twice), then a human must run `pulumi cancel` and reconfirm the stack name to release the lock
-- Pulumi commands must include `--yes --non-interactive` so the CLI never waits for manual confirmation.
+- **Pulumi runs locally**: No Docker container required for Pulumi - just run `cd deploy && uv run pulumi <command>` directly
+- **Docker Bake for builds**: Images are built using Docker Bake (see `docker-bake.hcl`) via `./scripts/build-and-push.sh`
+- **Image Build Separation**: Docker images are built and pushed separately from Pulumi using `./scripts/build-and-push.sh` and the `awslocal` CLI. This avoids networking complexity and uses LocalStack's well-tested workflow.
+- When validating changes, run `cd deploy && uv run pulumi preview --stack local`
+- If Pulumi doesn't stop and is running for more than 10 minutes, that likely means there was a failure and the logs from Docker Compose LocalStack need to be inspected. Do not let Pulumi run for more than 10 minutes. If Pulumi is stopped (Ctrl-C twice), then a human must run `cd deploy && pulumi cancel` and reconfirm the stack name to release the lock
+- Pulumi commands must include `--yes` for automated deployments so the CLI never waits for manual confirmation.
+
+## Container Image Management
+
+The project uses Docker Bake to simplify container image builds and separates building from infrastructure provisioning:
+
+- **Build Tool**: Docker Bake (config in `docker-bake.hcl`) provides declarative, reproducible builds
+- **Build & Push**: Use `./scripts/build-and-push.sh` to build with Bake and push to LocalStack ECR
+- **Pulumi**: Only creates the ECR repository and references the pre-built image
+- **Why**: This approach avoids networking complexity with Pulumi's docker-build provider and LocalStack ECR, using the well-documented `awslocal` workflow instead
+
+Prerequisites:
+- LocalStack running (`docker compose up -d localstack`)
+- `awslocal` installed (`uvx awscli-local` or `mise use pipx:awscli-local`)
+- `uv` for Python dependency management
+- `pulumi` CLI installed locally (or via `mise`)

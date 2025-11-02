@@ -1,5 +1,6 @@
 [tools]
 node = "latest"
+"pipx:awscli-local" = "latest"
 python = "3.13"
 
 [env]

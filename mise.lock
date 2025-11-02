@@ -2,6 +2,10 @@
 version = "25.1.0"
 backend = "core:node"
 
+[[tools."pipx:awscli-local"]]
+version = "0.22.2"
+backend = "pipx:awscli-local"
+
 [[tools.python]]
 version = "3.13.7"
 backend = "core:python"
