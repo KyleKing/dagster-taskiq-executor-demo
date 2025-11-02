@@ -13,10 +13,11 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
    cp .env.example .env
    nvim .env
    ```
-2. Start LocalStack
+2. Build and start LocalStack plus the Pulumi workspace container
    ```bash
-   docker compose up --build
+   docker compose up --build localstack pulumi
    ```
+   The Pulumi container (_pulumi-deploy_) stays running so you can execute `uv` and `pulumi` commands inside a consistent environment.
 3. The LocalStack web UI is now available at: <https://app.localstack.cloud>. Interact with the emulated services
    ```bash
    awslocal sqs list-queues
@@ -29,20 +30,21 @@ This repository bootstraps a LocalStack container preconfigured with ECS and SQS
    ```
 
 ## Pulumi Deployment
-1. Ensure LocalStack is running (see above).
-2. Provision resources with Pulumi via `uv`:
+1. Ensure the `localstack` and `pulumi` services are running:
    ```bash
-   cd deploy
-   uv sync
-   # Use the local stack (passphrase: 'localstack')
-   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
+   docker compose up -d localstack pulumi
    ```
-   The stack configurations (`Pulumi.local.yaml`) point the AWS provider at `http://localhost:4566` and seed demo names for the ECS cluster and SQS queue.
+2. Preview or apply the stack from inside the Pulumi container:
+   ```bash
+   docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local
+   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
+   ```
+   The container already has dependencies installed through `uv sync`, and the stack configuration (`Pulumi.local.yaml`) targets LocalStack at `http://localstack:4566`.
 
 3. Update configuration as needed, for example:
    ```bash
-   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi config set queueName my-queue --stack local
-   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
+   docker compose exec pulumi uv run pulumi config set queueName my-queue --stack local
+   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
    ```
 
 ## Configuration

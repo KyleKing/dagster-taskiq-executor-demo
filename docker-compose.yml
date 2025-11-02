@@ -36,7 +36,11 @@ services:
       - ./deploy:/workspace
       - ./app:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.pulumi:/root/.pulumi
+      # Don't mount host .pulumi - let container download correct architecture plugins
+      - pulumi-data:/root/.pulumi
     working_dir: /workspace
     # Keep container running for interactive use
     command: tail -f /dev/null
+
+volumes:
+  pulumi-data:

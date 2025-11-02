@@ -53,17 +53,18 @@ The project uses:
 
 ## Getting Started
 
-1. Launch LocalStack and PostgreSQL: `docker compose up localstack postgres`
-2. Install Pulumi dependencies and preview the stack:
+1. Build and launch LocalStack plus the Pulumi workspace container:
    ```sh
-   cd deploy
-   uv sync --extra dev
-   # Use the local stack (passphrase: 'localstack')
-   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local
+   docker compose up --build localstack pulumi
+   ```
+   The `pulumi` service keeps a uv-managed environment running so all commands execute in a consistent container.
+2. Preview the stack from inside the Pulumi container:
+   ```sh
+   docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local
    ```
 3. Do not auto-apply and instead inform the user they can run:
    ```sh
-   PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi up --stack local
+   docker compose exec pulumi uv run pulumi up --yes --non-interactive --stack local
    ```
 4. Run Dagster services as described in the application README once infrastructure is provisioned.
 
@@ -121,6 +122,7 @@ Keep this file up to date as major changes are made or errors in implementation 
 
 ## Automation Notes
 
-- When validating changes, run `PULUMI_CONFIG_PASSPHRASE=localstack uv run pulumi preview --stack local`
+- When validating changes, run `docker compose exec pulumi uv run pulumi preview --yes --non-interactive --stack local`
+- Always execute Pulumi via the container: `docker compose exec pulumi uv run pulumi <command> --yes --non-interactive --stack local`
 - If Pulumi doesn't stop and is running for more than 10 minutes, that likely means there was a failure and the logs from Docker Compose LocalStack need to be inspected. Do not let Pulumi run for more than 10 minutes. If Pulumi is stopped (Ctrl-C twice), then a human must run `pulumi cancel` and reconfirm the stack name to release the lock
 - Pulumi commands must include `--yes --non-interactive` so the CLI never waits for manual confirmation.

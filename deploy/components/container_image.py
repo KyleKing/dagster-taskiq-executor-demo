@@ -85,12 +85,11 @@ def create_container_image(
     raw_password = auth_token.apply(lambda token: token.password)
     password = pulumi.Output.secret(raw_password)
 
-    # For LocalStack, we need to use host.docker.internal:4566 for all registry operations since
-    # docker-build runs in a BuildKit container. The host.docker.internal hostname allows containers
-    # to reach the host's network where LocalStack is running.
-    # Use http:// explicitly to avoid TLS/HTTPS issues with LocalStack's self-signed certificate
-    registry_address = pulumi.Output.concat("http://host.docker.internal:4566")
-    image_tag = pulumi.Output.concat(f"host.docker.internal:4566/{project_name}-{environment}:latest")
+    # For LocalStack, use the Docker service name 'localstack' when running Pulumi inside Docker Compose.
+    # This allows direct communication over the Docker network without TLS/DNS issues.
+    # Use http:// explicitly to avoid HTTPS/TLS certificate verification issues.
+    registry_address = pulumi.Output.concat("http://localstack:4566")
+    image_tag = pulumi.Output.concat(f"localstack:4566/{project_name}-{environment}:latest")
 
     # Build and push image with caching
     image = docker_build.Image(
