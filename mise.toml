@@ -1,3 +1,6 @@
+# Root mise.toml - Monorepo Orchestration
+# This file coordinates tasks across the entire repository
+
 [tools]
 "asdf:postgres" = "17"
 node = "latest"
@@ -11,104 +14,64 @@ AWS_DEFAULT_REGION = "us-east-1"
 PROJECT_NAME = "dagster-taskiq-demo"
 ENVIRONMENT = "local"
 
-[vars]
-app_dir = "app"
-deploy_dir = "deploy"
-region = "us-east-1"
-
 # ==============================================================================
-# Development Tasks
+# Monorepo Orchestration Tasks
+# These tasks coordinate work across app/ and deploy/ subdirectories
 # ==============================================================================
 
 [tasks.install]
 description = "Install all dependencies (app + deploy)"
 alias = "i"
-depends = ["install:app", "install:deploy"]
-
-[tasks."install:app"]
-description = "Install app dependencies"
-hide = true
-run = "cd app && uv sync --all-groups"
-sources = ["app/pyproject.toml", "app/uv.lock"]
-
-[tasks."install:deploy"]
-description = "Install deploy dependencies"
-hide = true
-run = "cd deploy && uv sync --all-groups"
-sources = ["deploy/pyproject.toml", "deploy/uv.lock"]
+run = [
+    "mise -C app run install",
+    "mise -C deploy run install",
+]
 
 [tasks.test]
-description = "Run all tests"
+description = "Run all tests (app + deploy)"
 alias = "t"
-depends = ["test:app", "test:deploy"]
-
-[tasks."test:app"]
-description = "Run app tests with pytest"
-run = "cd app && uv run pytest"
-sources = ["app/src/**/*.py", "app/tests/**/*.py"]
-env = { PYTHONPATH = "app/src" }
-
-[tasks."test:deploy"]
-description = "Run deploy tests with pytest"
-run = "cd deploy && uv run pytest"
-sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+run = [
+    "mise -C app run test",
+    "mise -C deploy run test",
+]
 
 [tasks.lint]
-description = "Run ruff linter on all code"
+description = "Lint all code (app + deploy)"
 alias = "l"
-depends = ["lint:app", "lint:deploy"]
+run = [
+    "mise -C app run lint",
+    "mise -C deploy run lint",
+]
 
-[tasks."lint:app"]
-description = "Lint app code with ruff"
-hide = true
-run = "cd app && uv run ruff check ."
-sources = ["app/src/**/*.py", "app/tests/**/*.py"]
-
-[tasks."lint:deploy"]
-description = "Lint deploy code with ruff"
-hide = true
-run = "cd deploy && uv run ruff check ."
-sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+[tasks."lint:fix"]
+description = "Lint and auto-fix all code"
+run = [
+    "mise -C app run lint:fix",
+    "mise -C deploy run lint:fix",
+]
 
 [tasks.format]
-description = "Format all code with ruff"
+description = "Format all code (app + deploy)"
 alias = "f"
-depends = ["format:app", "format:deploy"]
+run = [
+    "mise -C app run format",
+    "mise -C deploy run format",
+]
 
-[tasks."format:app"]
-description = "Format app code with ruff"
-hide = true
-run = "cd app && uv run ruff format ."
-sources = ["app/src/**/*.py", "app/tests/**/*.py"]
-
-[tasks."format:deploy"]
-description = "Format deploy code with ruff"
-hide = true
-run = "cd deploy && uv run ruff format ."
-sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+[tasks."format:check"]
+description = "Check formatting without modifying files"
+run = [
+    "mise -C app run format:check",
+    "mise -C deploy run format:check",
+]
 
 [tasks.typecheck]
-description = "Run type checkers (mypy + pyright)"
+description = "Type check all code (app + deploy)"
 alias = "tc"
-depends = ["typecheck:app", "typecheck:deploy"]
-
-[tasks."typecheck:app"]
-description = "Type check app code"
-hide = true
 run = [
-    "cd app && uv run mypy src",
-    "cd app && uv run pyright",
+    "mise -C app run typecheck",
+    "mise -C deploy run typecheck",
 ]
-sources = ["app/src/**/*.py"]
-
-[tasks."typecheck:deploy"]
-description = "Type check deploy code"
-hide = true
-run = [
-    "cd deploy && uv run mypy .",
-    "cd deploy && uv run pyright",
-]
-sources = ["deploy/**/*.py"]
 
 [tasks.check]
 description = "Run all checks (lint + typecheck + test)"
@@ -153,36 +116,32 @@ run = "./scripts/build-and-push.sh"
 
 # ==============================================================================
 # Infrastructure Tasks (Pulumi)
+# Delegates to deploy/mise.toml but provides convenience aliases
 # ==============================================================================
 
-[tasks."infra:up"]
+[tasks.up]
 description = "Deploy infrastructure with Pulumi"
-alias = "up"
-run = "cd deploy && uv run pulumi up --yes --stack local"
-dir = "{{cwd}}"
+alias = "infra:up"
+run = "mise -C deploy run up"
 
-[tasks."infra:down"]
+[tasks.down]
 description = "Destroy infrastructure with Pulumi"
-alias = "down"
+alias = "infra:down"
 confirm = "Are you sure you want to destroy the infrastructure?"
-run = "cd deploy && uv run pulumi destroy --yes --stack local"
-dir = "{{cwd}}"
+run = "mise -C deploy run down"
 
-[tasks."infra:preview"]
+[tasks.preview]
 description = "Preview infrastructure changes"
-alias = "preview"
-run = "cd deploy && uv run pulumi preview --stack local"
-dir = "{{cwd}}"
+alias = "infra:preview"
+run = "mise -C deploy run preview"
 
-[tasks."infra:refresh"]
+[tasks.refresh]
 description = "Refresh Pulumi state"
-run = "cd deploy && uv run pulumi refresh --yes --stack local"
-dir = "{{cwd}}"
+run = "mise -C deploy run refresh"
 
-[tasks."infra:outputs"]
+[tasks.outputs]
 description = "Show Pulumi stack outputs"
-run = "cd deploy && uv run pulumi stack output --stack local"
-dir = "{{cwd}}"
+run = "mise -C deploy run outputs"
 
 # ==============================================================================
 # LocalStack Service Management
@@ -275,18 +234,15 @@ echo "Run 'mise run push' to build and push the Docker image"
 
 [tasks.deploy]
 description = "Full deployment workflow (build, infra, push)"
-depends = ["localstack:start", "infra:up", "push"]
+depends = ["localstack:start", "up", "push"]
 run = "echo 'Deployment complete! Check services: mise run aws:services'"
 
 [tasks.clean]
-description = "Clean build artifacts and caches"
+description = "Clean build artifacts and caches in all projects"
 run = [
-    "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.ruff_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type d -name '.mypy_cache' -exec rm -rf {} + 2>/dev/null || true",
-    "find . -type f -name '*.pyc' -delete 2>/dev/null || true",
-    "echo 'Cleaned Python caches and artifacts'",
+    "mise -C app run clean",
+    "mise -C deploy run clean",
+    "echo 'Cleaned all project caches and artifacts'",
 ]
 
 [tasks."clean:all"]
@@ -294,7 +250,8 @@ description = "Clean everything including venvs and Docker"
 confirm = "This will remove all virtual environments and Docker images. Continue?"
 depends = ["clean"]
 run = [
-    "rm -rf app/.venv deploy/.venv",
+    "mise -C app run clean:venv 2>/dev/null || true",
+    "mise -C deploy run clean:venv 2>/dev/null || true",
     "docker image rm dagster-taskiq-demo:latest 2>/dev/null || true",
     "echo 'Cleaned all build artifacts, venvs, and Docker images'",
 ]
@@ -306,13 +263,8 @@ run = [
 [tasks.ci]
 description = "Run all CI checks (format, lint, typecheck, test)"
 run = [
-    "echo 'Running format check...'",
-    "mise run format",
-    "echo 'Running lint...'",
-    "mise run lint",
-    "echo 'Running typecheck...'",
-    "mise run typecheck",
-    "echo 'Running tests...'",
-    "mise run test",
-    "echo 'All CI checks passed!'",
+    "echo '==> Running CI checks across all projects...'",
+    "mise -C app run ci",
+    "mise -C deploy run ci",
+    "echo '✓ All CI checks passed!'",
 ]
