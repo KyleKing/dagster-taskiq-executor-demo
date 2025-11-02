@@ -7,3 +7,312 @@ python = "3.13"
 [env]
 _.file = { path = ".env", redact = true }
 PULUMI_CONFIG_PASSPHRASE = "See README!"
+AWS_DEFAULT_REGION = "us-east-1"
+PROJECT_NAME = "dagster-taskiq-demo"
+ENVIRONMENT = "local"
+
+[vars]
+app_dir = "app"
+deploy_dir = "deploy"
+region = "us-east-1"
+
+# ==============================================================================
+# Development Tasks
+# ==============================================================================
+
+[tasks.install]
+description = "Install all dependencies (app + deploy)"
+alias = "i"
+depends = ["install:app", "install:deploy"]
+
+[tasks."install:app"]
+description = "Install app dependencies"
+hide = true
+run = "cd app && uv sync --all-groups"
+sources = ["app/pyproject.toml", "app/uv.lock"]
+
+[tasks."install:deploy"]
+description = "Install deploy dependencies"
+hide = true
+run = "cd deploy && uv sync --all-groups"
+sources = ["deploy/pyproject.toml", "deploy/uv.lock"]
+
+[tasks.test]
+description = "Run all tests"
+alias = "t"
+depends = ["test:app", "test:deploy"]
+
+[tasks."test:app"]
+description = "Run app tests with pytest"
+run = "cd app && uv run pytest"
+sources = ["app/src/**/*.py", "app/tests/**/*.py"]
+env = { PYTHONPATH = "app/src" }
+
+[tasks."test:deploy"]
+description = "Run deploy tests with pytest"
+run = "cd deploy && uv run pytest"
+sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+
+[tasks.lint]
+description = "Run ruff linter on all code"
+alias = "l"
+depends = ["lint:app", "lint:deploy"]
+
+[tasks."lint:app"]
+description = "Lint app code with ruff"
+hide = true
+run = "cd app && uv run ruff check ."
+sources = ["app/src/**/*.py", "app/tests/**/*.py"]
+
+[tasks."lint:deploy"]
+description = "Lint deploy code with ruff"
+hide = true
+run = "cd deploy && uv run ruff check ."
+sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+
+[tasks.format]
+description = "Format all code with ruff"
+alias = "f"
+depends = ["format:app", "format:deploy"]
+
+[tasks."format:app"]
+description = "Format app code with ruff"
+hide = true
+run = "cd app && uv run ruff format ."
+sources = ["app/src/**/*.py", "app/tests/**/*.py"]
+
+[tasks."format:deploy"]
+description = "Format deploy code with ruff"
+hide = true
+run = "cd deploy && uv run ruff format ."
+sources = ["deploy/**/*.py", "deploy/tests/**/*.py"]
+
+[tasks.typecheck]
+description = "Run type checkers (mypy + pyright)"
+alias = "tc"
+depends = ["typecheck:app", "typecheck:deploy"]
+
+[tasks."typecheck:app"]
+description = "Type check app code"
+hide = true
+run = [
+    "cd app && uv run mypy src",
+    "cd app && uv run pyright",
+]
+sources = ["app/src/**/*.py"]
+
+[tasks."typecheck:deploy"]
+description = "Type check deploy code"
+hide = true
+run = [
+    "cd deploy && uv run mypy .",
+    "cd deploy && uv run pyright",
+]
+sources = ["deploy/**/*.py"]
+
+[tasks.check]
+description = "Run all checks (lint + typecheck + test)"
+alias = "c"
+depends = ["lint", "typecheck", "test"]
+
+# ==============================================================================
+# Docker & Build Tasks
+# ==============================================================================
+
+[tasks.build]
+description = "Build Docker image with docker bake"
+alias = "b"
+run = "docker buildx bake app"
+sources = ["app/**/*", "docker-bake.hcl", "app/Dockerfile"]
+outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
+
+[tasks."docker:login"]
+description = "Login to LocalStack ECR"
+hide = true
+run = '''
+REPO_NAME="${PROJECT_NAME}-${ENVIRONMENT}"
+REPO_URI=$(awslocal ecr describe-repositories \
+  --region ${AWS_DEFAULT_REGION} \
+  --repository-names "${REPO_NAME}" \
+  --query 'repositories[0].repositoryUri' \
+  --output text 2>/dev/null || echo "")
+if [ -n "$REPO_URI" ]; then
+  awslocal ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+    docker login --username AWS --password-stdin "${REPO_URI%%/*}"
+else
+  echo "ECR repository not found. Run 'mise run infra:up' first."
+  exit 1
+fi
+'''
+
+[tasks.push]
+description = "Build and push Docker image to LocalStack ECR"
+alias = "p"
+depends = ["build"]
+run = "./scripts/build-and-push.sh"
+
+# ==============================================================================
+# Infrastructure Tasks (Pulumi)
+# ==============================================================================
+
+[tasks."infra:up"]
+description = "Deploy infrastructure with Pulumi"
+alias = "up"
+run = "cd deploy && uv run pulumi up --yes --stack local"
+dir = "{{cwd}}"
+
+[tasks."infra:down"]
+description = "Destroy infrastructure with Pulumi"
+alias = "down"
+confirm = "Are you sure you want to destroy the infrastructure?"
+run = "cd deploy && uv run pulumi destroy --yes --stack local"
+dir = "{{cwd}}"
+
+[tasks."infra:preview"]
+description = "Preview infrastructure changes"
+alias = "preview"
+run = "cd deploy && uv run pulumi preview --stack local"
+dir = "{{cwd}}"
+
+[tasks."infra:refresh"]
+description = "Refresh Pulumi state"
+run = "cd deploy && uv run pulumi refresh --yes --stack local"
+dir = "{{cwd}}"
+
+[tasks."infra:outputs"]
+description = "Show Pulumi stack outputs"
+run = "cd deploy && uv run pulumi stack output --stack local"
+dir = "{{cwd}}"
+
+# ==============================================================================
+# LocalStack Service Management
+# ==============================================================================
+
+[tasks."localstack:start"]
+description = "Start LocalStack container"
+alias = "start"
+run = "docker compose up -d localstack"
+
+[tasks."localstack:stop"]
+description = "Stop LocalStack container"
+alias = "stop"
+run = "docker compose down"
+
+[tasks."localstack:restart"]
+description = "Restart LocalStack container"
+depends = ["localstack:stop", "localstack:start"]
+
+[tasks."localstack:logs"]
+description = "View LocalStack logs"
+alias = "logs"
+run = "docker compose logs -f localstack"
+
+[tasks."localstack:status"]
+description = "Check LocalStack health"
+run = '''
+echo "Checking LocalStack health..."
+curl -s http://localhost:4566/_localstack/health | python3 -m json.tool || echo "LocalStack not running"
+'''
+
+[tasks."localstack:reset"]
+description = "Reset LocalStack state (removes volume data)"
+confirm = "This will delete all LocalStack data. Continue?"
+run = [
+    "docker compose down -v",
+    "rm -rf volume/*",
+    "docker compose up -d localstack",
+]
+
+# ==============================================================================
+# AWS/LocalStack Utility Tasks
+# ==============================================================================
+
+[tasks."aws:queues"]
+description = "List SQS queues in LocalStack"
+run = "awslocal sqs list-queues --region ${AWS_DEFAULT_REGION}"
+
+[tasks."aws:clusters"]
+description = "List ECS clusters in LocalStack"
+run = "awslocal ecs list-clusters --region ${AWS_DEFAULT_REGION}"
+
+[tasks."aws:images"]
+description = "List ECR images"
+run = "awslocal ecr list-images --repository-name ${PROJECT_NAME}-${ENVIRONMENT} --region ${AWS_DEFAULT_REGION}"
+
+[tasks."aws:services"]
+description = "List ECS services in the cluster"
+run = "awslocal ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
+
+[tasks."aws:tasks"]
+description = "List running ECS tasks"
+run = "awslocal ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
+
+# ==============================================================================
+# Composite Workflow Tasks
+# ==============================================================================
+
+[tasks.setup]
+description = "Initial project setup (check env, install deps)"
+run = [
+    "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
+    "mise install",
+]
+depends = ["install"]
+
+[tasks.dev]
+description = "Start development environment (LocalStack + deps)"
+depends = ["localstack:start", "install"]
+run = '''
+echo "Waiting for LocalStack to be ready..."
+timeout 60 bash -c 'until curl -s http://localhost:4566/_localstack/health > /dev/null 2>&1; do sleep 1; done' || {
+  echo "LocalStack failed to start"
+  exit 1
+}
+echo "LocalStack is ready!"
+echo "Run 'mise run infra:up' to deploy infrastructure"
+echo "Run 'mise run push' to build and push the Docker image"
+'''
+
+[tasks.deploy]
+description = "Full deployment workflow (build, infra, push)"
+depends = ["localstack:start", "infra:up", "push"]
+run = "echo 'Deployment complete! Check services: mise run aws:services'"
+
+[tasks.clean]
+description = "Clean build artifacts and caches"
+run = [
+    "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true",
+    "find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true",
+    "find . -type d -name '.ruff_cache' -exec rm -rf {} + 2>/dev/null || true",
+    "find . -type d -name '.mypy_cache' -exec rm -rf {} + 2>/dev/null || true",
+    "find . -type f -name '*.pyc' -delete 2>/dev/null || true",
+    "echo 'Cleaned Python caches and artifacts'",
+]
+
+[tasks."clean:all"]
+description = "Clean everything including venvs and Docker"
+confirm = "This will remove all virtual environments and Docker images. Continue?"
+depends = ["clean"]
+run = [
+    "rm -rf app/.venv deploy/.venv",
+    "docker image rm dagster-taskiq-demo:latest 2>/dev/null || true",
+    "echo 'Cleaned all build artifacts, venvs, and Docker images'",
+]
+
+# ==============================================================================
+# CI/CD Tasks
+# ==============================================================================
+
+[tasks.ci]
+description = "Run all CI checks (format, lint, typecheck, test)"
+run = [
+    "echo 'Running format check...'",
+    "mise run format",
+    "echo 'Running lint...'",
+    "mise run lint",
+    "echo 'Running typecheck...'",
+    "mise run typecheck",
+    "echo 'Running tests...'",
+    "mise run test",
+    "echo 'All CI checks passed!'",
+]
