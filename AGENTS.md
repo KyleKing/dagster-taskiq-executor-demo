@@ -325,8 +325,10 @@ mise run format ::: lint ::: typecheck
 ## Pulumi Guidance
 
 - Follow above Python guidance and Pulumi best practices, additionally follow:
-- Share configuration via the structured `StackSettings` loader in `deploy/config.py` and keep per-environment overrides in `Pulumi.<stack>.yaml`.
-- Prepare for multiple environments/stacks, but focus on the LocalStack deployment only initially. Keep stack-specific values in config rather than hard-coding constants.
+- Use Pulumi.yaml for configuration instead of ESC; share config via `StackSettings` in `deploy/config.py` with per-environment overrides in `Pulumi.<stack>.yaml`.
+- Prepare for multiple environments/stacks, but focus on LocalStack deployment initially. Avoid hard-coding constants.
+- Organize infrastructure with Four Factors: Templates (reusable code), Components (encapsulated resources), Environments (config via Pulumi.yaml), Policies (governance rules).
+- Use patterns like composable environments, components using other components, and policies as tests for cost/security control.
 
 ### Infrastructure Organization: `components/` vs `modules/`
 
