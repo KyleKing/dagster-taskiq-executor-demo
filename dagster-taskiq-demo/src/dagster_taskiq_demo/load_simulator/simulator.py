@@ -3,7 +3,7 @@
 import asyncio
 import random
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 from dagster_graphql import DagsterGraphQLClient, DagsterGraphQLClientError
@@ -21,8 +21,8 @@ class LoadSimulator:
         self,
         host: str = "localhost",
         port: int = settings.dagster_webserver_port,
-        repository_location_name: Optional[str] = None,
-        repository_name: Optional[str] = None,
+        repository_location_name: str | None = None,
+        repository_name: str | None = None,
     ) -> None:
         """Initialize the load simulator.
 
@@ -48,9 +48,9 @@ class LoadSimulator:
     async def submit_run(
         self,
         job_name: str,
-        run_config: Optional[Dict[str, Any]] = None,
-        tags: Optional[Dict[str, str]] = None,
-    ) -> Optional[str]:
+        run_config: dict[str, Any] | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> str | None:
         """Submit a single Dagster run asynchronously.
 
         Args:
@@ -121,9 +121,9 @@ class LoadSimulator:
 
     async def submit_scenario(
         self,
-        scenario: Dict[str, Any],
+        scenario: dict[str, Any],
         duration_seconds: int = 300,  # 5 minutes default
-    ) -> List[str]:
+    ) -> list[str]:
         """Submit runs according to a scenario configuration.
 
         Args:
@@ -155,7 +155,7 @@ class LoadSimulator:
         logger.info("scenario_completed", submitted_runs=len(submitted_runs))
         return submitted_runs
 
-    def _select_job_from_scenario(self, scenario: Dict[str, Any]) -> str:
+    def _select_job_from_scenario(self, scenario: dict[str, Any]) -> str:
         """Select a job name based on scenario configuration.
 
         Args:
@@ -180,7 +180,7 @@ class LoadSimulator:
         self,
         jobs_per_minute: int = 6,
         duration_seconds: int = 300,
-    ) -> List[str]:
+    ) -> list[str]:
         """Run a steady load scenario.
 
         Args:
@@ -209,7 +209,7 @@ class LoadSimulator:
         burst_size: int = 10,
         burst_interval_minutes: int = 5,
         duration_seconds: int = 600,
-    ) -> List[str]:
+    ) -> list[str]:
         """Run a burst load scenario.
 
         Args:
@@ -258,7 +258,7 @@ class LoadSimulator:
     async def mixed_workload_scenario(
         self,
         duration_seconds: int = 600,
-    ) -> List[str]:
+    ) -> list[str]:
         """Run a mixed workload scenario with various job types.
 
         Args:
@@ -286,7 +286,7 @@ class LoadSimulator:
         failure_burst_size: int = 20,
         recovery_interval_minutes: int = 2,
         duration_seconds: int = 600,
-    ) -> List[str]:
+    ) -> list[str]:
         """Run a worker failure scenario that submits bursts that may overwhelm workers.
 
         Args:
@@ -337,7 +337,7 @@ class LoadSimulator:
         self,
         max_burst_size: int = 5,
         duration_seconds: int = 600,
-    ) -> List[str]:
+    ) -> list[str]:
         """Run a network partition scenario with intermittent submissions.
 
         Args:
@@ -399,7 +399,7 @@ async def run_steady_load(
     duration_seconds: int = 300,
     host: str = "localhost",
     port: int = settings.dagster_webserver_port,
-) -> List[str]:
+) -> list[str]:
     """Run a steady load scenario.
 
     Args:
@@ -421,7 +421,7 @@ async def run_burst_load(
     duration_seconds: int = 600,
     host: str = "localhost",
     port: int = settings.dagster_webserver_port,
-) -> List[str]:
+) -> list[str]:
     """Run a burst load scenario.
 
     Args:
@@ -442,7 +442,7 @@ async def run_mixed_workload(
     duration_seconds: int = 600,
     host: str = "localhost",
     port: int = settings.dagster_webserver_port,
-) -> List[str]:
+) -> list[str]:
     """Run a mixed workload scenario.
 
     Args:
@@ -463,7 +463,7 @@ async def run_worker_failure(
     duration_seconds: int = 600,
     host: str = "localhost",
     port: int = settings.dagster_webserver_port,
-) -> List[str]:
+) -> list[str]:
     """Run a worker failure scenario.
 
     Args:
@@ -485,7 +485,7 @@ async def run_network_partition(
     duration_seconds: int = 600,
     host: str = "localhost",
     port: int = settings.dagster_webserver_port,
-) -> List[str]:
+) -> list[str]:
     """Run a network partition scenario.
 
     Args:

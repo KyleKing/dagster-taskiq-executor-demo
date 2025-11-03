@@ -1,11 +1,12 @@
 """Tests for the load simulator."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from click.testing import CliRunner
 
-from dagster_taskiq_demo.load_simulator.simulator import LoadSimulator
 from dagster_taskiq_demo.load_simulator.cli import cli
+from dagster_taskiq_demo.load_simulator.simulator import LoadSimulator
 
 
 class TestLoadSimulator:
@@ -135,12 +136,7 @@ class TestLoadSimulatorCLI:
         """Test the burst-load CLI command."""
         mock_run_burst_load.return_value = ["run-1", "run-2"]
 
-        result = runner.invoke(cli, [
-            "burst-load",
-            "--burst-size", "10",
-            "--burst-interval", "5",
-            "--duration", "120"
-        ])
+        result = runner.invoke(cli, ["burst-load", "--burst-size", "10", "--burst-interval", "5", "--duration", "120"])
 
         assert result.exit_code == 0
         assert "Starting burst load scenario" in result.output
@@ -174,12 +170,9 @@ class TestLoadSimulatorCLI:
         """Test the worker-failure CLI command."""
         mock_run_worker_failure.return_value = ["run-1"]
 
-        result = runner.invoke(cli, [
-            "worker-failure",
-            "--failure-burst-size", "20",
-            "--recovery-interval", "2",
-            "--duration", "600"
-        ])
+        result = runner.invoke(
+            cli, ["worker-failure", "--failure-burst-size", "20", "--recovery-interval", "2", "--duration", "600"]
+        )
 
         assert result.exit_code == 0
         assert "Starting worker failure scenario" in result.output
@@ -197,11 +190,7 @@ class TestLoadSimulatorCLI:
         """Test the network-partition CLI command."""
         mock_run_network_partition.return_value = ["run-1", "run-2"]
 
-        result = runner.invoke(cli, [
-            "network-partition",
-            "--max-burst-size", "5",
-            "--duration", "300"
-        ])
+        result = runner.invoke(cli, ["network-partition", "--max-burst-size", "5", "--duration", "300"])
 
         assert result.exit_code == 0
         assert "Starting network partition scenario" in result.output

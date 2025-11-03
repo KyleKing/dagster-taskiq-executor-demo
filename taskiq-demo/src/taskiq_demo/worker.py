@@ -11,7 +11,12 @@ from .logging import configure_logging, get_logger
 
 
 def main() -> None:
-    """Configure logging and start the TaskIQ worker."""
+    """Configure logging and start the TaskIQ worker.
+
+    Raises:
+        SystemExit: If the worker fails to start.
+
+    """
     settings = get_settings()
     configure_logging()
     logger = get_logger(__name__)
@@ -34,11 +39,23 @@ def main() -> None:
 
 
 def _to_log_level(level: str) -> LogLevel:
-    """Map configuration string to TaskIQ LogLevel enum."""
+    """Map configuration string to TaskIQ LogLevel enum.
+
+    Args:
+        level: The log level string.
+
+    Returns:
+        The TaskIQ LogLevel enum value.
+
+    Raises:
+        ValueError: If the log level is unsupported.
+
+    """
     try:
         return LogLevel[level.upper()]
     except KeyError as exc:
-        raise ValueError(f"Unsupported log level '{level}'.") from exc
+        msg = f"Unsupported log level '{level}'."
+        raise ValueError(msg) from exc
 
 
 if __name__ == "__main__":

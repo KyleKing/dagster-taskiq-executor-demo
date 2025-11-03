@@ -1,9 +1,9 @@
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
-from taskiq_demo.config import get_settings
 from taskiq_demo import tasks
+from taskiq_demo.config import get_settings
 
 
 @pytest.mark.asyncio

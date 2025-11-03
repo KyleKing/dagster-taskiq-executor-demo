@@ -9,13 +9,10 @@ import structlog
 
 from .config import get_settings
 
-_CONFIGURED = False
-
 
 def configure_logging(level: int | str | None = None) -> None:
     """Initialise standard logging and structlog configuration."""
-    global _CONFIGURED
-    if _CONFIGURED:
+    if hasattr(configure_logging, "_configured") and configure_logging._configured:  # type: ignore
         return
 
     settings = get_settings()
@@ -41,20 +38,34 @@ def configure_logging(level: int | str | None = None) -> None:
         context_class=dict,
         cache_logger_on_first_use=True,
     )
-    _CONFIGURED = True
+    configure_logging._configured = True  # type: ignore
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Return a configured structlog logger."""
+    """Return a configured structlog logger.
+
+    Args:
+        name: The logger name.
+
+    Returns:
+        A configured structlog logger.
+
+    """
     configure_logging()
     return structlog.get_logger(name)
 
 
 def _resolve_level(raw_level: Any) -> int:
-    """Convert a string or logging level constant into an integer level."""
+    """Convert a string or logging level constant into an integer level.
+
+    Args:
+        raw_level: The raw log level value.
+
+    Returns:
+        The integer log level.
+
+    """
     if isinstance(raw_level, int):
         return raw_level
-    level_value = logging.getLevelName(str(raw_level))
-    if isinstance(level_value, int):
-        return level_value
-    return logging.INFO
+    level_names = logging.getLevelNamesMapping()
+    return level_names.get(str(raw_level), logging.INFO)

@@ -60,7 +60,7 @@ def cli(ctx: click.Context, host: str, port: int, log_level: str) -> None:
     )
 
     # Set log level
-    import logging
+
     logging.getLogger().setLevel(getattr(logging, log_level))
 
     # Store common options in context
@@ -199,7 +199,9 @@ def mixed_workload(ctx: click.Context, duration: int) -> None:
 @click.pass_context
 def worker_failure(ctx: click.Context, failure_burst_size: int, recovery_interval: int, duration: int) -> None:
     """Run a worker failure scenario."""
-    click.echo(f"Starting worker failure scenario: {failure_burst_size} jobs every {recovery_interval} minutes for {duration} seconds")
+    click.echo(
+        f"Starting worker failure scenario: {failure_burst_size} jobs every {recovery_interval} minutes for {duration} seconds"
+    )
 
     try:
         submitted_runs = asyncio.run(

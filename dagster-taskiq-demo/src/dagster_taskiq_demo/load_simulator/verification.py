@@ -292,7 +292,13 @@ class ExactlyOnceVerifier:
         job_step_mapping = {
             "fast_job": ["fast_async_op", "data_processing_op"],
             "slow_job": ["slow_async_op", "data_processing_op"],
-            "mixed_job": ["fast_async_op", "slow_async_op", "data_processing_op", "data_processing_op_2", "aggregation_op"],
+            "mixed_job": [
+                "fast_async_op",
+                "slow_async_op",
+                "data_processing_op",
+                "data_processing_op_2",
+                "aggregation_op",
+            ],
             "parallel_fast_job": ["fast_op_1", "fast_op_2", "fast_op_3", "process_1", "process_2", "process_3"],
             "sequential_slow_job": ["slow_op_1", "slow_op_2", "process_1", "process_2", "aggregation_op"],
         }
@@ -315,15 +321,14 @@ class ExactlyOnceVerifier:
                 state=record.state.value,
                 duplicates=duplicates,
             )
-        else:
-            return StepVerificationDetail(
-                step_key=step_key,
-                idempotency_key=idempotency_key,
-                expected=True,
-                found=False,
-                state=None,
-                duplicates=0,
-            )
+        return StepVerificationDetail(
+            step_key=step_key,
+            idempotency_key=idempotency_key,
+            expected=True,
+            found=False,
+            state=None,
+            duplicates=0,
+        )
 
     def export_report(self, result: VerificationResult, output_path: Path, format: str = "json") -> None:
         """Export verification results to file.
@@ -338,7 +343,8 @@ class ExactlyOnceVerifier:
         elif format == "csv":
             self._export_csv_report(result, output_path)
         else:
-            raise ValueError(f"Unsupported format: {format}")
+            msg = f"Unsupported format: {format}"
+            raise ValueError(msg)
 
     def _export_json_report(self, result: VerificationResult, output_path: Path) -> None:
         """Export results as JSON."""
@@ -378,19 +384,25 @@ class ExactlyOnceVerifier:
             ],
         }
 
-        with open(output_path, "w") as f:
+        with Path(output_path).open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
         logger.info("exported_json_report", path=str(output_path))
 
     def _export_csv_report(self, result: VerificationResult, output_path: Path) -> None:
         """Export results as CSV."""
-        with open(output_path, "w", newline="") as f:
+        with Path(output_path).open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "run_id", "job_name", "submitted_at", "status",
-                "expected_steps", "completed_steps", "failed_steps",
-                "duplicate_steps", "missing_steps"
+                "run_id",
+                "job_name",
+                "submitted_at",
+                "status",
+                "expected_steps",
+                "completed_steps",
+                "failed_steps",
+                "duplicate_steps",
+                "missing_steps",
             ])
 
             for detail in result.run_details:

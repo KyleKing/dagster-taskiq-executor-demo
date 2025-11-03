@@ -30,7 +30,15 @@ def run_api() -> None:
 
 
 def run(role: str | None = None) -> None:
-    """Dispatch to the API or worker based on role argument."""
+    """Dispatch to the API or worker based on role argument.
+
+    Args:
+        role: The role to run ('api' or 'worker'). Defaults to 'api'.
+
+    Raises:
+        SystemExit: If an unsupported role is provided.
+
+    """
     role_name = (role or os.environ.get("SERVICE_ROLE", "api")).lower()
     if role_name == "api":
         run_api()
@@ -38,9 +46,9 @@ def run(role: str | None = None) -> None:
     if role_name == "worker":
         run_worker()
         return
-    raise SystemExit(f"Unsupported SERVICE_ROLE '{role_name}'.")
+    msg = f"Unsupported SERVICE_ROLE '{role_name}'."
+    raise SystemExit(msg)
 
 
 if __name__ == "__main__":
     run()
-

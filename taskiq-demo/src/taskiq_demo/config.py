@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 
-from pydantic import AnyUrl, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     aws_access_key_id: str = Field(default="localstack")
     aws_secret_access_key: str = Field(default="localstack")
     aws_region: str = Field(default="us-east-1")
-    sqs_endpoint_url: AnyUrl = Field(default="http://localhost:4566")
+    sqs_endpoint_url: str = Field(default="http://localhost:4566")
     sqs_queue_name: str = Field(default="taskiq-demo")
     log_level: str = Field(default="INFO", description="Python logging level.")
     min_duration_seconds: float = Field(default=1.0, ge=0.0)
@@ -38,20 +38,42 @@ class Settings(BaseSettings):
     @field_validator("log_level", mode="before")
     @classmethod
     def normalize_log_level(cls, value: str) -> str:
-        """Normalise configured log level to uppercase."""
+        """Normalise configured log level to uppercase.
+
+        Args:
+            value: The log level string to normalize.
+
+        Returns:
+            The uppercase log level string.
+
+        """
         return str(value or "").upper() or "INFO"
 
     def clamp_duration(self, requested: float) -> float:
-        """Clamp the requested sleep duration to the configured bounds."""
+        """Clamp the requested sleep duration to the configured bounds.
+
+        Args:
+            requested: The requested duration in seconds.
+
+        Returns:
+            The clamped duration within min/max bounds.
+
+        """
         return max(self.min_duration_seconds, min(requested, self.max_duration_seconds))
 
     @property
     def log_level_value(self) -> int:
         """Return the numeric logging level for configured log level."""
-        return logging.getLevelName(self.log_level)
+        level_names = logging.getLevelNamesMapping()
+        return level_names.get(self.log_level, logging.INFO)
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return cached settings instance."""
+    """Return cached settings instance.
+
+    Returns:
+        The cached Settings instance.
+
+    """
     return Settings()

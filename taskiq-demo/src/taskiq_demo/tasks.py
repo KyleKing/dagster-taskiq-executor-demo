@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from taskiq.result import TaskiqResult
 from taskiq_aio_sqs import SQSBroker
 
 from .config import get_settings
@@ -30,7 +29,15 @@ taskiq_app = broker
 
 
 async def perform_sleep(duration_seconds: float) -> dict[str, Any]:
-    """Execute the sleep payload with clamped duration."""
+    """Execute the sleep payload with clamped duration.
+
+    Args:
+        duration_seconds: The duration to sleep.
+
+    Returns:
+        The result dictionary with duration.
+
+    """
     duration = settings.clamp_duration(duration_seconds)
     logger.info(
         "task.start",
@@ -44,10 +51,26 @@ async def perform_sleep(duration_seconds: float) -> dict[str, Any]:
 
 @broker.task()
 async def sleep_task(duration_seconds: float) -> dict[str, Any]:
-    """TaskIQ entrypoint for sleeping."""
+    """TaskIQ entrypoint for sleeping.
+
+    Args:
+        duration_seconds: The duration to sleep.
+
+    Returns:
+        The result dictionary with duration.
+
+    """
     return await perform_sleep(duration_seconds)
 
 
-async def enqueue_sleep(duration_seconds: float) -> TaskiqResult[Any]:
-    """Convenience helper to enqueue a sleep task."""
+async def enqueue_sleep(duration_seconds: float) -> Any:
+    """Enqueue a sleep task.
+
+    Args:
+        duration_seconds: The duration to sleep.
+
+    Returns:
+        The task result.
+
+    """
     return await sleep_task.kiq(duration_seconds=duration_seconds)
