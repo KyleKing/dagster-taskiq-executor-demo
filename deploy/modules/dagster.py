@@ -33,8 +33,10 @@ class DagsterResources:
     daemon_service_discovery: servicediscovery.Service
     webserver_service_discovery: servicediscovery.Service
     load_balancer: lb.LoadBalancer
-    target_group: lb.TargetGroup
+    dagster_target_group: lb.TargetGroup
+    taskiq_target_group: lb.TargetGroup
     listener: lb.Listener
+    taskiq_listener_rule: lb.ListenerRule
 
 
 def create_dagster_infrastructure(
@@ -350,9 +352,10 @@ def create_dagster_infrastructure(
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
-    target_group = lb.TargetGroup(
-        f"{resource_name}-tg",
-        name=f"{project_name}-tg-{environment}",
+    # Target group for Dagster webserver
+    dagster_target_group = lb.TargetGroup(
+        f"{resource_name}-dagster-tg",
+        name=f"{project_name}-dagster-tg-{environment}",
         port=3000,
         protocol="HTTP",
         vpc_id=vpc_id,
@@ -371,6 +374,28 @@ def create_dagster_infrastructure(
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
+    # Target group for TaskIQ demo API
+    taskiq_target_group = lb.TargetGroup(
+        f"{resource_name}-taskiq-tg",
+        name=f"{project_name}-taskiq-tg-{environment}",
+        port=8000,
+        protocol="HTTP",
+        vpc_id=vpc_id,
+        target_type="ip",
+        health_check=lb.TargetGroupHealthCheckArgs(
+            enabled=True,
+            healthy_threshold=2,
+            interval=30,
+            matcher="200",
+            path="/health",
+            port="traffic-port",
+            protocol="HTTP",
+            timeout=5,
+            unhealthy_threshold=2,
+        ),
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
     listener = lb.Listener(
         f"{resource_name}-listener",
         load_balancer_arn=load_balancer.arn,
@@ -379,8 +404,29 @@ def create_dagster_infrastructure(
         default_actions=[
             lb.ListenerDefaultActionArgs(
                 type="forward",
-                target_group_arn=target_group.arn,
+                target_group_arn=dagster_target_group.arn,
             )
+        ],
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    # Listener rule for TaskIQ demo API (path-based routing)
+    taskiq_listener_rule = lb.ListenerRule(
+        f"{resource_name}-taskiq-rule",
+        listener_arn=listener.arn,
+        priority=10,
+        conditions=[
+            lb.ListenerRuleConditionArgs(
+                path_pattern=lb.ListenerRuleConditionPathPatternArgs(
+                    values=["/api/*"],
+                ),
+            ),
+        ],
+        actions=[
+            lb.ListenerRuleActionArgs(
+                type="forward",
+                target_group_arn=taskiq_target_group.arn,
+            ),
         ],
         opts=pulumi.ResourceOptions(provider=provider),
     )
@@ -396,6 +442,8 @@ def create_dagster_infrastructure(
         daemon_service_discovery=daemon_service_discovery,
         webserver_service_discovery=webserver_service_discovery,
         load_balancer=load_balancer,
-        target_group=target_group,
+        dagster_target_group=dagster_target_group,
+        taskiq_target_group=taskiq_target_group,
         listener=listener,
+        taskiq_listener_rule=taskiq_listener_rule,
     )

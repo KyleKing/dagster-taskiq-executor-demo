@@ -90,7 +90,15 @@ def test_run_priority_job(localstack):
                 hi_run = hi_runs[0]
                 histats = instance.get_run_stats(hi_run.run_id)
 
-                assert lowstats.start_time < histats.start_time  # pyright: ignore[reportOperatorIssue]
+                # Higher priority (3) should start before lower priority (-3)
+                # Priority 3: delay = (5-3)*10 = 20 seconds
+                # Priority -3: delay = (5-(-3))*10 = 80 seconds
+                # So hi_job should start first (have earlier start_time)
+                assert histats.start_time < lowstats.start_time, (  # pyright: ignore[reportOperatorIssue]
+                    f"Expected high priority job (priority=3, delay=20s) to start before "
+                    f"low priority job (priority=-3, delay=80s), but got "
+                    f"hi_job start={histats.start_time}, low_job start={lowstats.start_time}"
+                )
 
 
 @pytest.mark.parametrize(

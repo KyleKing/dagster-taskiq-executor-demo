@@ -128,6 +128,12 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
     # Translate Dagster priority into SQS delay (higher Dagster priority = lower delay)
     delay_seconds = _priority_to_delay_seconds(priority)
 
+    # Debug logging for priority/delay mapping
+    plan_context.log.info(
+        f"Task for step '{execute_step_args.step_keys_to_execute[0]}': "
+        f"priority={priority}, calculated_delay={delay_seconds}s"
+    )
+
     # Use kicker with delay label for taskiq-aio-sqs
     task_result = await task.kicker().with_labels(delay=delay_seconds).kiq(
         execute_step_args_packed=pack_value(execute_step_args),

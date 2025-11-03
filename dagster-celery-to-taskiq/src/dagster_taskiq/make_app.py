@@ -98,7 +98,8 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     env_enable_cancellation = os.getenv('DAGSTER_TASKIQ_ENABLE_CANCELLATION')
     default_enable_cancellation = env_enable_cancellation
     if default_enable_cancellation is None:
-        default_enable_cancellation = True
+        # Disable cancellation by default until fully implemented (see IMPLEMENTATION_PROGRESS.md Phase 3)
+        default_enable_cancellation = False
     enable_cancellation_raw = _resolve_value(
         config, source_overrides, 'enable_cancellation', default_enable_cancellation
     )

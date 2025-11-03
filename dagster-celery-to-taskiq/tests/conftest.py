@@ -45,7 +45,8 @@ def _wait_for_localstack(endpoint: str, timeout: int = 30) -> None:
     raise RuntimeError("LocalStack failed to report healthy status within timeout")
 
 
-def _allocate_localstack_port(preferred: int = 4566) -> int:
+def _allocate_localstack_port(preferred: int = 4567) -> int:
+    """Allocate a LocalStack port, avoiding 4566 which may be used by dagster-taskiq-demo."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.5)
         if sock.connect_ex(("127.0.0.1", preferred)) != 0:
@@ -145,7 +146,8 @@ def localstack():
         aws_secret_access_key="test",
     )
 
-    queue_name = "dagster-tasks"
+    # Use unique queue name to avoid conflicts with other instances
+    queue_name = f"dagster-tasks-test-{host_port}"
     queue_url = _rewrite_queue_url_port(
         sqs.create_queue(QueueName=queue_name)["QueueUrl"], host_port
     )
@@ -162,7 +164,8 @@ def localstack():
     cancel_queue_name = f"{queue_name}-cancels"
     sqs.create_queue(QueueName=cancel_queue_name)
 
-    bucket_name = "dagster-taskiq-results"
+    # Use unique bucket name to avoid conflicts
+    bucket_name = f"dagster-taskiq-test-{host_port}"
     try:
         s3.create_bucket(Bucket=bucket_name)
     except ClientError as exc:

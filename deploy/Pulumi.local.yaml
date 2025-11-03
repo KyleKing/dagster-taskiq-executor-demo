@@ -1,4 +1,4 @@
-encryptionsalt: v1:qfQt0poXbXc=:v1:h7ulWwFRd+n+Y4ml:v8GYbLgPLGtcs+2JPFKS44MhAL03RA==
+encryptionsalt: v1:mo3eYhNtJJM=:v1:lma7cNLhkm1Tl+2D:BD0DdjiArlfdmP4OOAWtPGoF0pJlcQ==
 config:
   localstack-ecs-sqs:taskiqDemo:
     enabled: true

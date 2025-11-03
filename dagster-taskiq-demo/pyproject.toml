@@ -26,12 +26,12 @@ dependencies = [
   "dagster-graphql>=0.21.0",
   "taskiq>=0.11.0",
   "taskiq-aio-sqs>=0.4.0",
-  "pydantic>=2.10.0,<=2.11.0", # base_dir is missing a type annotation
+  "pydantic>=2.10.0,<=2.11.0", # FYI: issues with dependencies
   "pydantic-settings>=2.0.0",
   "aioboto3>=13.0.0",
   "sqlalchemy>=2.0.0",
   "PyYAML>=6.0.0",
-  "structlog>=25.5.0"
+  "structlog>=25.5.0",
 ]
 
 [tool.mypy]

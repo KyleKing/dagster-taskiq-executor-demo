@@ -250,7 +250,7 @@ def main() -> None:
             ),
             load_balancers=[
                 aws.ecs.ServiceLoadBalancerArgs(
-                    target_group_arn=dagster.target_group.arn,
+                    target_group_arn=dagster.dagster_target_group.arn,
                     container_name="dagster-webserver",
                     container_port=3000,
                 )
@@ -323,6 +323,67 @@ def main() -> None:
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
+    # Create TaskIQ demo services if enabled
+    if taskiq_demo_resources is not None:
+        taskiq_demo_api_service = aws.ecs.Service(
+            "taskiq-demo-api-service",
+            aws.ecs.ServiceArgs(
+                name=taskiq_demo_resources.api_service.name,
+                cluster=cluster.cluster.id,
+                task_definition=taskiq_demo_resources.api_task_definition.arn,
+                desired_count=settings.taskiq_demo.api_desired_count,
+                launch_type="FARGATE",
+                network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
+                    subnets=network.subnets.ids,
+                    security_groups=pulumi.Output.from_input(taskiq_demo_resources.security_group.id).apply(lambda sg: [sg]),
+                    assign_public_ip=settings.taskiq_demo.assign_public_ip,
+                ),
+                load_balancers=[
+                    aws.ecs.ServiceLoadBalancerArgs(
+                        target_group_arn=dagster.taskiq_target_group.arn,
+                        container_name="taskiq-demo-api",
+                        container_port=8000,
+                    )
+                ],
+                deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                    enable=True,
+                    rollback=True,
+                ),
+                deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                    type="ECS",
+                ),
+                health_check_grace_period_seconds=60,
+                force_new_deployment=True,
+            ),
+            opts=pulumi.ResourceOptions(provider=provider),
+        )
+
+        taskiq_demo_worker_service = aws.ecs.Service(
+            "taskiq-demo-worker-service",
+            aws.ecs.ServiceArgs(
+                name=taskiq_demo_resources.worker_service.name,
+                cluster=cluster.cluster.id,
+                task_definition=taskiq_demo_resources.worker_task_definition.arn,
+                desired_count=settings.taskiq_demo.worker_desired_count,
+                launch_type="FARGATE",
+                network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
+                    subnets=network.subnets.ids,
+                    security_groups=pulumi.Output.from_input(taskiq_demo_resources.security_group.id).apply(lambda sg: [sg]),
+                    assign_public_ip=settings.taskiq_demo.assign_public_ip,
+                ),
+                deployment_circuit_breaker=aws.ecs.ServiceDeploymentCircuitBreakerArgs(
+                    enable=True,
+                    rollback=True,
+                ),
+                deployment_controller=aws.ecs.ServiceDeploymentControllerArgs(
+                    type="ECS",
+                ),
+                health_check_grace_period_seconds=60,
+                force_new_deployment=True,
+            ),
+            opts=pulumi.ResourceOptions(provider=provider),
+        )
+
     # Stack outputs to simplify debugging and downstream configuration.
     pulumi.export("container_image_uri", ecr_repo.repository_uri)
     pulumi.export("ecr_repository_url", ecr_repo.repository.repository_url)
@@ -355,6 +416,7 @@ def main() -> None:
         pulumi.export("taskiqDemoApiServiceName", taskiq_demo_resources.api_service.name)
         pulumi.export("taskiqDemoWorkerServiceName", taskiq_demo_resources.worker_service.name)
         pulumi.export("taskiqDemoSecurityGroupId", taskiq_demo_resources.security_group.id)
+        pulumi.export("taskiq_demo_api_url", pulumi.Output.concat("http://", dagster.load_balancer.dns_name, "/api"))
 
 
 main()

@@ -9,17 +9,18 @@ dev = [
   "pyright>=1.1.390",
   "mypy>=1.18.2",
   "pytest>=8.4.2",
-  "taskiq-dashboard>=0.2.0"
+  "taskiq-dashboard>=0.2.0",
+  "docker>=7.1.0" # Find alternative
 ]
 
 [project]
 name = "dagster-taskiq"
-version = "1!0+dev"
+version = "0.0.0"
 description = "Package for using Taskiq as Dagster's execution engine."
 requires-python = ">=3.11.11"
 license = "Apache-2.0"
 authors = [
-  {name = "Dagster Labs", email = "hello@dagsterlabs.com"}
+  {name = "Kyle King", email = "dev.act.kyle@gmail.com"}
 ]
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
@@ -34,14 +35,11 @@ classifiers = [
   "Operating System :: OS Independent"
 ]
 dependencies = [
+  "aioboto3>=13.0.0",
   "dagster>=1.0.0",
   "taskiq-aio-sqs>=0.4.0",
   "pydantic>=2.0"
 ]
-
-[project.optional-dependencies]
-kubernetes = ["kubernetes"]
-test = ["docker", "pytest-asyncio"]
 
 [project.scripts]
 dagster-taskiq = "dagster_taskiq.cli:main"

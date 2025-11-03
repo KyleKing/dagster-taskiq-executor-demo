@@ -366,9 +366,10 @@ wheels = [
 
 [[package]]
 name = "dagster-taskiq"
-version = "1!0+dev"
+version = "0.0.0"
 source = { editable = "../dagster-celery-to-taskiq" }
 dependencies = [
+    { name = "aioboto3" },
     { name = "dagster" },
     { name = "pydantic" },
     { name = "taskiq-aio-sqs" },
@@ -376,17 +377,15 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aioboto3", specifier = ">=13.0.0" },
     { name = "dagster", specifier = ">=1.0.0" },
-    { name = "docker", marker = "extra == 'test'" },
-    { name = "kubernetes", marker = "extra == 'kubernetes'" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "taskiq-aio-sqs", specifier = ">=0.4.0" },
 ]
-provides-extras = ["kubernetes", "test"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "docker", specifier = ">=7.1.0" },
     { name = "mypy", specifier = ">=1.18.2" },
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8.4.2" },
