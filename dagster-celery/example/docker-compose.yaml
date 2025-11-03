@@ -47,7 +47,7 @@ services:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-celery worker start -y /app/celery.yaml -A dagster_celery.app -q short-queue
+    command: dagster-celery worker start -y /app/celery.yaml -A dagster_taskiq.app -q short-queue
     restart: on-failure
     env_file: docker/docker.env
     cap_add:
@@ -68,7 +68,7 @@ services:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-celery worker start -y /app/celery.yaml -A dagster_celery.app -q long-queue
+    command: dagster-celery worker start -y /app/celery.yaml -A dagster_taskiq.app -q long-queue
     restart: on-failure
     env_file: docker/docker.env
     cap_add:

@@ -14,8 +14,8 @@ WORKDIR /app
 COPY ./example/pyproject.toml ./example/poetry.lock /app/
 RUN poetry install --no-cache
 
-COPY . /app/dagster_celery_package
-RUN pip install /app/dagster_celery_package
+COPY . /app/dagster_taskiq_package
+RUN pip install /app/dagster_taskiq_package
 
 RUN rm /app/pyproject.toml
 

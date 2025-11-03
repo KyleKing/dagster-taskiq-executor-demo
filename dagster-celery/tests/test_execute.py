@@ -10,7 +10,7 @@ from dagster._core.execution.api import execute_job, execute_run_iterator
 from dagster._core.instance import DagsterInstance
 from dagster._utils import send_interrupt
 
-from dagster_taskiq_tests.utils import (
+from tests.utils import (
     REPO_FILE,
     events_of_type,
     execute_eagerly_on_taskiq,
@@ -18,7 +18,7 @@ from dagster_taskiq_tests.utils import (
 )
 
 
-def test_execute_on_celery_default(dagster_celery_worker):
+def test_execute_on_celery_default(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_job") as result:
         assert result.output_for_node("simple") == 1
         assert len(result.all_node_events) == 4
@@ -28,7 +28,7 @@ def test_execute_on_celery_default(dagster_celery_worker):
         assert len(events_of_type(result, "STEP_SUCCESS")) == 1
 
 
-def test_execute_serial_on_celery(dagster_celery_worker):
+def test_execute_serial_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_serial_job") as result:
         assert result.output_for_node("simple") == 1
         assert result.output_for_node("add_one") == 2
@@ -41,7 +41,7 @@ def test_execute_serial_on_celery(dagster_celery_worker):
         assert len(events_of_type(result, "STEP_SUCCESS")) == 2
 
 
-def test_execute_diamond_job_on_celery(dagster_celery_worker):
+def test_execute_diamond_job_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_diamond_job") as result:
         assert result.output_for_node("emit_values", "value_one") == 1
         assert result.output_for_node("emit_values", "value_two") == 2
@@ -50,24 +50,24 @@ def test_execute_diamond_job_on_celery(dagster_celery_worker):
         assert result.output_for_node("subtract") == -1
 
 
-def test_execute_parallel_job_on_celery(dagster_celery_worker):
+def test_execute_parallel_job_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_parallel_job") as result:
         assert len(result.get_step_success_events()) == 11
 
 
-def test_execute_composite_job_on_celery(dagster_celery_worker):
+def test_execute_composite_job_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("composite_job") as result:
         assert result.success
         assert len(result.get_step_success_events()) == 16
 
 
-def test_execute_optional_outputs_job_on_celery(dagster_celery_worker):
+def test_execute_optional_outputs_job_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_optional_outputs") as result:
         assert len(result.get_step_success_events()) == 2
         assert len(result.get_step_skipped_events()) == 2
 
 
-def test_execute_fails_job_on_celery(dagster_celery_worker):
+def test_execute_fails_job_on_celery(dagster_taskiq_worker):
     with execute_job_on_taskiq("test_fails") as result:
         assert len(result.get_step_failure_events()) == 1
         assert result.is_node_failed("fails")
@@ -75,7 +75,7 @@ def test_execute_fails_job_on_celery(dagster_celery_worker):
         assert result.is_node_untouched("should_never_execute")
 
 
-def test_terminate_job_on_celery(dagster_celery_worker, instance: DagsterInstance, tempdir: str):
+def test_terminate_job_on_celery(dagster_taskiq_worker, instance: DagsterInstance, tempdir: str):
     recon_job = ReconstructableJob.for_file(REPO_FILE, "interrupt_job")
 
     run_config = {

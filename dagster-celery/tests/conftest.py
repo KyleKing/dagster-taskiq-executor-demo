@@ -9,9 +9,9 @@ import pytest
 from dagster import file_relative_path
 from dagster._core.instance import DagsterInstance
 from dagster._core.test_utils import environ, instance_for_test
-from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
+# from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 
-from dagster_taskiq_tests.utils import start_taskiq_worker
+from tests.utils import start_taskiq_worker
 
 IS_BUILDKITE = os.getenv("BUILDKITE") is not None
 
@@ -120,19 +120,19 @@ def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[Non
         yield
 
 
-@pytest.fixture(scope="session")
-def dagster_docker_image():
-    docker_image = get_test_project_docker_image()
-
-    if not IS_BUILDKITE:
-        try:
-            client = docker.from_env()
-            client.images.get(docker_image)
-            print(  # noqa: T201
-                f"Found existing image tagged {docker_image}, skipping image build. To rebuild, first run: "
-                f"docker rmi {docker_image}"
-            )
-        except docker.errors.ImageNotFound:  # pyright: ignore[reportAttributeAccessIssue]
-            build_and_tag_test_image(docker_image)
-
-    return docker_image
+# @pytest.fixture(scope="session")
+# def dagster_docker_image():
+#     docker_image = get_test_project_docker_image()
+#
+#     if not IS_BUILDKITE:
+#         try:
+#             client = docker.from_env()
+#             client.images.get(docker_image)
+#             print(  # noqa: T201
+#                 f"Found existing image tagged {docker_image}, skipping image build. To rebuild, first run: "
+#                 f"docker rmi {docker_image}"
+#             )
+#         except docker.errors.ImageNotFound:  # pyright: ignore[reportAttributeAccessIssue]
+#             build_and_tag_test_image(docker_image)
+#
+#     return docker_image

@@ -8,12 +8,12 @@ from dagster import DagsterInstance, DagsterRunStatus, file_relative_path, insta
 from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext
 from dagster._core.workspace.load_target import PythonFileTarget
 from dagster._daemon import execute_run_monitoring_iteration
-from dagster_celery.defaults import broker_url
+from dagster_taskiq.defaults import broker_url
 from dagster_shared import seven
 
-from dagster_taskiq_tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
-from dagster_taskiq_tests.utils import start_taskiq_worker
-from dagster_taskiq_tests.utils_launcher import poll_for_finished_run, poll_for_step_start
+from tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
+from tests.utils import start_taskiq_worker
+from tests.utils_launcher import poll_for_finished_run, poll_for_step_start
 
 
 @pytest.fixture(scope="function")
@@ -22,7 +22,7 @@ def instance(tempdir):
         temp_dir=tempdir,
         overrides={
             "run_launcher": {
-                "module": "dagster_celery.launcher",
+                "module": "dagster_taskiq.launcher",
                 "class": "CeleryRunLauncher",
                 "config": {
                     "broker": broker_url,
@@ -63,7 +63,7 @@ def workspace(
 
 
 @pytest.fixture(scope="function")
-def dagster_celery_worker(rabbitmq, instance: DagsterInstance) -> Iterator[None]:
+def dagster_taskiq_worker(rabbitmq, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker(queue="custom-queue"):
         yield
 
@@ -79,7 +79,7 @@ def run_configs():
     run_configs(),
 )
 def test_successful_run(
-    dagster_celery_worker,
+    dagster_taskiq_worker,
     instance: DagsterInstance,
     workspace: WorkspaceRequestContext,
     run_config,
@@ -121,7 +121,7 @@ def test_successful_run(
     reason="Crashy jobs leave resources open on windows, causing filesystem contention",
 )
 def test_crashy_run(
-    dagster_celery_worker,
+    dagster_taskiq_worker,
     instance: DagsterInstance,
     workspace: WorkspaceRequestContext,
     workspace_process_context: WorkspaceProcessContext,
@@ -170,7 +170,7 @@ def test_crashy_run(
     reason="Crashy jobs leave resources open on windows, causing filesystem contention",
 )
 def test_exity_run(
-    dagster_celery_worker,
+    dagster_taskiq_worker,
     instance: DagsterInstance,
     workspace: WorkspaceRequestContext,
     run_config: Mapping[str, Any],
@@ -221,7 +221,7 @@ def test_exity_run(
     run_configs(),
 )
 def test_terminated_run(
-    dagster_celery_worker,
+    dagster_taskiq_worker,
     instance: DagsterInstance,
     workspace: WorkspaceRequestContext,
     run_config: Mapping[str, Any],

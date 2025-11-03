@@ -1,6 +1,6 @@
 import os
 
-from dagster_taskiq_tests.utils import tempdir_wrapper
+from tests.utils import tempdir_wrapper
 
 
 def test_tempdir_wrapper():

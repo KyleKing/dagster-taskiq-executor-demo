@@ -3,7 +3,7 @@ import time
 
 from dagster._core.test_utils import instance_for_test
 
-from dagster_taskiq_tests.utils import execute_on_thread, start_taskiq_worker
+from tests.utils import execute_on_thread, start_taskiq_worker
 
 
 def test_multiqueue(rabbitmq):

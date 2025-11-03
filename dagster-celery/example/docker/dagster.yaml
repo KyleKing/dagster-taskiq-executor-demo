@@ -25,7 +25,7 @@ run_coordinator:
   class: QueuedRunCoordinator
 
 run_launcher:
-  module: dagster_celery.launcher
+  module: dagster_taskiq.launcher
   class: CeleryRunLauncher
   config:
     broker:

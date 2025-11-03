@@ -9,7 +9,7 @@ from dagster._core.storage.dagster_run import RunsFilter
 from dagster._core.test_utils import instance_for_test
 from dagster_taskiq.tags import DAGSTER_TASKIQ_RUN_PRIORITY_TAG
 
-from dagster_taskiq_tests.utils import (
+from tests.utils import (
     execute_eagerly_on_taskiq,
     execute_on_thread,
     start_taskiq_worker,
