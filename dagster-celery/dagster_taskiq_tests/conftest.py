@@ -102,10 +102,6 @@ def localstack():
                 pass
 
 
-# Backward-compatible alias
-rabbitmq = localstack
-
-
 @pytest.fixture(scope="function")
 def tempdir():
     with tempfile.TemporaryDirectory() as the_dir:
@@ -122,10 +118,6 @@ def instance(tempdir):
 def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker():
         yield
-
-
-# Backward-compatible alias
-dagster_celery_worker = dagster_taskiq_worker
 
 
 @pytest.fixture(scope="session")

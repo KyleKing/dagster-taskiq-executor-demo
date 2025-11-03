@@ -127,8 +127,3 @@ def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
 def events_of_type(result: ExecutionResult, event_type: str) -> Sequence[DagsterEvent]:
     return [event for event in result.all_events if event.event_type_value == event_type]
 
-
-# Backward-compatible aliases for migration
-execute_job_on_celery = execute_job_on_taskiq
-execute_eagerly_on_celery = execute_eagerly_on_taskiq
-start_celery_worker = start_taskiq_worker

@@ -10,14 +10,14 @@ from dagster._core.test_utils import instance_for_test
 from dagster_taskiq.tags import DAGSTER_TASKIQ_RUN_PRIORITY_TAG
 
 from dagster_taskiq_tests.utils import (
-    execute_eagerly_on_celery,
+    execute_eagerly_on_taskiq,
     execute_on_thread,
-    start_celery_worker,
+    start_taskiq_worker,
 )
 
 
 def test_eager_priority_job():
-    with execute_eagerly_on_celery("simple_priority_job") as result:
+    with execute_eagerly_on_taskiq("simple_priority_job") as result:
         assert result.success
         step_events_in_order = [event for event in result.all_events if event.is_step_event]
         assert list(OrderedDict.fromkeys([evt.step_key for evt in step_events_in_order])) == [
@@ -69,7 +69,7 @@ def test_run_priority_job(rabbitmq):
 
             time.sleep(5)  # sleep to give queue time to prioritize tasks
 
-            with start_celery_worker():
+            with start_taskiq_worker():
                 while not low_done.is_set() or not hi_done.is_set():
                     time.sleep(1)
 

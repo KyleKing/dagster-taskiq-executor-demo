@@ -11,9 +11,9 @@ from dagster._daemon import execute_run_monitoring_iteration
 from dagster_celery.defaults import broker_url
 from dagster_shared import seven
 
-from dagster_celery_tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
-from dagster_celery_tests.utils import start_celery_worker
-from dagster_celery_tests.utils_launcher import poll_for_finished_run, poll_for_step_start
+from dagster_taskiq_tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
+from dagster_taskiq_tests.utils import start_taskiq_worker
+from dagster_taskiq_tests.utils_launcher import poll_for_finished_run, poll_for_step_start
 
 
 @pytest.fixture(scope="function")
@@ -64,7 +64,7 @@ def workspace(
 
 @pytest.fixture(scope="function")
 def dagster_celery_worker(rabbitmq, instance: DagsterInstance) -> Iterator[None]:
-    with start_celery_worker(queue="custom-queue"):
+    with start_taskiq_worker(queue="custom-queue"):
         yield
 
 
