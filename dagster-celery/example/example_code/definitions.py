@@ -10,6 +10,7 @@ from dagster import (
     job,
     op,
 )
+from dagster_taskiq import taskiq_executor
 from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition
 
 example_partition_def = StaticPartitionsDefinition(
@@ -57,8 +58,8 @@ def end(_num: int) -> None:
 
 
 @job(
-    executor_def=in_process_executor,
-    tags={"dagster-celery/queue": "short-queue"},
+    executor_def=taskiq_executor,
+    tags={"dagster-taskiq/queue": "short-queue"},
 )
 def unreliable_job_short() -> None:
     """This job is unreliable and will fail 50% of the time."""
@@ -68,5 +69,5 @@ def unreliable_job_short() -> None:
 definitions = Definitions(
     assets=[partitioned_asset],
     jobs=[partitioned_job_long, unreliable_job_short],
-    executor=in_process_executor,
+    executor=taskiq_executor,
 )

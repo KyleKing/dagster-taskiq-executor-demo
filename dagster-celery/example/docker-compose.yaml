@@ -14,16 +14,19 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7.2
-    command: /bin/sh -c 'redis-server --appendonly yes --requirepass $${REDIS_PASSWORD}'
+  localstack:
+    image: localstack/localstack:3.0
     ports:
-      - "6379:6379"
-    env_file: docker/docker.env
+      - "4566:4566"
     environment:
-      REDIS_DATABASES: 1
+      SERVICES: sqs
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      LAMBDA_EXECUTOR: local
+      DOCKER_HOST: unix:///var/run/docker.sock
     volumes:
-      - dagster-redis:/data
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - dagster-localstack:/tmp/localstack
     networks:
       - dagster-network
 
@@ -47,7 +50,7 @@ services:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-celery worker start -y /app/celery.yaml -A dagster_taskiq.app -q short-queue
+    command: dagster-taskiq worker start -y /app/taskiq.yaml -q short-queue
     restart: on-failure
     env_file: docker/docker.env
     cap_add:
@@ -56,19 +59,19 @@ services:
       DAGSTER_HOME: /app
     volumes:
       - ./docker/dagster.yaml:/app/dagster.yaml
-      - ./docker/celery.yaml:/app/celery.yaml
+      - ./docker/taskiq.yaml:/app/taskiq.yaml
     networks:
       - dagster-network
     depends_on:
       - postgresql
-      - redis
+      - localstack
       - daemon
 
   worker-long:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-celery worker start -y /app/celery.yaml -A dagster_taskiq.app -q long-queue
+    command: dagster-taskiq worker start -y /app/taskiq.yaml -q long-queue
     restart: on-failure
     env_file: docker/docker.env
     cap_add:
@@ -77,12 +80,12 @@ services:
       DAGSTER_HOME: /app
     volumes:
       - ./docker/dagster.yaml:/app/dagster.yaml
-      - ./docker/celery.yaml:/app/celery.yaml
+      - ./docker/taskiq.yaml:/app/taskiq.yaml
     networks:
       - dagster-network
     depends_on:
       - postgresql
-      - redis
+      - localstack
       - daemon
 
   webserver:
@@ -132,29 +135,11 @@ services:
     depends_on:
       - postgresql
 
-  flower:
-    image: mher/flower:latest
-    command:
-      [
-        "celery",
-        "--broker=redis://:password@redis:6379/0",
-        "flower",
-        "--port=5555",
-      ]
-    expose:
-      - 5555
-    ports:
-      - "5555:5555"
-    environment:
-      FLOWER_UNAUTHENTICATED_API: true
-    networks:
-      - dagster-network
-    depends_on:
-      - redis
+
 
 volumes:
   dagster-postgres:
-  dagster-redis:
+  dagster-localstack:
 
 networks:
   dagster-network:

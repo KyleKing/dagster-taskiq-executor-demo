@@ -1,0 +1,9 @@
+execution:
+  taskiq:
+    broker:
+      sqs_queue_url:
+        env: DAGSTER_TASKIQ_SQS_QUEUE_URL
+      aws_region:
+        env: AWS_DEFAULT_REGION
+      endpoint_url:
+        env: DAGSTER_TASKIQ_SQS_ENDPOINT_URL

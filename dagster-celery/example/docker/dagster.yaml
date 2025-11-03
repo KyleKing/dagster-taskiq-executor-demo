@@ -26,12 +26,15 @@ run_coordinator:
 
 run_launcher:
   module: dagster_taskiq.launcher
-  class: CeleryRunLauncher
+  class: TaskiqRunLauncher
   config:
     broker:
-      env: CELERY_BROKER_URL
-    backend:
-      env: CELERY_RESULT_BACKEND
+      sqs_queue_url:
+        env: DAGSTER_TASKIQ_SQS_QUEUE_URL
+      aws_region:
+        env: AWS_DEFAULT_REGION
+      endpoint_url:
+        env: DAGSTER_TASKIQ_SQS_ENDPOINT_URL
     default_queue: long-queue
 
 run_monitoring:
