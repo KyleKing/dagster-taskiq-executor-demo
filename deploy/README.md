@@ -1,59 +1,48 @@
 # Pulumi Infrastructure Deployment
 
-This directory contains Pulumi infrastructure as code for deploying the Dagster TaskIQ LocalStack demo. It follows Pulumi best practices using Pulumi.yaml for configuration instead of ESC.
+Infrastructure as code for deploying the Dagster TaskIQ LocalStack demo using Pulumi best practices with Pulumi.yaml configuration.
 
-## Best Practices
+## Architecture
 
-### Core Concepts
-
-The deployment follows the [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practices/four-factors): Templates, Components, Environments, and Policies.
-
+Follows the [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practices/four-factors):
 - **Templates**: Reusable code patterns in `components/` and `modules/`
-- **Components**: Encapsulated AWS resources (e.g., ECS clusters, RDS instances)
-- **Environments**: Configuration managed via `Pulumi.<stack>.yaml` files
+- **Components**: Encapsulated AWS resources (ECS clusters, RDS instances)
+- **Environments**: Configuration via `Pulumi.<stack>.yaml` files
 - **Policies**: Governance through code structure and validation
 
-### Key Patterns
-
-- **[Composable Environments](https://www.pulumi.com/docs/idp/best-practices/patterns/composable-environments)**: Stack configurations build upon shared base settings
-- **[Components Using Other Components](https://www.pulumi.com/docs/idp/best-practices/patterns/components-using-other-components)**: Infrastructure modules compose primitive components
-- **[Policies as Tests](https://www.pulumi.com/docs/idp/best-practices/patterns/policies-as-tests)**: Validation logic ensures compliance
-- **[Cost Control](https://www.pulumi.com/docs/idp/best-practices/patterns/cost-control-using-components-policies-constrained-inputs)**: Constrained inputs and policies prevent resource over-provisioning
-- **[Security Updates](https://www.pulumi.com/docs/idp/best-practices/patterns/security-updates-using-components)**: Centralized component updates for security patches
-
-### Configuration Management
-
-- Use `StackSettings` in `config.py` for structured configuration loading
-- Override per-environment values in `Pulumi.<stack>.yaml`
-- Avoid hard-coding values; use configuration for all environment-specific settings
-
-### Infrastructure Organization
+## Directory Structure
 
 **`components/`** - Generic, reusable AWS primitives:
 - Technology-focused thin wrappers (VPC, ECS, RDS, SQS)
-- Functions returning dataclasses
-- Independently importable without `__init__.py` re-exports
+- Functions returning dataclasses, independently importable
 - Examples: `sqs_fifo.py`, `ecs_helpers.py`, `rds_postgres.py`
 
 **`modules/`** - Application-specific infrastructure bundles:
 - Compose multiple components with application logic
-- Include Dagster, TaskIQ, and other app-specific concerns
+- Include Dagster, TaskIQ, and app-specific concerns
 - Examples: `dagster.py` (complete deployment), `taskiq.py` (queues + workers + IAM)
 
 **Guideline**: Reusable across projects → `components/`. Application-specific → `modules/`.
 
-## Getting Started
+## Quick Start
 
-1. Install prerequisites: Pulumi CLI, Python dependencies via `uv`
-2. Launch LocalStack: `docker compose up -d localstack`
-3. Deploy infrastructure: `mise run up`
-4. Build and push images: `./scripts/build-and-push.sh`
+1. **Prerequisites**: Pulumi CLI, Python dependencies via `uv`
+2. **Start LocalStack**: `docker compose up -d localstack`
+3. **Deploy infrastructure**: `mise run up`
+4. **Build and push images**: `./scripts/build-and-push.sh`
 
-### TaskIQ Demo Configuration
+## Configuration
 
-The TaskIQ demo module is optional and disabled by default. Enable and configure it with:
+Uses `StackSettings` in `config.py` for structured configuration:
+- Override per-environment values in `Pulumi.<stack>.yaml`
+- Avoid hard-coding values; use configuration for environment-specific settings
+- All configuration managed through Pulumi.yaml (not ESC)
 
-```sh
+## TaskIQ Demo Module
+
+Optional module disabled by default. Enable with:
+
+```bash
 cd deploy
 uv run pulumi config set --path taskiqDemo.enabled true --stack local
 uv run pulumi config set --path taskiqDemo.queueName taskiq-demo --stack local
@@ -63,22 +52,54 @@ uv run pulumi config set --path taskiqDemo.workerDesiredCount 1 --stack local
 cd ..
 ```
 
-Then build and push the image and apply the stack:
-
-```sh
+Deploy with:
+```bash
 mise run push:taskiq-demo
 mise run demo:taskiq
 ```
 
-Pulumi exports additional outputs when the module is enabled (`taskiqDemoQueueUrl`, `taskiqDemoApiServiceName`, `taskiqDemoWorkerServiceName`, and `taskiqDemoSecurityGroupId`) to simplify troubleshooting.
+Exports additional outputs when enabled: `taskiqDemoQueueUrl`, `taskiqDemoApiServiceName`, `taskiqDemoWorkerServiceName`, `taskiqDemoSecurityGroupId`.
 
 ## Commands
 
-- `mise run up` - Deploy infrastructure
-- `mise run preview` - Preview changes
-- `mise run destroy` - Destroy infrastructure
-- `mise run refresh` - Refresh state from cloud
-- `mise run demo:taskiq` - Build/push the TaskIQ demo image and deploy the stack (requires `taskiqDemo.enabled=true`)
+```bash
+mise run up         # Deploy infrastructure
+mise run preview    # Preview changes
+mise run destroy    # Destroy infrastructure
+mise run refresh    # Refresh state from cloud
+mise run demo:taskiq # Build/push TaskIQ demo and deploy (requires taskiqDemo.enabled=true)
+```
+
+## Best Practices
+
+- **Composable Environments**: Stack configurations build upon shared base settings
+- **Component Composition**: Infrastructure modules compose primitive components
+- **Policies as Tests**: Validation logic ensures compliance
+- **Cost Control**: Constrained inputs prevent resource over-provisioning
+- **Security Updates**: Centralized component updates for security patches
+
+## Development
+
+**Infrastructure changes**:
+```bash
+cd deploy
+# Edit infrastructure code
+mise run up
+```
+
+**Configuration updates**:
+```bash
+cd deploy
+uv run pulumi config set queueName my-new-queue --stack local
+mise run up
+```
+
+**Troubleshooting**:
+```bash
+cd deploy
+pulumi cancel  # Release stuck locks
+pulumi refresh # Sync state with cloud
+```
 
 ## Additional Resources
 

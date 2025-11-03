@@ -1,57 +1,66 @@
 # TaskIQ Demo
 
-Minimal TaskIQ deployment that targets LocalStack SQS. The project exposes a FastAPI ingress service for enqueueing sleep jobs and a TaskIQ worker that consumes the queue.
+Minimal TaskIQ deployment targeting LocalStack SQS with FastAPI ingress service and TaskIQ worker for sleep job processing.
 
-## Local Setup
+## Quick Start
 
-1. Copy `.env.example` to `.env` and adjust values if needed. Defaults target LocalStack at `http://localhost:4566`.
-2. Install dependencies via `uv`:
-   ```sh
+### Local Development
+
+1. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Defaults target LocalStack at http://localhost:4566
+   ```
+
+2. **Install dependencies**:
+   ```bash
    uv sync
    ```
-3. Run the API locally:
-   ```sh
+
+3. **Run services**:
+   ```bash
+   # Terminal 1: API service
    uv run taskiq-demo-api
-   ```
-   The service listens on `http://localhost:8000` by default. Submit work with:
-   ```sh
-   curl -X POST http://localhost:8000/tasks -H 'content-type: application/json' -d '{"duration_seconds": 5}'
-   ```
-4. Run the worker in a second terminal:
-   ```sh
+   # Listens on http://localhost:8000
+
+   # Terminal 2: Worker
    uv run taskiq-demo-worker
    ```
 
-Alternatively, use Mise tasks:
-```sh
-mise run app
-mise run worker
+4. **Submit jobs**:
+   ```bash
+   curl -X POST http://localhost:8000/tasks \
+     -H 'content-type: application/json' \
+     -d '{"duration_seconds": 5}'
+   ```
+
+**Or use Mise tasks**:
+```bash
+mise run app    # Start API
+mise run worker # Start worker
 ```
 
-## Container Image
+### Container Deployment
 
-The Docker image uses a shared entrypoint that dispatches on `SERVICE_ROLE` (`api` or `worker`). Build via the project-wide Bake target:
-```sh
+Build via project-wide Bake target:
+```bash
 docker buildx bake taskiq-demo
 ```
 
+Image uses shared entrypoint dispatching on `SERVICE_ROLE` (`api` or `worker`).
+
 ## Testing
 
-Run linters and tests with Mise:
-```sh
-mise run lint
-mise run test
+```bash
+mise run lint    # Lint code
+mise run test    # Run tests
+uv run pytest    # Direct pytest
 ```
 
-Or run pytest directly:
-```sh
-uv run pytest
-```
+## Pulumi Deployment
 
-## Deployment with Pulumi
-
-1. Enable the demo module in Pulumi config (values can be adjusted per environment):
-   ```sh
+1. **Enable demo module**:
+   ```bash
    cd deploy
    uv run pulumi config set --path taskiqDemo.enabled true --stack local
    uv run pulumi config set --path taskiqDemo.queueName taskiq-demo --stack local
@@ -60,21 +69,19 @@ uv run pytest
    uv run pulumi config set --path taskiqDemo.workerDesiredCount 1 --stack local
    cd ..
    ```
-2. Start LocalStack if it is not already running and deploy the stack:
-   ```sh
+
+2. **Deploy stack**:
+   ```bash
    mise run demo:taskiq
    ```
-   The task builds the `taskiq-demo` image, pushes it to LocalStack ECR, runs `pulumi up`, and prints the stack outputs.
+   Builds image, pushes to LocalStack ECR, runs `pulumi up`, prints outputs.
 
-## Manual Verification
+## Verification
 
-After the stack is deployed, obtain the API endpoint and submit a job:
+### API Testing
 
-```sh
-# Capture helper values from Pulumi outputs
-mise -C deploy run pulumi:outputs
-
-# Example using the default stack names (run from the deploy/ directory)
+```bash
+# Get API endpoint from deployed stack
 cd deploy
 CLUSTER="dagster-taskiq-demo-local"
 API_SERVICE=$(uv run pulumi stack output taskiqDemoApiServiceName --stack local)
@@ -83,17 +90,36 @@ ENI_ID=$(awslocal ecs describe-tasks --cluster "${CLUSTER}" --tasks "${TASK_ARN}
 API_IP=$(awslocal ec2 describe-network-interfaces --network-interface-ids "${ENI_ID}" --query 'NetworkInterfaces[0].Association.PublicIp' --output text)
 cd ..
 
+# Test API
 curl "http://${API_IP}:8000/health"
-curl -X POST "http://${API_IP}:8000/tasks" -H 'content-type: application/json' -d '{"duration_seconds": 8}'
+curl -X POST "http://${API_IP}:8000/tasks" \
+  -H 'content-type: application/json' \
+  -d '{"duration_seconds": 8}'
 ```
 
-Confirm the worker processes the request:
-```sh
+### Worker Monitoring
+
+```bash
+# Check worker logs
 awslocal logs tail '/aws/ecs/taskiq-demo-worker-local' --since 5m
+
+# Check queue depth
+QUEUE_URL=$(cd deploy && uv run pulumi stack output taskiqDemoQueueUrl --stack local)
+awslocal sqs get-queue-attributes \
+  --queue-url "${QUEUE_URL}" \
+  --attribute-names ApproximateNumberOfMessages
 ```
 
-You can also inspect the queue depth:
-```sh
-QUEUE_URL=$(cd deploy && uv run pulumi stack output taskiqDemoQueueUrl --stack local)
-awslocal sqs get-queue-attributes --queue-url "${QUEUE_URL}" --attribute-names ApproximateNumberOfMessages
-```
+## Architecture
+
+- **FastAPI Service**: HTTP ingress for job submission
+- **TaskIQ Worker**: Consumes SQS messages and processes sleep jobs
+- **LocalStack**: Provides SQS queue and ECS infrastructure
+- **Docker**: Containerized deployment with role-based entrypoint
+
+## Configuration
+
+Environment variables in `.env`:
+- `AWS_DEFAULT_REGION`: AWS region (default: us-east-1)
+- `SQS_QUEUE_NAME`: TaskIQ queue name
+- `LOCALSTACK_ENDPOINT`: LocalStack URL (default: http://localhost:4566)
