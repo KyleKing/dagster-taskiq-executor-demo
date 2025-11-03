@@ -6,12 +6,11 @@ from dagster import (
     Definitions,
     asset,
     define_asset_job,
-    in_process_executor,
     job,
     op,
 )
-from dagster_taskiq import taskiq_executor
 from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition
+from dagster_taskiq import taskiq_executor
 
 example_partition_def = StaticPartitionsDefinition(
     partition_keys=[str(i) for i in range(1, 32)],
