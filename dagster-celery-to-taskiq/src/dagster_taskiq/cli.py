@@ -20,6 +20,7 @@ def create_worker_cli_group():
     group = click.Group(name="worker")
     group.add_command(worker_start_command)
     group.add_command(worker_list_command)
+    group.add_command(dashboard_command)
     return group
 
 
@@ -240,6 +241,60 @@ def worker_start_command(
         click.echo("Worker started in background.")
     else:
         return subprocess.check_call(subprocess_args, env=env)
+
+
+@click.command(
+    name="dashboard",
+    help="Start the Taskiq dashboard server.",
+)
+@click.option(
+    "--host",
+    type=click.STRING,
+    default="0.0.0.0",
+    help="Host to bind the dashboard server to.",
+)
+@click.option(
+    "--port",
+    type=click.INT,
+    default=8080,
+    help="Port to bind the dashboard server to.",
+)
+@click.option(
+    "--api-token",
+    type=click.STRING,
+    default="default-token",
+    help="API token for dashboard authentication.",
+)
+@click.option(
+    "--broker",
+    "-b",
+    type=click.STRING,
+    default="dagster_taskiq.app:broker",
+    help="Python path to the broker instance.",
+)
+def dashboard_command(host, port, api_token, broker):
+    """Start the Taskiq dashboard server."""
+    try:
+        from taskiq_dashboard import TaskiqDashboard
+    except ImportError:
+        click.echo("Error: taskiq-dashboard is not installed. Install it with: pip install taskiq-dashboard")
+        return
+
+    click.echo(f"Starting Taskiq dashboard on {host}:{port}")
+    click.echo(f"Broker: {broker}")
+
+    # Import the broker
+    module_name, attr_name = broker.split(":")
+    module = __import__(module_name, fromlist=[attr_name])
+    broker_instance = getattr(module, attr_name)
+
+    # Create and run the dashboard
+    dashboard = TaskiqDashboard(
+        api_token=api_token,
+        broker=broker_instance,
+        uvicorn_kwargs={"host": host, "port": port}
+    )
+    dashboard.run()
 
 
 @click.command(

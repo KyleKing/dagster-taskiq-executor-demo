@@ -1,5 +1,0 @@
-execution:
-  taskiq:
-    broker:
-    backend:
-    config_source:

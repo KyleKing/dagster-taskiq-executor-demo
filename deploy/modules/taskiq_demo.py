@@ -87,7 +87,7 @@ def create_taskiq_demo_infrastructure(
     iam.RolePolicy(
         f"{resource_name}-inline-policy",
         role=task_role.id,
-        policy=pulumi.Output.all(queue.arn).apply(
+        policy=queue.arn.apply(
             lambda arn: json.dumps({
                 "Version": "2012-10-17",
                 "Statement": [
