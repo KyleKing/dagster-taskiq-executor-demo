@@ -65,7 +65,7 @@ async def core_taskiq_execution_loop(
     )
     _warn_on_priority_misuse(job_context, execution_plan)
 
-    step_results = {}  # Dict[str, TaskiqResult]
+    step_results = {}  # Dict[str, dict] {'result': TaskiqResult, 'task_id': str}
     step_errors = {}
 
     with InstanceConcurrencyContext(
@@ -87,17 +87,26 @@ async def core_taskiq_execution_loop(
                     )
                     stopping = True
                     active_execution.mark_interrupted()
+                    # Cancel running tasks (not supported by current broker)
+                    # TODO: Implement cancellation when CancellableSQSBroker is used
+                    pass
 
                 results_to_pop = []
-                for step_key, result in sorted(
+                for step_key, data in sorted(
                     step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
                 ):
+                    result = data['result']
                     # Check if result is ready
-                    is_ready = await _check_result_ready(result)
+                    is_ready = await result.is_ready()
 
                     if is_ready:
                         try:
-                            step_events = await _get_result(result)
+                            task_result = await result.get_result()
+                            # taskiq results are wrapped in TaskiqResult with return_value
+                            if hasattr(task_result, 'return_value'):
+                                step_events = task_result.return_value
+                            else:
+                                step_events = task_result
                         except Exception:
                             # Handle errors from task execution
                             step_events = []
@@ -171,32 +180,7 @@ async def core_taskiq_execution_loop(
                 )
 
 
-async def _check_result_ready(result: Any) -> bool:
-    """Check if a taskiq result is ready.
 
-    Args:
-        result: TaskiqResult object
-
-    Returns:
-        bool: True if result is ready
-    """
-    return await result.is_ready()
-
-
-async def _get_result(result: Any) -> Any:
-    """Get the result from a taskiq task.
-
-    Args:
-        result: TaskiqResult object
-
-    Returns:
-        The task result
-    """
-    task_result = await result.get_result()
-    # taskiq results are wrapped in TaskiqResult with return_value
-    if hasattr(task_result, 'return_value'):
-        return task_result.return_value
-    return task_result
 
 
 def _get_step_priority(context: PlanOrchestrationContext, step: Any) -> int:

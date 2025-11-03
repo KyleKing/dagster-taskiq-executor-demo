@@ -33,7 +33,7 @@ def create_sqs_broker(
         aws_secret_access_key: AWS secret key
         max_number_of_messages: Max messages per receive call
         wait_time_seconds: Long polling wait time
-        visibility_timeout: Message visibility timeout
+        visibility_timeout: Message visibility timeout (unused, kept for compatibility)
         result_backend: Optional result backend
         s3_extended_bucket_name: S3 bucket for extended messages
         **kwargs: Additional broker arguments
@@ -55,7 +55,7 @@ def create_sqs_broker(
         aws_secret_access_key=aws_secret_access_key,
         max_number_of_messages=max_number_of_messages,
         wait_time_seconds=wait_time_seconds,
-        delay_seconds=0,  # Visibility timeout handled by SQS
+        delay_seconds=0,  # Delay handled per task via labels
         s3_extended_bucket_name=s3_extended_bucket_name,
         **kwargs,
     )

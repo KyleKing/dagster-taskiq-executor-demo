@@ -125,13 +125,17 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
 
     task = create_task(broker)
 
-    # Use kiq() to kick the task
-    task_result = await task.kiq(
+    # Calculate delay based on priority (higher priority = lower delay)
+    # Priority is typically 0-10, map to delay_seconds (0-900 max for SQS)
+    delay_seconds = max(0, min(900, priority * 10))  # 10 seconds per priority level
+
+    # Use kicker with delay label for taskiq-aio-sqs
+    task_result = await task.kicker().with_labels(delay=delay_seconds).kiq(
         execute_step_args_packed=pack_value(execute_step_args),
         executable_dict=plan_context.reconstructable_job.to_dict(),
     )
 
-    return task_result
+    return {'result': task_result, 'task_id': str(task_result.task_id)}
 
 
 

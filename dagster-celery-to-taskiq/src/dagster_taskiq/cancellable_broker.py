@@ -1,6 +1,23 @@
 # Modifications copyright (c) 2024 dagster-taskiq contributors
 
-"""Cancellable SQS broker implementation with SQS-based task cancellation."""
+"""
+Cancellable SQS broker implementation with SQS-based task cancellation.
+
+DESIGN NOTES:
+- Uses separate SQS queue for cancellation messages to avoid Redis dependency
+- Workers poll cancel queue alongside main task queue
+- Cancellation messages contain task_id to identify which task to cancel
+- Implements at-least-once delivery semantics for cancellation
+- Future enhancement: Integrate with taskiq-aio-sqs native cancellation features
+
+ARCHITECTURE:
+1. Main task queue: dagster-tasks (for job execution)
+2. Cancel queue: dagster-cancels (for cancellation signals)
+3. Workers listen to both queues simultaneously
+4. Cancellation is cooperative - workers check cancel queue periodically
+
+TODO: Implement worker-side cancellation checking in core_execution_loop.py
+"""
 
 import uuid
 from typing import AsyncGenerator

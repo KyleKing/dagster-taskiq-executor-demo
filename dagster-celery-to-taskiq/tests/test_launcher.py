@@ -8,7 +8,7 @@ from dagster import DagsterInstance, DagsterRunStatus, file_relative_path, insta
 from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext
 from dagster._core.workspace.load_target import PythonFileTarget
 from dagster._daemon import execute_run_monitoring_iteration
-from dagster_taskiq.defaults import broker_url
+from dagster_taskiq.defaults import sqs_queue_url
 from dagster_shared import seven
 
 from tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
@@ -25,7 +25,7 @@ def instance(tempdir):
                 "module": "dagster_taskiq.launcher",
                 "class": "TaskiqRunLauncher",
                 "config": {
-                    "broker": broker_url,
+                    "broker": sqs_queue_url,
                     "backend": "rpc://",
                     "default_queue": "custom-queue",
                 },

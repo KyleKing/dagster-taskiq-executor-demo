@@ -61,7 +61,7 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     except ImportError:
         raise ImportError("taskiq-aio-sqs is required for S3 backend support")
 
-    # Create the SQS broker with S3 result backend and extended messages
+    # Create the SQS broker with S3 result backend, extended messages, and fair queuing
     broker = create_sqs_broker(
         queue_url=queue_url,
         endpoint_url=sqs_endpoint,
@@ -73,6 +73,7 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
         visibility_timeout=visibility,
         result_backend=result_backend,
         s3_extended_bucket_name=s3_bucket,  # Enable extended messages for large payloads
+        is_fair_queue=True,  # Enable FIFO queue support for better priority handling
     )
 
     return broker
