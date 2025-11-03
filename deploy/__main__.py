@@ -17,6 +17,7 @@ from config import StackSettings
 from modules.auto_scaler import create_auto_scaler_infrastructure
 from modules.dagster import create_dagster_infrastructure
 from modules.taskiq import create_taskiq_infrastructure
+from modules.taskiq_demo import create_taskiq_demo_infrastructure
 
 
 def main() -> None:
@@ -175,6 +176,33 @@ def main() -> None:
         execution_role_arn=execution_role.arn,
     )
 
+    taskiq_demo_resources = None
+    if settings.taskiq_demo.enabled:
+        taskiq_demo_image = ecr_repo.repository.repository_url.apply(
+            lambda url: f"{url}:{settings.taskiq_demo.image_tag}",
+        )
+        taskiq_demo_resources = create_taskiq_demo_infrastructure(
+            "taskiq-demo",
+            provider=provider,
+            project_name=settings.project.name,
+            environment=settings.project.environment,
+            region=settings.aws.region,
+            cluster_arn=cluster.cluster.arn,
+            vpc_id=network.vpc.id,
+            subnet_ids=network.subnets.ids,
+            container_image=taskiq_demo_image,
+            aws_endpoint_url=settings.aws.endpoint,
+            aws_access_key=settings.aws.access_key,
+            aws_secret_key=settings.aws.secret_key,
+            queue_name=settings.taskiq_demo.queue_name,
+            message_retention_seconds=settings.taskiq_demo.message_retention_seconds,
+            visibility_timeout=settings.taskiq_demo.visibility_timeout,
+            execution_role_arn=execution_role.arn,
+            api_desired_count=settings.taskiq_demo.api_desired_count,
+            worker_desired_count=settings.taskiq_demo.worker_desired_count,
+            assign_public_ip=settings.taskiq_demo.assign_public_ip,
+        )
+
     # Create ECS services
     security_group_output = pulumi.Output.from_input(dagster.security_group.id).apply(lambda sg: [sg])
 
@@ -322,6 +350,11 @@ def main() -> None:
     pulumi.export("taskiq_worker_service_name", taskiq_worker_service.name)
     pulumi.export("auto_scaler_service_name", auto_scaler_service.name)
     pulumi.export("dagster_web_url", pulumi.Output.concat("http://", dagster.load_balancer.dns_name))
+    if taskiq_demo_resources is not None:
+        pulumi.export("taskiqDemoQueueUrl", taskiq_demo_resources.queue.id)
+        pulumi.export("taskiqDemoApiServiceName", taskiq_demo_resources.api_service.name)
+        pulumi.export("taskiqDemoWorkerServiceName", taskiq_demo_resources.worker_service.name)
+        pulumi.export("taskiqDemoSecurityGroupId", taskiq_demo_resources.security_group.id)
 
 
 main()

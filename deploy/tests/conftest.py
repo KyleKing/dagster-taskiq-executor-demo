@@ -16,6 +16,7 @@ from config import (
     QueueSettings,
     ServiceSettings,
     StackSettings,
+    TaskiqDemoSettings,
 )
 
 
@@ -61,6 +62,16 @@ def mock_pulumi_config() -> MagicMock:
                 "daemonDesiredCount": "1",
                 "webserverDesiredCount": "1",
                 "workerDesiredCount": "2",
+            },
+            "taskiqDemo": {
+                "enabled": True,
+                "queueName": "taskiq-demo",
+                "messageRetentionSeconds": "604800",
+                "visibilityTimeout": "120",
+                "apiDesiredCount": "1",
+                "workerDesiredCount": "1",
+                "imageTag": "taskiq-demo",
+                "assignPublicIp": True,
             },
         }
         return config_map.get(key)
@@ -128,6 +139,16 @@ def sample_stack_settings() -> StackSettings:
             daemon_desired_count=1,
             webserver_desired_count=1,
             worker_desired_count=2,
+        ),
+        taskiq_demo=TaskiqDemoSettings(
+            enabled=True,
+            queue_name="taskiq-demo",
+            message_retention_seconds=604800,
+            visibility_timeout=120,
+            api_desired_count=1,
+            worker_desired_count=1,
+            image_tag="taskiq-demo",
+            assign_public_ip=True,
         ),
     )
 

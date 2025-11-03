@@ -62,6 +62,20 @@ class ServiceSettings:
 
 
 @dataclass
+class TaskiqDemoSettings:
+    """Configuration for the TaskIQ demo module."""
+
+    enabled: bool
+    queue_name: str
+    message_retention_seconds: int
+    visibility_timeout: int
+    api_desired_count: int
+    worker_desired_count: int
+    image_tag: str
+    assign_public_ip: bool
+
+
+@dataclass
 class StackSettings:
     """Aggregated configuration for the stack."""
 
@@ -70,6 +84,7 @@ class StackSettings:
     queue: QueueSettings
     database: DatabaseSettings
     services: ServiceSettings
+    taskiq_demo: TaskiqDemoSettings
 
     @classmethod
     def load(cls) -> StackSettings:
@@ -131,10 +146,23 @@ class StackSettings:
             worker_desired_count=int(services_cfg.get("workerDesiredCount", 2)),
         )
 
+        taskiq_demo_cfg = _get_mapping("taskiqDemo")
+        taskiq_demo = TaskiqDemoSettings(
+            enabled=bool(taskiq_demo_cfg.get("enabled", False)),
+            queue_name=str(taskiq_demo_cfg.get("queueName", "taskiq-demo")),
+            message_retention_seconds=int(taskiq_demo_cfg.get("messageRetentionSeconds", 7 * 24 * 60 * 60)),
+            visibility_timeout=int(taskiq_demo_cfg.get("visibilityTimeout", 120)),
+            api_desired_count=int(taskiq_demo_cfg.get("apiDesiredCount", 1)),
+            worker_desired_count=int(taskiq_demo_cfg.get("workerDesiredCount", 1)),
+            image_tag=str(taskiq_demo_cfg.get("imageTag", "taskiq-demo")),
+            assign_public_ip=bool(taskiq_demo_cfg.get("assignPublicIp", True)),
+        )
+
         return cls(
             project=project,
             aws=aws,
             queue=queue,
             database=database,
             services=services,
+            taskiq_demo=taskiq_demo,
         )

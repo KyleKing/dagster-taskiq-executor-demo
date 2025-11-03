@@ -44,6 +44,7 @@ run = "toml-sort --in-place **/pyproject.toml"
 description = "Install all dependencies (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
     "mise -C dagster-taskiq-demo run install",
+    "mise -C taskiq-demo run install",
     "mise -C deploy run install",
     "mise -C dagster-taskiq run install",
 ]
@@ -52,6 +53,7 @@ run = [
 description = "Check all code (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
     "mise -C dagster-taskiq-demo run checks",
+    "mise -C taskiq-demo run checks",
     "mise -C deploy run checks",
     "mise -C dagster-taskiq run checks",
 ]
@@ -60,6 +62,7 @@ run = [
 description = "Lint and auto-fix all code (dagster-taskiq-demo + deploy + dagster-taskiq)"
 run = [
     "mise -C dagster-taskiq-demo run fixes",
+    "mise -C taskiq-demo run fixes",
     "mise -C deploy run fixes",
     "mise -C dagster-taskiq run fixes",
 ]
@@ -74,6 +77,11 @@ description = "Build Docker image with docker bake"
 run = "docker buildx bake dagster-taskiq-demo"
 sources = ["dagster-taskiq-demo/**/*", "docker-bake.hcl", "dagster-taskiq-demo/Dockerfile"]
 outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
+
+[tasks."build:taskiq-demo"]
+description = "Build TaskIQ demo image with docker bake"
+run = "docker buildx bake taskiq-demo"
+sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
 
 [tasks."docker:login"]
 description = "Login to LocalStack ECR"
@@ -98,6 +106,10 @@ fi
 description = "Build and push Docker image to LocalStack ECR"
 depends = ["build"]
 run = "./scripts/build-and-push.sh"
+
+[tasks."push:taskiq-demo"]
+description = "Build and push TaskIQ demo image to LocalStack ECR"
+run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
 # ==============================================================================
 # LocalStack Service Management (via Docker Compose)
@@ -174,4 +186,13 @@ description = "Initial project setup (check env, install deps)"
 run = [
     "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
     "mise install",
+]
+
+[tasks."demo:taskiq"]
+description = "Deploy the TaskIQ demo (LocalStack, image push, Pulumi up, outputs)"
+run = [
+    "docker compose up -d localstack",
+    "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh",
+    "mise -C deploy run pulumi:up",
+    "mise -C deploy run pulumi:outputs",
 ]

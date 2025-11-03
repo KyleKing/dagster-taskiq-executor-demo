@@ -49,12 +49,36 @@ The deployment follows the [Four Factors Framework](https://www.pulumi.com/docs/
 3. Deploy infrastructure: `mise run up`
 4. Build and push images: `./scripts/build-and-push.sh`
 
+### TaskIQ Demo Configuration
+
+The TaskIQ demo module is optional and disabled by default. Enable and configure it with:
+
+```sh
+cd deploy
+uv run pulumi config set --path taskiqDemo.enabled true --stack local
+uv run pulumi config set --path taskiqDemo.queueName taskiq-demo --stack local
+uv run pulumi config set --path taskiqDemo.imageTag taskiq-demo --stack local
+uv run pulumi config set --path taskiqDemo.apiDesiredCount 1 --stack local
+uv run pulumi config set --path taskiqDemo.workerDesiredCount 1 --stack local
+cd ..
+```
+
+Then build and push the image and apply the stack:
+
+```sh
+mise run push:taskiq-demo
+mise run demo:taskiq
+```
+
+Pulumi exports additional outputs when the module is enabled (`taskiqDemoQueueUrl`, `taskiqDemoApiServiceName`, `taskiqDemoWorkerServiceName`, and `taskiqDemoSecurityGroupId`) to simplify troubleshooting.
+
 ## Commands
 
 - `mise run up` - Deploy infrastructure
 - `mise run preview` - Preview changes
 - `mise run destroy` - Destroy infrastructure
 - `mise run refresh` - Refresh state from cloud
+- `mise run demo:taskiq` - Build/push the TaskIQ demo image and deploy the stack (requires `taskiqDemo.enabled=true`)
 
 ## Additional Resources
 

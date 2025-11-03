@@ -39,6 +39,14 @@ def test_load_with_full_config(mock_pulumi_config: MagicMock) -> None:
         assert settings.services.daemon_desired_count == 1
         assert settings.services.webserver_desired_count == 1
         assert settings.services.worker_desired_count == 2
+        assert settings.taskiq_demo.enabled is True
+        assert settings.taskiq_demo.queue_name == "taskiq-demo"
+        assert settings.taskiq_demo.message_retention_seconds == 604800
+        assert settings.taskiq_demo.visibility_timeout == 120
+        assert settings.taskiq_demo.api_desired_count == 1
+        assert settings.taskiq_demo.worker_desired_count == 1
+        assert settings.taskiq_demo.image_tag == "taskiq-demo"
+        assert settings.taskiq_demo.assign_public_ip is True
 
 
 @patch("pulumi.get_stack")
@@ -80,6 +88,14 @@ def test_load_with_defaults(mock_get_stack: MagicMock) -> None:
         assert settings.services.daemon_desired_count == 1
         assert settings.services.webserver_desired_count == 1
         assert settings.services.worker_desired_count == 2
+        assert settings.taskiq_demo.enabled is False
+        assert settings.taskiq_demo.queue_name == "taskiq-demo"
+        assert settings.taskiq_demo.message_retention_seconds == 7 * 24 * 60 * 60
+        assert settings.taskiq_demo.visibility_timeout == 120
+        assert settings.taskiq_demo.api_desired_count == 1
+        assert settings.taskiq_demo.worker_desired_count == 1
+        assert settings.taskiq_demo.image_tag == "taskiq-demo"
+        assert settings.taskiq_demo.assign_public_ip is True
 
 
 def test_load_with_invalid_config_type() -> None:
@@ -121,6 +137,7 @@ def test_load_with_missing_config_sections() -> None:
         assert isinstance(settings, StackSettings)
         assert settings.project.name == "dagster-taskiq-demo"
         assert settings.project.environment == "local"  # Default from get_stack()
+        assert settings.taskiq_demo.enabled is False
 
 
 @pytest.mark.parametrize(
@@ -131,6 +148,7 @@ def test_load_with_missing_config_sections() -> None:
         ("queue", "messageRetentionSeconds", "864000"),
         ("database", "engineVersion", "16"),
         ("services", "daemonDesiredCount", "3"),
+        ("taskiqDemo", "queueName", "custom-queue"),
     ],
 )
 def test_load_individual_config_overrides(config_key: str, field_name: str, expected_value: str) -> None:
@@ -161,3 +179,5 @@ def test_load_individual_config_overrides(config_key: str, field_name: str, expe
                 assert settings.database.engine_version == expected_value
         elif config_key == "services" and field_name == "daemonDesiredCount":
             assert settings.services.daemon_desired_count == int(expected_value)
+        elif config_key == "taskiqDemo" and field_name == "queueName":
+            assert settings.taskiq_demo.queue_name == expected_value
