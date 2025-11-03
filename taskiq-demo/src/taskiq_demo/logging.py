@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -12,7 +12,7 @@ from .config import get_settings
 
 def configure_logging(level: int | str | None = None) -> None:
     """Initialise standard logging and structlog configuration."""
-    if hasattr(configure_logging, "_configured") and configure_logging._configured:  # type: ignore
+    if hasattr(configure_logging, "_configured") and configure_logging._configured:  # noqa: SLF001
         return
 
     settings = get_settings()
@@ -38,7 +38,7 @@ def configure_logging(level: int | str | None = None) -> None:
         context_class=dict,
         cache_logger_on_first_use=True,
     )
-    configure_logging._configured = True  # type: ignore
+    configure_logging._configured = True  # type: ignore[attr-defined] # noqa: SLF001
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
@@ -52,7 +52,7 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
 
     """
     configure_logging()
-    return structlog.get_logger(name)
+    return cast("structlog.stdlib.BoundLogger", structlog.get_logger(name))
 
 
 def _resolve_level(raw_level: Any) -> int:

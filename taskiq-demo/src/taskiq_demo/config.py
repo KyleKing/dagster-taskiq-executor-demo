@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     worker_processes: int = Field(default=1, ge=1)
     worker_max_async_tasks: int = Field(default=100, ge=1)
     worker_max_prefetch: int = Field(default=0, ge=0)
-    api_host: str = Field(default="0.0.0.0")
+    api_host: str = Field(default="127.0.0.1")
     api_port: int = Field(default=8000, ge=1, le=65535)
 
     @field_validator("log_level", mode="before")
