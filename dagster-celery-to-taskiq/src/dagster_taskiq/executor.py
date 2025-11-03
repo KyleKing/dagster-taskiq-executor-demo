@@ -16,7 +16,7 @@ from dagster._grpc.types import ExecuteStepArgs
 from dagster._serdes import pack_value
 
 from dagster_taskiq.config import DEFAULT_CONFIG, dict_wrapper
-from dagster_taskiq.defaults import sqs_queue_url, aws_region_name
+from dagster_taskiq.defaults import sqs_queue_url, aws_region_name, task_default_priority
 
 TASKIQ_CONFIG = {
     "queue_url": Field(
@@ -125,9 +125,8 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
 
     task = create_task(broker)
 
-    # Calculate delay based on priority (higher priority = lower delay)
-    # Priority is typically 0-10, map to delay_seconds (0-900 max for SQS)
-    delay_seconds = max(0, min(900, priority * 10))  # 10 seconds per priority level
+    # Translate Dagster priority into SQS delay (higher Dagster priority = lower delay)
+    delay_seconds = _priority_to_delay_seconds(priority)
 
     # Use kicker with delay label for taskiq-aio-sqs
     task_result = await task.kicker().with_labels(delay=delay_seconds).kiq(
@@ -204,3 +203,21 @@ class TaskiqExecutor(Executor):
             "config_source": self.config_source,
             "retries": self.retries,
         }
+MAX_SQS_DELAY_SECONDS = 900
+DELAY_SECONDS_STEP = 10
+
+
+def _priority_to_delay_seconds(priority: int) -> int:
+    """Translate Dagster priority into an SQS delay.
+
+    Higher priority (larger numeric value) should reduce delay to zero, while
+    lower priority numbers introduce a bounded delay. Values higher than the
+    default priority map to zero delay, and low priorities are clamped to the
+    SQS maximum delay window.
+    """
+    priority_delta = task_default_priority - priority
+    if priority_delta <= 0:
+        return 0
+
+    delay = priority_delta * DELAY_SECONDS_STEP
+    return max(0, min(MAX_SQS_DELAY_SECONDS, delay))

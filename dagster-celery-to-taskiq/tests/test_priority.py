@@ -5,8 +5,16 @@ import threading
 import time
 from collections import OrderedDict
 
+import pytest
+
 from dagster._core.storage.dagster_run import RunsFilter
 from dagster._core.test_utils import instance_for_test
+from dagster_taskiq.defaults import task_default_priority
+from dagster_taskiq.executor import (
+    DELAY_SECONDS_STEP,
+    MAX_SQS_DELAY_SECONDS,
+    _priority_to_delay_seconds,
+)
 from dagster_taskiq.tags import DAGSTER_TASKIQ_RUN_PRIORITY_TAG
 
 from tests.utils import (
@@ -83,3 +91,21 @@ def test_run_priority_job(localstack):
                 histats = instance.get_run_stats(hi_run.run_id)
 
                 assert lowstats.start_time < histats.start_time  # pyright: ignore[reportOperatorIssue]
+
+
+@pytest.mark.parametrize(
+    ('priority', 'expected_delay'),
+    [
+        (task_default_priority, 0),
+        (task_default_priority + 5, 0),
+        (task_default_priority - 1, DELAY_SECONDS_STEP),
+        (task_default_priority - 5, 5 * DELAY_SECONDS_STEP),
+        (-100, MAX_SQS_DELAY_SECONDS),
+    ],
+)
+def test_priority_delay_translation(priority: int, expected_delay: int) -> None:
+    # Arrange & Act
+    delay = _priority_to_delay_seconds(priority)
+
+    # Assert
+    assert delay == min(expected_delay, MAX_SQS_DELAY_SECONDS)

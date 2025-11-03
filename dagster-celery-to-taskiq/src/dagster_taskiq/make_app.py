@@ -1,4 +1,5 @@
 import os
+import warnings
 from typing import Any, Optional
 
 from taskiq import AsyncBroker
@@ -32,6 +33,15 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     queue_url = config.get("queue_url", sqs_queue_url)
     sqs_endpoint = config.get("endpoint_url", sqs_endpoint_url)
     region_name = config.get("region_name", aws_region_name)
+    config_source = config.get("config_source")
+    if isinstance(config_source, dict):
+        source_overrides = config_source
+    elif config_source is None:
+        source_overrides = {}
+    else:
+        source_overrides = getattr(config_source, "__dict__", {})
+        if not isinstance(source_overrides, dict):
+            source_overrides = {}
 
     # Get S3 configuration
     s3_bucket = config.get("s3_bucket_name", s3_bucket_name)
@@ -61,6 +71,24 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     except ImportError:
         raise ImportError("taskiq-aio-sqs is required for S3 backend support")
 
+    # Determine fair-queue configuration. Taskiq fair queues require FIFO URLs.
+    queue_is_fifo = str(queue_url or "").lower().endswith(".fifo")
+    requested_fair_queue = config.get("is_fair_queue")
+    if requested_fair_queue is None:
+        requested_fair_queue = source_overrides.get("is_fair_queue")
+
+    if requested_fair_queue is None:
+        is_fair_queue = queue_is_fifo
+    elif requested_fair_queue and not queue_is_fifo:
+        warnings.warn(
+            'Ignoring "is_fair_queue=True" because the configured queue URL is not FIFO.',
+            UserWarning,
+            stacklevel=2,
+        )
+        is_fair_queue = False
+    else:
+        is_fair_queue = bool(requested_fair_queue)
+
     # Create the SQS broker with S3 result backend, extended messages, and fair queuing
     broker = create_sqs_broker(
         queue_url=queue_url,
@@ -73,7 +101,7 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
         visibility_timeout=visibility,
         result_backend=result_backend,
         s3_extended_bucket_name=s3_bucket,  # Enable extended messages for large payloads
-        is_fair_queue=True,  # Enable FIFO queue support for better priority handling
+        is_fair_queue=is_fair_queue,
     )
 
     return broker

@@ -65,7 +65,7 @@ async def core_taskiq_execution_loop(
     )
     _warn_on_priority_misuse(job_context, execution_plan)
 
-    step_results = {}  # Dict[str, dict] {'result': TaskiqResult, 'task_id': str}
+    step_results = {}  # Dict[str, dict] {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
 
     with InstanceConcurrencyContext(
@@ -95,31 +95,28 @@ async def core_taskiq_execution_loop(
                 for step_key, data in sorted(
                     step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
                 ):
-                    result = data['result']
-                    # Check if result is ready
-                    is_ready = await result.is_ready()
+                    waiter = data['waiter']
+                    if not waiter.done():
+                        continue
 
-                    if is_ready:
-                        try:
-                            task_result = await result.get_result()
-                            # taskiq results are wrapped in TaskiqResult with return_value
-                            if hasattr(task_result, 'return_value'):
-                                step_events = task_result.return_value
-                            else:
-                                step_events = task_result
-                        except Exception:
-                            # Handle errors from task execution
-                            step_events = []
-                            step_errors[step_key] = serializable_error_info_from_exc_info(
-                                sys.exc_info()
-                            )
+                    try:
+                        task_result = waiter.result()
+                        if hasattr(task_result, 'raise_for_error'):
+                            task_result.raise_for_error()
+                        if hasattr(task_result, 'return_value'):
+                            step_events = task_result.return_value
+                        else:
+                            step_events = task_result
+                    except Exception:
+                        step_events = []
+                        step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
 
-                        for step_event in step_events:
-                            event = deserialize_value(step_event, DagsterEvent)
-                            yield event
-                            active_execution.handle_event(event)
+                    for step_event in step_events:
+                        event = deserialize_value(step_event, DagsterEvent)
+                        yield event
+                        active_execution.handle_event(event)
 
-                        results_to_pop.append(step_key)
+                    results_to_pop.append(step_key)
 
                 for step_key in results_to_pop:
                     if step_key in step_results:
@@ -156,6 +153,13 @@ async def core_taskiq_execution_loop(
                             priority,
                             active_execution.get_known_state(),
                         )
+                        result_handle = step_results[step.key]['result']
+                        wait_result_fn = getattr(result_handle, 'wait_result', None)
+                        check.invariant(
+                            callable(wait_result_fn),
+                            'Taskiq result handle missing wait_result() method.',
+                        )
+                        step_results[step.key]['waiter'] = asyncio.create_task(wait_result_fn())
 
                     except Exception:
                         yield DagsterEvent.engine_event(
