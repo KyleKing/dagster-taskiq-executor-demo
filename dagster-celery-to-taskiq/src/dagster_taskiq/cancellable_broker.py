@@ -20,21 +20,28 @@ TODO: Implement worker-side cancellation checking in core_execution_loop.py
 """
 
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 import aioboto3
 
 from taskiq.message import TaskiqMessage
 
-from .broker import create_sqs_broker
+from .broker import SqsBrokerConfig
 
 
 class CancellableSQSBroker:
     """SQS broker with SQS-based cancellation support."""
 
-    def __init__(self, *args, cancel_queue_url: str | None = None, **kwargs):
-        self.sqs_broker = create_sqs_broker(*args, **kwargs)
-        self.cancel_queue_url = cancel_queue_url or self.sqs_broker.queue_url.replace("dagster-tasks", "dagster-cancels")  # Default cancel queue
+    def __init__(
+        self,
+        broker_config: SqsBrokerConfig,
+        *,
+        result_backend: Optional[object] = None,
+        cancel_queue_url: str | None = None,
+    ):
+        self._config = broker_config
+        self.sqs_broker = broker_config.create_broker(result_backend=result_backend)
+        self.cancel_queue_url = cancel_queue_url or _derive_cancel_queue_url(broker_config.queue_url)
         self.cancel_sqs_client = None
 
     async def startup(self):
@@ -42,10 +49,10 @@ class CancellableSQSBroker:
         # Setup SQS client for cancel queue
         self.cancel_sqs_client = aioboto3.client(
             "sqs",
-            endpoint_url=self.sqs_broker.endpoint_url,
-            region_name=self.sqs_broker.region_name,
-            aws_access_key_id=self.sqs_broker.aws_access_key_id,
-            aws_secret_access_key=self.sqs_broker.aws_secret_access_key,
+            endpoint_url=self._config.endpoint_url,
+            region_name=self._config.region_name,
+            aws_access_key_id=self._config.aws_access_key_id,
+            aws_secret_access_key=self._config.aws_secret_access_key,
         )
 
     async def shutdown(self):
@@ -101,3 +108,12 @@ class CancellableSQSBroker:
     # Delegate other methods to sqs_broker
     def __getattr__(self, name):
         return getattr(self.sqs_broker, name)
+
+
+def _derive_cancel_queue_url(queue_url: str) -> str:
+    if not queue_url:
+        raise ValueError('Cannot derive cancel queue URL without a base queue URL')
+    queue_url = queue_url.rstrip('/')
+    prefix, _, queue_name = queue_url.rpartition('/')
+    cancel_suffix = f'{queue_name}-cancels' if queue_name else 'dagster-cancels'
+    return f'{prefix}/{cancel_suffix}' if prefix else cancel_suffix

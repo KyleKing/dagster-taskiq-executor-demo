@@ -3,15 +3,18 @@ from dagster_taskiq.defaults import (
     task_default_queue,
     worker_max_messages,
     wait_time_seconds,
-    visibility_timeout,
 )
 
 DEFAULT_CONFIG = {
     "task_default_priority": task_default_priority,
     "task_default_queue": task_default_queue,
-    "worker_max_messages": worker_max_messages,
     "wait_time_seconds": wait_time_seconds,
-    "visibility_timeout": visibility_timeout,
+    "max_number_of_messages": worker_max_messages,
+    "worker_max_messages": worker_max_messages,
+    "delay_seconds": 0,
+    "is_fair_queue": None,
+    "use_task_id_for_deduplication": False,
+    "extra_options": {},
 }
 
 

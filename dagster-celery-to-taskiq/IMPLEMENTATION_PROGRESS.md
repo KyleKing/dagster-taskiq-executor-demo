@@ -3,24 +3,17 @@
 ## Snapshot (2025-01-02)
 - **Overall progress**: in progress – core simplifications incomplete, cancellation not wired
 - **Focus**: stabilise queue behaviour, finish TaskIQ API adoption, implement SQS-based cancellation
-- **Blocking issues**: incorrect priority→delay mapping, forced FIFO settings on standard queues, executor still relies on wrapper APIs
+- **Blocking issues**: cancellation wiring still absent, S3 extended payload path unverified, LocalStack-backed regression coverage flaky
 
 ## What’s Done
 - Created this progress log to track the migration effort.
 - Added a draft `CancellableSQSBroker` with design notes (`src/dagster_taskiq/cancellable_broker.py`) – not yet used by the executor.
+- Replaced the `create_sqs_broker` wrapper with `SqsBrokerConfig`, letting `make_app()` construct `taskiq_aio_sqs.SQSBroker` directly and surfacing unsupported options (e.g. `visibility_timeout`) via warnings.
 
 ## Gaps & Rework Required
-- **Result handling** (`src/dagster_taskiq/core_execution_loop.py`): still uses manual `TaskiqResult` polling; helper removal noted but not implemented.
-- **Delayed tasks** (`src/dagster_taskiq/executor.py`):
-  - Delay is derived as `priority * 10`, so higher numeric priority yields *longer* wait.
-  - Default priority (5) now incurs a 50 s delay for every step.
-  - Needs an inverted mapping or a bounded translation layer aligned with Dagster semantics.
-- **Fair queues** (`src/dagster_taskiq/make_app.py`):
-  - Forces `is_fair_queue=True` even when the queue is not FIFO (`defaults.sqs_queue_url`).
-  - This will trigger AWS `InvalidParameterValue` errors on standard queues; must be conditional.
-- **Broker simplification** (`src/dagster_taskiq/broker.py`):
-  - Wrapper still instantiates `taskiq_aio_sqs.SQSBroker`; no direct usage in call sites.
-  - Extra parameters like `visibility_timeout` are silently ignored; revisit configuration surface.
+- **Result handling follow-ups** (`src/dagster_taskiq/core_execution_loop.py`): waiter tasks should be cancelled or drained when the execution loop exits to avoid leaks.
+- **Priority delays** (`src/dagster_taskiq/executor.py`): need integration coverage that the new delay mapping hits SQS as expected once LocalStack fixtures are stable.
+- **Fair queue documentation** (`src/dagster_taskiq/make_app.py`): document the FIFO-only toggle in config examples once broker simplification lands across the docs.
 - **S3 extended payloads**: configuration is present but unverified; no integration tests or smoke checks.
 - **Cancellation flow**:
   - Broker exposes cancellation queue hooks, but the executor loop never consumes them.

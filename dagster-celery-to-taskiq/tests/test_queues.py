@@ -41,8 +41,8 @@ def test_make_app_fair_queue_detection(
 ) -> None:
     recorded = {}
 
-    def _capture_broker(**kwargs):
-        recorded['is_fair_queue'] = kwargs['is_fair_queue']
+    def _capture_broker(self, *, result_backend=None):
+        recorded['is_fair_queue'] = self.is_fair_queue
 
         class _DummyBroker:
             async def startup(self):
@@ -53,7 +53,7 @@ def test_make_app_fair_queue_detection(
 
         return _DummyBroker()
 
-    monkeypatch.setattr('dagster_taskiq.make_app.create_sqs_broker', _capture_broker)
+    monkeypatch.setattr('dagster_taskiq.broker.SqsBrokerConfig.create_broker', _capture_broker)
 
     config = {'queue_url': queue_url}
     if override is not None:

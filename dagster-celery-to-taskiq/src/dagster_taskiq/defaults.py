@@ -23,5 +23,3 @@ task_default_queue = "dagster"
 worker_max_messages = 1
 
 wait_time_seconds = 20  # Long polling
-
-visibility_timeout = 300  # 5 minutes

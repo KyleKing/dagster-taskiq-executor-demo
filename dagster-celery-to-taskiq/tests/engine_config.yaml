@@ -1,5 +1,5 @@
 execution:
   config:
     config_source:
-      broker_transport_options:
-        visibility_timeout: 18000
+      wait_time_seconds: 5
+      max_number_of_messages: 2
