@@ -10,7 +10,7 @@ ENV POETRY_VIRTUALENVS_IN_PROJECT=0 \
 
 WORKDIR /app
 
-# Install Dagster Celery Runner
+# Install Dagster TaskIQ Runner
 COPY ./example/pyproject.toml ./example/poetry.lock /app/
 RUN poetry install --no-cache
 
@@ -21,7 +21,7 @@ RUN rm /app/pyproject.toml
 
 ENV PYTHONPATH=/app
 
-# Copy the Celery runner
+# Copy the TaskIQ runner
 COPY example/example_code /app/example_code
 
 CMD ["dagster", "api", "grpc", "--host", "0.0.0.0", "--port", "3030", "--python-file", "./example_code/definitions.py"]

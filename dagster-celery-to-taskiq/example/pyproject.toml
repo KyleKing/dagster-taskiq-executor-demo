@@ -16,7 +16,7 @@ dev = [
 [project]
 name = "dagster-taskiq-example"
 version = "0.1.0"
-description = "Example of Dagster with Celery execution"
+description = "Example of Dagster with TaskIQ execution"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "dagster>=1.7.10",
@@ -92,7 +92,7 @@ ignore = [
 unfixable = ["ERA001"] # Commented-out code
 
 [tool.ruff.lint.isort]
-known-first-party = ["dagster_celery_example"]
+known-first-party = ["dagster_taskiq_example"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/**/*.py" = [

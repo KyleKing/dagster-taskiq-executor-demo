@@ -103,5 +103,4 @@ class CancellableReceiver(Receiver):
                 name=str(taskiq_msg.task_id),
             )
             self.tasks.add(task)
-            task.add_done_callback(task_cb)</content>
-<parameter name="filePath">/Users/kyleking/Developer/kyleking/dagster-taskiq-executor-demo/dagster-celery-to-taskiq/src/dagster_taskiq/cancellable_receiver.py
+            task.add_done_callback(task_cb)

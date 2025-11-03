@@ -1,5 +1,5 @@
 execution:
-  celery:
+  taskiq:
     broker:
     backend:
     config_source:

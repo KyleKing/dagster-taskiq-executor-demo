@@ -100,5 +100,4 @@ class CancellableSQSBroker:
 
     # Delegate other methods to sqs_broker
     def __getattr__(self, name):
-        return getattr(self.sqs_broker, name)</content>
-<parameter name="filePath">/Users/kyleking/Developer/kyleking/dagster-taskiq-executor-demo/dagster-celery-to-taskiq/src/dagster_taskiq/cancellable_broker.py
+        return getattr(self.sqs_broker, name)
