@@ -1,6 +1,6 @@
-# Dagster Celery (Legacy Reference)
+# Dagster Celery to TaskIQ
 
-Legacy Dagster-Celery implementation preserved for migration reference and comparison with the new TaskIQ-based executor.
+Direct migration from Dagster-Celery implementation to Dagster-TaskIQ. **WARN**: the below content is out of date
 
 ## Purpose
 
@@ -97,7 +97,7 @@ When implementing new features or debugging issues, use this directory as a refe
 Run legacy tests for comparison:
 
 ```bash
-cd dagster-celery
+cd dagster-celery-to-taskiq
 mise run test
 ```
 

@@ -14,7 +14,7 @@ dev = [
 ]
 
 [project]
-name = "dagster-celery-example"
+name = "dagster-taskiq-example"
 version = "0.1.0"
 description = "Example of Dagster with Celery execution"
 requires-python = ">=3.13,<3.14"

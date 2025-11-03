@@ -310,7 +310,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dagster-celery-example"
+name = "dagster-celery-to-taskiq-example"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

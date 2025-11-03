@@ -117,15 +117,15 @@
 
 ## Files Modified During Investigation
 
-- `dagster-celery/pyproject.toml` - Added taskiq-aio-sqs dependency
-- `dagster-celery/src/dagster_taskiq/broker.py` - Replaced custom SQS broker with taskiq-aio-sqs
-- `dagster-celery/src/dagster_taskiq/make_app.py` - Added S3 backend configuration
-- `dagster-celery/src/dagster_taskiq/defaults.py` - Added S3 configuration defaults
-- `dagster-celery/src/dagster_taskiq/executor.py` - Added broker startup in task submission
-- `dagster-celery/src/dagster_taskiq/app.py` - Added broker/result backend startup
-- `dagster-celery/tests/conftest.py` - Added S3 service and bucket creation
-- `dagster-celery/MIGRATION_STATUS.md` - Updated with current status
-- `dagster-celery/INTEGRATION_TESTING_REVIEW.md` - This analysis document
+- `dagster-celery-to-taskiq/pyproject.toml` - Added taskiq-aio-sqs dependency
+- `dagster-celery-to-taskiq/src/dagster_taskiq/broker.py` - Replaced custom SQS broker with taskiq-aio-sqs
+- `dagster-celery-to-taskiq/src/dagster_taskiq/make_app.py` - Added S3 backend configuration
+- `dagster-celery-to-taskiq/src/dagster_taskiq/defaults.py` - Added S3 configuration defaults
+- `dagster-celery-to-taskiq/src/dagster_taskiq/executor.py` - Added broker startup in task submission
+- `dagster-celery-to-taskiq/src/dagster_taskiq/app.py` - Added broker/result backend startup
+- `dagster-celery-to-taskiq/tests/conftest.py` - Added S3 service and bucket creation
+- `dagster-celery-to-taskiq/MIGRATION_STATUS.md` - Updated with current status
+- `dagster-celery-to-taskiq/INTEGRATION_TESTING_REVIEW.md` - This analysis document
 
 ## Key Insights
 

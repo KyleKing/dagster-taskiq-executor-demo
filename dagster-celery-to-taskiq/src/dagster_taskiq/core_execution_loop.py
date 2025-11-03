@@ -1,6 +1,6 @@
 import asyncio
 import sys
-import time
+from typing import Any, AsyncGenerator, Callable, cast
 
 import dagster._check as check
 from dagster._core.errors import DagsterSubprocessError
@@ -8,11 +8,13 @@ from dagster._core.events import DagsterEvent, EngineEventData
 from dagster._core.execution.context.system import PlanOrchestrationContext
 from dagster._core.execution.plan.instance_concurrency_context import InstanceConcurrencyContext
 from dagster._core.execution.plan.plan import ExecutionPlan
+
 from dagster._core.storage.tags import PRIORITY_TAG
 from dagster._utils.error import serializable_error_info_from_exc_info
 from dagster_shared.serdes import deserialize_value
 
 from dagster_taskiq.defaults import task_default_priority, task_default_queue
+from dagster_taskiq.executor import TaskiqExecutor
 from dagster_taskiq.make_app import make_app
 from dagster_taskiq.tags import (
     DAGSTER_TASKIQ_QUEUE_TAG,
@@ -24,7 +26,11 @@ TICK_SECONDS = 1
 DELEGATE_MARKER = "taskiq_queue_wait"
 
 
-def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
+async def core_taskiq_execution_loop(
+    job_context: PlanOrchestrationContext,
+    execution_plan: ExecutionPlan,
+    step_execution_fn: Callable[..., Any],
+) -> AsyncGenerator[DagsterEvent, None]:
     """Core execution loop for taskiq-based distributed execution.
 
     Args:
@@ -39,8 +45,6 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
     check.inst_param(execution_plan, "execution_plan", ExecutionPlan)
     check.callable_param(step_execution_fn, "step_execution_fn")
 
-    executor = job_context.executor
-
     # If there are no step keys to execute, then any io managers will not be used.
     if len(execution_plan.step_keys_to_execute) > 0:
         # https://github.com/dagster-io/dagster/issues/2440
@@ -50,13 +54,13 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
             "similar system that allows files to be available to all nodes), S3, or GCS",
         )
 
-    broker = make_app(executor.app_args())
+    broker = make_app(cast(TaskiqExecutor, job_context.executor).app_args())
 
-    priority_for_step = lambda step: (
-        -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
+    priority_for_step = lambda step: (  # type: ignore
+        -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore
         + -1 * _get_run_priority(job_context)
     )
-    priority_for_key = lambda step_key: (
+    priority_for_key = lambda step_key: (  # type: ignore
         priority_for_step(execution_plan.get_step_by_key(step_key))
     )
     _warn_on_priority_misuse(job_context, execution_plan)
@@ -78,24 +82,22 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
                 if active_execution.check_for_interrupts():
                     yield DagsterEvent.engine_event(
                         job_context,
-                        "Taskiq executor: received termination signal - cancelling active tasks",
+                        "Taskiq executor: received termination signal",
                         EngineEventData.interrupted(list(step_results.keys())),
                     )
                     stopping = True
                     active_execution.mark_interrupted()
-                    # Note: Taskiq doesn't have a direct revoke mechanism like Celery
-                    # Tasks will continue but results won't be processed
 
                 results_to_pop = []
                 for step_key, result in sorted(
-                    step_results.items(), key=lambda x: priority_for_key(x[0])
+                    step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
                 ):
                     # Check if result is ready
-                    is_ready = _check_result_ready(result)
+                    is_ready = await _check_result_ready(result)
 
                     if is_ready:
                         try:
-                            step_events = _get_result(result)
+                            step_events = await _get_result(result)
                         except Exception:
                             # Handle errors from task execution
                             step_events = []
@@ -124,7 +126,7 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
                     continue
 
                 # Submit new steps for execution
-                for step in active_execution.get_steps_to_execute():
+                for step in active_execution.get_steps_to_execute():  # type: ignore
                     try:
                         queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
                         yield DagsterEvent.engine_event(
@@ -137,7 +139,7 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
                         priority = _get_step_priority(job_context, step)
 
                         # Submit the task
-                        step_results[step.key] = step_execution_fn(
+                        step_results[step.key] = await step_execution_fn(
                             broker,
                             job_context,
                             step,
@@ -156,7 +158,7 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
                         )
                         raise
 
-                time.sleep(TICK_SECONDS)
+                await asyncio.sleep(TICK_SECONDS)
 
             if step_errors:
                 raise DagsterSubprocessError(
@@ -169,7 +171,7 @@ def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
                 )
 
 
-def _check_result_ready(result):
+async def _check_result_ready(result: Any) -> bool:
     """Check if a taskiq result is ready.
 
     Args:
@@ -178,15 +180,10 @@ def _check_result_ready(result):
     Returns:
         bool: True if result is ready
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(result.is_ready())
-    finally:
-        loop.close()
+    return await result.is_ready()
 
 
-def _get_result(result):
+async def _get_result(result: Any) -> Any:
     """Get the result from a taskiq task.
 
     Args:
@@ -195,19 +192,14 @@ def _get_result(result):
     Returns:
         The task result
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        task_result = loop.run_until_complete(result.get_result())
-        # taskiq results are wrapped in TaskiqResult with return_value
-        if hasattr(task_result, 'return_value'):
-            return task_result.return_value
-        return task_result
-    finally:
-        loop.close()
+    task_result = await result.get_result()
+    # taskiq results are wrapped in TaskiqResult with return_value
+    if hasattr(task_result, 'return_value'):
+        return task_result.return_value
+    return task_result
 
 
-def _get_step_priority(context, step):
+def _get_step_priority(context: PlanOrchestrationContext, step: Any) -> int:
     """Step priority is (currently) set as the overall run priority plus the individual
     step priority.
     """
@@ -217,27 +209,28 @@ def _get_step_priority(context, step):
     return priority
 
 
-def _get_run_priority(context):
-    if not context.has_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG):
+def _get_run_priority(context: PlanOrchestrationContext) -> int:
+    tag_value = context.get_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG)
+    if tag_value is None:
         return 0
     try:
-        return int(context.get_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG))
+        return int(tag_value)
     except ValueError:
         return 0
 
 
-def _warn_on_priority_misuse(context, execution_plan):
+def _warn_on_priority_misuse(context: PlanOrchestrationContext, execution_plan: ExecutionPlan) -> None:
     bad_keys = []
     for key in execution_plan.step_keys_to_execute:
         step = execution_plan.get_step_by_key(key)
         if (
-            step.tags.get(PRIORITY_TAG) is not None
-            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None
+            step.tags.get(PRIORITY_TAG) is not None  # type: ignore
+            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore
         ):
             bad_keys.append(key)
 
     if bad_keys:
-        context.log.warn(
+        context.log.warning(
             'The following steps do not have "dagster-taskiq/priority" set but do '
             'have "dagster/priority" set which is not applicable for the taskiq engine: [{}]. '
             "Consider using a function to set both keys.".format(", ".join(bad_keys))

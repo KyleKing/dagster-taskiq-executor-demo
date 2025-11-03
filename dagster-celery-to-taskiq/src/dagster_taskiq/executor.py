@@ -125,12 +125,6 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
 
     task = create_task(broker)
 
-    # Submit the task with labels for priority and queue
-    labels = {
-        "priority": str(priority),
-        "queue": queue,
-    }
-
     # Use kiq() to kick the task
     task_result = await task.kiq(
         execute_step_args_packed=pack_value(execute_step_args),
@@ -140,19 +134,7 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
     return task_result
 
 
-def _submit_task(broker, plan_context, step, queue, priority, known_state):
-    """Synchronous wrapper for _submit_task_async.
 
-    This allows us to call the async task submission from sync code.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(
-            _submit_task_async(broker, plan_context, step, queue, priority, known_state)
-        )
-    finally:
-        loop.close()
 
 
 class TaskiqExecutor(Executor):
@@ -179,9 +161,21 @@ class TaskiqExecutor(Executor):
     def execute(self, plan_context, execution_plan):
         from dagster_taskiq.core_execution_loop import core_taskiq_execution_loop
 
-        return core_taskiq_execution_loop(
-            plan_context, execution_plan, step_execution_fn=_submit_task
-        )
+        # Run the async generator in a new event loop and yield synchronously
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            async_gen = core_taskiq_execution_loop(
+                plan_context, execution_plan, step_execution_fn=_submit_task_async
+            )
+            while True:
+                try:
+                    event = loop.run_until_complete(async_gen.__anext__())
+                    yield event
+                except StopAsyncIteration:
+                    break
+        finally:
+            loop.close()
 
     @staticmethod
     def for_cli(

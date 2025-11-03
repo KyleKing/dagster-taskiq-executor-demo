@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Verification script for Celery to Taskiq migration."""
+"""Verification script for Celery to TaskIQ migration."""
 
 import sys
 

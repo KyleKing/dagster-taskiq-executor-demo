@@ -58,14 +58,6 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
         )
-        # Start the result backend
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(result_backend.startup())
-        finally:
-            loop.close()
     except ImportError:
         raise ImportError("taskiq-aio-sqs is required for S3 backend support")
 

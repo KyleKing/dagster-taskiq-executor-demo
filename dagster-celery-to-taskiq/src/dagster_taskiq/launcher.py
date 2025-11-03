@@ -124,7 +124,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
     def terminate(self, run_id: str) -> bool:
         """Terminate a running task.
 
-        Note: Taskiq doesn't support task revocation like Celery.
+        Note: Taskiq doesn't support task termination.
         This method returns False to indicate termination is not supported.
 
         Args:
@@ -137,10 +137,10 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         if run is None:
             return False
 
-        # Taskiq doesn't have a revoke mechanism like Celery
+        # Taskiq doesn't support task termination
         # Workers will continue processing but we mark intent to stop
         self._instance.report_engine_event(
-            "Taskiq does not support task revocation. Task will complete normally.",
+            "Taskiq does not support task termination. Task will complete normally.",
             run,
             cls=self.__class__,
         )

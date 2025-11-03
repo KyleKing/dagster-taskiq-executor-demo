@@ -61,14 +61,8 @@ mise run checks     # Run all checks (lint + typecheck + test)
 ```
 
 Pass custom arguments: `mise run test -- -v -k "test_name"`
+
 Run multiple tasks in parallel: `mise run format ::: lint ::: typecheck`
-
-## Project Structure
-
-- `dagster-taskiq-demo/` - Main application with Dagster jobs and TaskIQ executor
-- `deploy/` - Pulumi infrastructure (components/ = reusable AWS primitives, modules/ = app-specific bundles)
-- `dagster-celery/` - Legacy Dagster-Celery implementation for migration reference
-- `taskiq-demo/` - Standalone TaskIQ demo
 
 ## Load Testing
 

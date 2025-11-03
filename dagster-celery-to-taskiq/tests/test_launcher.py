@@ -23,7 +23,7 @@ def instance(tempdir):
         overrides={
             "run_launcher": {
                 "module": "dagster_taskiq.launcher",
-                "class": "CeleryRunLauncher",
+                "class": "TaskiqRunLauncher",
                 "config": {
                     "broker": broker_url,
                     "backend": "rpc://",
@@ -47,7 +47,7 @@ def workspace_process_context(instance) -> Iterator[WorkspaceProcessContext]:
         instance,
         PythonFileTarget(
             python_file=file_relative_path(__file__, "repo_runner.py"),
-            attribute="celery_test_repository",
+            attribute="taskiq_test_repository",
             working_directory=None,
             location_name="test",
         ),
@@ -86,7 +86,7 @@ def test_successful_run(
 ):
     remote_job = (
         workspace.get_code_location("test")
-        .get_repository("celery_test_repository")
+        .get_repository("taskiq_test_repository")
         .get_full_job("noop_job")
     )
 
@@ -131,7 +131,7 @@ def test_crashy_run(
 
     remote_job = (
         workspace.get_code_location("test")
-        .get_repository("celery_test_repository")
+        .get_repository("taskiq_test_repository")
         .get_full_job("crashy_job")
     )
 
@@ -157,7 +157,7 @@ def test_crashy_run(
 
     poll_for_step_start(instance, run_id, timeout=5)
     time.sleep(5)
-    # Monitoring reads failed status from celery backend
+    # Monitoring reads failed status from taskiq backend
     list(execute_run_monitoring_iteration(workspace_process_context, logger))
 
     failed_run = poll_for_finished_run(instance, run_id, timeout=10)
@@ -177,7 +177,7 @@ def test_exity_run(
 ):
     remote_job = (
         workspace.get_code_location("test")
-        .get_repository("celery_test_repository")
+        .get_repository("taskiq_test_repository")
         .get_full_job("exity_job")
     )
 
@@ -228,7 +228,7 @@ def test_terminated_run(
 ):
     remote_job = (
         workspace.get_code_location("test")
-        .get_repository("celery_test_repository")
+        .get_repository("taskiq_test_repository")
         .get_full_job("sleepy_job")
     )
     run = instance.create_run_for_job(
