@@ -35,7 +35,7 @@ def test_eager_priority_job():
         ]
 
 
-def test_run_priority_job(rabbitmq):
+def test_run_priority_job(localstack):
     with tempfile.TemporaryDirectory() as tempdir:
         with instance_for_test(temp_dir=tempdir) as instance:
             low_done = threading.Event()

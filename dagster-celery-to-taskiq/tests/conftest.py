@@ -70,7 +70,7 @@ def localstack():
         raise RuntimeError("LocalStack failed to start")
 
     # Create SQS queue
-    queue_name = "dagster-test-queue"
+    queue_name = "dagster-tasks"
     result = subprocess.check_output([
         "aws", "--endpoint-url=http://localhost:4566",
         "sqs", "create-queue",

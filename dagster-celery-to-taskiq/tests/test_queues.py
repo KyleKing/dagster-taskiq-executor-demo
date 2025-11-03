@@ -6,7 +6,7 @@ from dagster._core.test_utils import instance_for_test
 from tests.utils import execute_on_thread, start_taskiq_worker
 
 
-def test_multiqueue(rabbitmq):
+def test_multiqueue(localstack):
     with instance_for_test() as instance:
         done = threading.Event()
         with start_taskiq_worker():

@@ -16,7 +16,10 @@ def test_basic_environment_config():
             "DAGSTER_TASKIQ_SQS_QUEUE_URL": "https://sqs.us-east-1.amazonaws.com/123/test",
             "AWS_DEFAULT_REGION": "us-east-1",
         }):
-            # Import here to pick up environment variables
+            # Reload module to pick up environment variables
+            import importlib
+            import dagster_taskiq.defaults
+            importlib.reload(dagster_taskiq.defaults)
             from dagster_taskiq.defaults import sqs_queue_url, aws_region_name
 
             assert sqs_queue_url == "https://sqs.us-east-1.amazonaws.com/123/test"

@@ -63,7 +63,7 @@ def workspace(
 
 
 @pytest.fixture(scope="function")
-def dagster_taskiq_worker(rabbitmq, instance: DagsterInstance) -> Iterator[None]:
+def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker(queue="custom-queue"):
         yield
 

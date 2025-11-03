@@ -4,24 +4,23 @@
 [env]
 PYTHONPATH = "src"
 
-# ==============================================================================
-# Common Development Tasks
-# ==============================================================================
+[tasks.checks]
+description = "Run all read-only checks (lint + typechecks + test)"
+depends = ["lint", "mypy", "pyright", "test"]
 
-[tasks.install]
-description = "Install deploy dependencies"
-run = "uv sync --all-groups"
-sources = ["pyproject.toml", "uv.lock"]
-
-[tasks.test]
-description = "Run deploy tests with pytest (pass additional args)"
-run = "uv run pytest"
-sources = ["**/*.py"]
+[tasks.fixes]
+description = "Run all fixes (ruff format and linter)"
+depends = ["format", "lint:power-fix"]
 
 [tasks.format]
 description = "Format deploy code with ruff (pass --check to check only)"
 run = "uv run ruff format"
 sources = ["**/*.py"]
+
+[tasks.install]
+description = "Install deploy dependencies"
+run = "uv sync --all-groups"
+sources = ["pyproject.toml", "uv.lock"]
 
 [tasks.lint]
 description = "Lint deploy code with ruff (pass --fix to auto-fix)"
@@ -42,10 +41,8 @@ description = "Run pyright type checker (pass additional args)"
 run = "uv run pyright"
 sources = ["**/*.py"]
 
-[tasks.checks]
-description = "Run all read-only checks (lint + typechecks + test)"
-depends = ["lint", "mypy", "pyright", "test"]
-
-[tasks.fixes]
-description = "Run all fixes (ruff format and linter)"
-depends = ["format", "lint:power-fix"]
+[tasks.test]
+description = "Run deploy tests with pytest (pass additional args)"
+run = "uv run pytest"
+env = {PYTHONPATH = "src"}
+sources = ["**/*.py"]
