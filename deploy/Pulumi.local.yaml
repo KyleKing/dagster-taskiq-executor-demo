@@ -1,1 +1,8 @@
 encryptionsalt: v1:qfQt0poXbXc=:v1:h7ulWwFRd+n+Y4ml:v8GYbLgPLGtcs+2JPFKS44MhAL03RA==
+config:
+  localstack-ecs-sqs:taskiqDemo:
+    enabled: true
+    queueName: taskiq-demo
+    imageTag: taskiq-demo
+    apiDesiredCount: 1
+    workerDesiredCount: 1

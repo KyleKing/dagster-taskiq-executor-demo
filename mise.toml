@@ -112,16 +112,6 @@ description = "View LocalStack logs"
 alias = "logs"
 run = "docker compose logs -f localstack"
 
-# PLANNED: Add helper for Pulumi to remove (aka forget) the pulumi stack when LocalStack is purged
-[tasks."localstack:reset"]
-description = "Reset LocalStack state (removes volume data)"
-confirm = "This will delete all LocalStack data. Continue?"
-run = [
-  "mise run localstack:stop",
-  "rm -rf volume/*",
-  "mise run localstack:start"
-]
-
 [tasks."localstack:restart"]
 description = "Restart LocalStack container"
 depends = ["localstack:stop", "localstack:start"]
