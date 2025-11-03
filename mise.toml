@@ -1,86 +1,35 @@
 # Root mise.toml - Monorepo Orchestration
 # This file coordinates tasks across the entire repository
 
-[settings]
-experimental = true
-
-[tools]
-"asdf:postgres" = "17"
-node = "latest"
-"pipx:awscli-local" = "latest"
-"pipx:mdformat" = "latest"
-"pipx:toml-sort" = "latest"
-python = "3.13"
-
 [env]
-_.file = { path = ".env" }
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
 PROJECT_NAME = "dagster-taskiq-demo"
 PULUMI_CONFIG_PASSPHRASE = "See README!"
+_.file = {path = ".env"}
 
-# ==============================================================================
-# Meta-Tasks for Mise Management
-# ==============================================================================
+[settings]
+experimental = true
 
-[tasks."mise:bump"]
-description = "Bump all tool versions to latest and update mise.toml/lock"
-run = "mise up --bump"
+[tasks."aws:clusters"]
+description = "List ECS clusters in LocalStack"
+run = "awslocal ecs list-clusters --region ${AWS_DEFAULT_REGION}"
 
-# ==============================================================================
-# General Utilities
-# ==============================================================================
+[tasks."aws:images"]
+description = "List ECR images"
+run = "awslocal ecr list-images --repository-name ${PROJECT_NAME}-${ENVIRONMENT} --region ${AWS_DEFAULT_REGION}"
 
-[tasks.mdformat]
-description = "Format all markdown files"
-run = "mdformat **/*.md"
-sources = ["**/*.md"]
+[tasks."aws:queues"]
+description = "List SQS queues in LocalStack"
+run = "awslocal sqs list-queues --region ${AWS_DEFAULT_REGION}"
 
-[tasks.toml-sort]
-description = "Format all toml files"
-# FYI: Currently only formats pyproject.toml because mise.toml are manually sorted
-run = "toml-sort --in-place **/pyproject.toml"
-sources = ["**/pyproject.toml"]
+[tasks."aws:services"]
+description = "List ECS services in the cluster"
+run = "awslocal ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
 
-# ==============================================================================
-# Monorepo Orchestration Tasks
-# These tasks coordinate work across dagster-taskiq-demo/ and deploy/ subdirectories
-# ==============================================================================
-
-[tasks.install]
-description = "Install all dependencies (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
-run = [
-    "mise -C dagster-taskiq-demo run install",
-    "mise -C taskiq-demo run install",
-    "mise -C deploy run install",
-    "mise -C dagster-taskiq run install",
-    "mise -C dagster-celery-to-taskiq/example run install",
-]
-
-[tasks.checks]
-description = "Check all code (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
-run = [
-    "mise -C dagster-taskiq-demo run checks",
-    "mise -C taskiq-demo run checks",
-    "mise -C deploy run checks",
-    "mise -C dagster-taskiq run checks",
-    "mise -C dagster-celery-to-taskiq/example run checks",
-]
-
-[tasks.fixes]
-description = "Lint and auto-fix all code (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
-run = [
-    "mise -C dagster-taskiq-demo run fixes",
-    "mise -C taskiq-demo run fixes",
-    "mise -C deploy run fixes",
-    "mise -C dagster-taskiq run fixes",
-    "mise -C dagster-celery-to-taskiq/example run fixes",
-]
-
-# ==============================================================================
-# Docker & Build Tasks
-# PLANNED: de-duplicate with build and push script
-# ==============================================================================
+[tasks."aws:tasks"]
+description = "List running ECS tasks"
+run = "awslocal ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
 
 [tasks."build:dagster-taskiq-demo"]
 description = "Build Docker image with docker bake"
@@ -92,6 +41,16 @@ outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
 description = "Build TaskIQ demo image with docker bake"
 run = "docker buildx bake taskiq-demo"
 sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
+
+[tasks.checks]
+description = "Check all code (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
+run = [
+  "mise -C dagster-taskiq-demo run checks",
+  "mise -C taskiq-demo run checks",
+  "mise -C deploy run checks",
+  "mise -C dagster-taskiq run checks",
+  "mise -C dagster-celery-to-taskiq/example run checks"
+]
 
 [tasks."ecr:login"]
 description = "Login to LocalStack ECR"
@@ -121,28 +80,56 @@ run = "./scripts/build-and-push.sh"
 description = "Build and push TaskIQ demo image to LocalStack ECR"
 run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
-# ==============================================================================
-# LocalStack Service Management (via Docker Compose)
-# ==============================================================================
+[tasks.env-setup]
+description = "Initial project setup (check env, install deps)"
+run = [
+  "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
+  "mise install"
+]
 
-[tasks."localstack:start"]
-description = "Start LocalStack container"
-alias = "start"
-run = "docker compose up --build --remove-orphans"
+[tasks.fixes]
+description = "Lint and auto-fix all code (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
+run = [
+  "mise -C dagster-taskiq-demo run fixes",
+  "mise -C taskiq-demo run fixes",
+  "mise -C deploy run fixes",
+  "mise -C dagster-taskiq run fixes",
+  "mise -C dagster-celery-to-taskiq/example run fixes"
+]
 
-[tasks."localstack:stop"]
-description = "Stop LocalStack container"
-alias = "stop"
-run = "docker compose down"
-
-[tasks."localstack:restart"]
-description = "Restart LocalStack container"
-depends = ["localstack:stop", "localstack:start"]
+[tasks.install]
+description = "Install all dependencies (dagster-taskiq-demo + deploy + dagster-taskiq + dagster-celery-to-taskiq-example)"
+run = [
+  "mise -C dagster-taskiq-demo run install",
+  "mise -C taskiq-demo run install",
+  "mise -C deploy run install",
+  "mise -C dagster-taskiq run install",
+  "mise -C dagster-celery-to-taskiq/example run install"
+]
 
 [tasks."localstack:logs"]
 description = "View LocalStack logs"
 alias = "logs"
 run = "docker compose logs -f localstack"
+
+# PLANNED: Add helper for Pulumi to remove (aka forget) the pulumi stack when LocalStack is purged
+[tasks."localstack:reset"]
+description = "Reset LocalStack state (removes volume data)"
+confirm = "This will delete all LocalStack data. Continue?"
+run = [
+  "mise run localstack:stop",
+  "rm -rf volume/*",
+  "mise run localstack:start"
+]
+
+[tasks."localstack:restart"]
+description = "Restart LocalStack container"
+depends = ["localstack:stop", "localstack:start"]
+
+[tasks."localstack:start"]
+description = "Start LocalStack container"
+alias = "start"
+run = "docker compose up --build --remove-orphans"
 
 [tasks."localstack:status"]
 description = "Check LocalStack health"
@@ -151,49 +138,34 @@ echo "Checking LocalStack health..."
 (curl -s http://localhost:4566/_localstack/health | jq) || echo "LocalStack not running"
 '''
 
-# PLANNED: Add helper for Pulumi to remove (aka forget) the pulumi stack when LocalStack is purged
-[tasks."localstack:reset"]
-description = "Reset LocalStack state (removes volume data)"
-confirm = "This will delete all LocalStack data. Continue?"
-run = [
-    "mise run localstack:stop",
-    "rm -rf volume/*",
-    "mise run localstack:start",
-]
+[tasks."localstack:stop"]
+description = "Stop LocalStack container"
+alias = "stop"
+run = "docker compose down"
 
-# ==============================================================================
-# AWS/LocalStack Utility Tasks
-# ==============================================================================
+[tasks.mdformat]
+description = "Format all markdown files"
+run = "mdformat **/*.md"
+sources = ["**/*.md"]
 
-[tasks."aws:queues"]
-description = "List SQS queues in LocalStack"
-run = "awslocal sqs list-queues --region ${AWS_DEFAULT_REGION}"
+[tasks."mise:bump"]
+description = "Bump all tool versions to latest and update mise.toml/lock"
+run = "mise up --bump"
 
-[tasks."aws:clusters"]
-description = "List ECS clusters in LocalStack"
-run = "awslocal ecs list-clusters --region ${AWS_DEFAULT_REGION}"
+[tasks.toml-sort]
+description = "Format all toml files"
+# FYI: Currently only formats pyproject.toml because mise.toml are manually sorted
+run = "toml-sort --in-place **/pyproject.toml"
+sources = ["**/pyproject.toml"]
 
-[tasks."aws:images"]
-description = "List ECR images"
-run = "awslocal ecr list-images --repository-name ${PROJECT_NAME}-${ENVIRONMENT} --region ${AWS_DEFAULT_REGION}"
-
-[tasks."aws:services"]
-description = "List ECS services in the cluster"
-run = "awslocal ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
-
-[tasks."aws:tasks"]
-description = "List running ECS tasks"
-run = "awslocal ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
-
-# TODO: Consider other helpers for logs and possibly reading from Pulumi Outputs for the values instead of ENV
-
-# ==============================================================================
-# Composite Workflow Tasks
-# ==============================================================================
-
-[tasks.env-setup]
-description = "Initial project setup (check env, install deps)"
-run = [
-    "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
-    "mise install",
-]
+[tools]
+"asdf:postgres" = "17"
+hadolint = "latest"
+hk = "latest"
+node = "latest"
+"pipx:awscli-local" = "latest"
+"pipx:mdformat" = "latest"
+"pipx:toml-sort" = "latest"
+python = "3.13"
+pkl = "latest"
+"pipx:commitizen" = "latest"

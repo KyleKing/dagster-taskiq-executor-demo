@@ -2,6 +2,19 @@
 version = "17.6"
 backend = "asdf:postgres"
 
+[[tools.hadolint]]
+version = "2.14.0"
+backend = "aqua:hadolint/hadolint"
+
+[tools.hadolint.platforms.macos-arm64]
+checksum = "sha256:3625e2e9f43dcfe7bd38738a5f5520ed50ce39ed28485266e6803dd7bc197b10"
+size = 100982664
+url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-macos-arm64"
+
+[[tools.hk]]
+version = "1.20.0"
+backend = "aqua:jdx/hk"
+
 [[tools.node]]
 version = "25.1.0"
 backend = "core:node"
@@ -10,6 +23,10 @@ backend = "core:node"
 version = "0.22.2"
 backend = "pipx:awscli-local"
 
+[[tools."pipx:commitizen"]]
+version = "4.9.1"
+backend = "pipx:commitizen"
+
 [[tools."pipx:mdformat"]]
 version = "1.0.0"
 backend = "pipx:mdformat"
@@ -17,6 +34,10 @@ backend = "pipx:mdformat"
 [[tools."pipx:toml-sort"]]
 version = "latest"
 backend = "pipx:toml-sort"
+
+[[tools.pkl]]
+version = "0.29.1"
+backend = "aqua:apple/pkl"
 
 [[tools.python]]
 version = "3.13.7"

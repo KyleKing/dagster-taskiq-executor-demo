@@ -1,0 +1,78 @@
+// Install with `hk install --mise` to ensure local tools are available
+
+amends "package://github.com/jdx/hk/releases/download/v1.20.0/hk@1.20.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.20.0/hk@1.20.0#/Builtins.pkl"
+
+min_hk_version = "1.20.0"
+
+local linters = new Mapping<String, Step> {
+    // ["actionlint"] = Builtins.actionlint // GitHub Actions
+    ["check-added-large-files"] = Builtins.check_added_large_files
+    ["check-merge-conflict"] = Builtins.check_merge_conflict
+    ["check-symlinks"] = Builtins.check_symlinks
+    ["end-of-file-fixer"] = Builtins.newlines
+    ["hadolint"] = Builtins.hadolint // Dockerfile
+    ["mixed-line-ending"] = Builtins.mixed_line_ending
+    ["mypy"] = Builtins.mypy
+    ["pch-check-symlinks"] = Builtins.check_symlinks
+    ["python-check-ast"] = Builtins.python_check_ast
+    ["python-debug-statements"] = Builtins.python_debug_statements
+    ["ruff"] = Builtins.ruff
+    ["ruff-format"] = Builtins.ruff_format
+    ["trailing-whitespace"] = Builtins.trailing_whitespace
+    ["yamllint"] = Builtins.yamllint
+    ["toml-sort"] = new Step {
+        glob = List("**/*.toml")
+        check = "toml-sort --check {{files}}"
+        fix = "toml-sort --in-place {{files}}"
+    }
+    // TODO: See other builtins from: https://hk.jdx.dev/builtins.html
+}
+
+local commit_msg_checks = new Mapping<String, Step> {
+    ["commitizen"] {
+        check = "cz check --allow-abort --commit-msg-file={{commit_msg_file}}"
+    }
+}
+local pre_push_checks = new Mapping<String, Step> {
+    ["checks"] {
+        check = "mise run checks"
+    }
+    ["commitizen-branch"] {
+        check = "cz check --rev-range origin/HEAD..HEAD"
+    }
+}
+
+// FYI: there are additional configuration options for batch, workspace_indicator, etc. https://hk.jdx.dev/configuration.html
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "patch-file" // stashes unstaged changes while running fix steps
+        steps = linters
+    }
+    ["pre-push"] {
+        steps {
+            // FYI: PRs aren't required for this project
+            // ["no-commit-to-branch"] {
+            //     check = "no-commit-to-branch --branch=main"
+            // }
+            ...pre_push_checks
+            ...linters
+        }
+    }
+    ["commit-msg"] {
+        steps = commit_msg_checks
+    }
+
+    // "fix" and "check" are special steps for `hk fix` and `hk check` commands
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps {
+            ...pre_push_checks
+            ...linters
+        }
+    }
+}
