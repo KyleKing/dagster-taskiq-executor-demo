@@ -48,7 +48,7 @@ def test_postgres_url_property(test_settings: Settings) -> None:
 
 def test_dagster_postgres_url_property(test_settings: Settings) -> None:
     """dagster_postgres_url property construction."""
-    expected_url = "postgresql+psycopg2://test:test@localhost:5432/test"
+    expected_url = "postgresql+psycopg://test:test@localhost:5432/test"
     assert test_settings.dagster_postgres_url == expected_url
 
 

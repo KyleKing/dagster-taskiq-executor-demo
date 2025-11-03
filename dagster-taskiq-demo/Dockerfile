@@ -26,15 +26,15 @@ ENV DAGSTER_HOME=/opt/dagster/dagster_home
 RUN mkdir -p $DAGSTER_HOME \
     && chown -R nonroot:nonroot /opt/dagster
 
-COPY --from=dagster-taskiq uv.lock /dagster-taskiq/uv.lock
-COPY --from=dagster-taskiq pyproject.toml /dagster-taskiq/pyproject.toml
-COPY --from=dagster-taskiq src/dagster_taskiq/__init__.py /dagster-taskiq/src/dagster_taskiq/__init__.py
+COPY --from=dagster-celery-to-taskiq uv.lock /dagster-celery-to-taskiq/uv.lock
+COPY --from=dagster-celery-to-taskiq pyproject.toml /dagster-celery-to-taskiq/pyproject.toml
+COPY --from=dagster-celery-to-taskiq src/dagster_taskiq/__init__.py /dagster-celery-to-taskiq/src/dagster_taskiq/__init__.py
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock,readonly \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml,readonly \
     uv sync --locked --no-dev --no-install-project
 
-COPY --from=dagster-taskiq . /dagster-taskiq/
+COPY --from=dagster-celery-to-taskiq . /dagster-celery-to-taskiq/
 COPY --chown=nonroot:nonroot . /app
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     uv sync --locked --no-dev --offline

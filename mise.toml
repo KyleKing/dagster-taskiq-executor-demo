@@ -114,7 +114,8 @@ run = "docker compose logs -f localstack"
 
 [tasks."localstack:restart"]
 description = "Restart LocalStack container"
-depends = ["localstack:stop", "localstack:start"]
+run = "mise run localstack:start --detach"
+wait_for = ["localstack:stop"]
 
 [tasks."localstack:start"]
 description = "Start LocalStack container"

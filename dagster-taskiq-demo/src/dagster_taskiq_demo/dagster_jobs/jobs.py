@@ -1,8 +1,7 @@
 """Dagster job definitions for fast and slow operations."""
 
 from dagster import job
-
-from dagster_taskiq_demo.taskiq_executor import taskiq_executor
+from dagster_taskiq import taskiq_executor
 
 from .ops import aggregation_op, data_processing_op, fast_async_op, slow_async_op
 
@@ -21,6 +20,7 @@ def fast_job() -> None:
 @job(
     name="slow_job",
     description="Job with slow async operations (5±2 minutes)",
+    executor_def=taskiq_executor,
 )
 def slow_job() -> None:
     """Job that executes slow async operations."""
@@ -31,6 +31,7 @@ def slow_job() -> None:
 @job(
     name="mixed_job",
     description="Job with both fast and slow operations",
+    executor_def=taskiq_executor,
 )
 def mixed_job() -> None:
     """Job that executes both fast and slow operations and aggregates results."""
@@ -48,6 +49,7 @@ def mixed_job() -> None:
 @job(
     name="parallel_fast_job",
     description="Job with multiple parallel fast operations",
+    executor_def=taskiq_executor,
 )
 def parallel_fast_job() -> None:
     """Job that executes multiple fast operations in parallel."""
@@ -65,6 +67,7 @@ def parallel_fast_job() -> None:
 @job(
     name="sequential_slow_job",
     description="Job with sequential slow operations",
+    executor_def=taskiq_executor,
 )
 def sequential_slow_job() -> None:
     """Job that executes slow operations sequentially."""

@@ -126,4 +126,4 @@ known-first-party = ["dagster_taskiq_demo"]
 convention = "google"
 
 [tool.uv.sources]
-dagster-taskiq = {path = "../dagster-taskiq", editable = true}
+dagster-taskiq = {path = "../dagster-celery-to-taskiq", editable = true}

@@ -2,50 +2,36 @@
 
 ## Setup commands
 
+- Use `mise` for tool orchestration, `uv` for Python packages
 - Install dependencies: `mise run install`
 - Start LocalStack: `mise run localstack:start`
 - Deploy infrastructure: `cd deploy && mise run pulumi:up`
 - Build and push image: `./scripts/build-and-push.sh`
-- Start Dagster: `cd dagster-taskiq-demo && python -m dagster dev`
-- Run tests: `mise run test`
+- Start Dagster: `cd dagster-taskiq-demo` and `uv run python -m dagster dev`
 - Run all checks: `mise run checks`
+- Run all fixes: `mise run fixes`
+- Run tests: `cd <dir>` and `mise run test`
+- General Python: `cd <dir>` and `uv run python -m <>` (or `source .venv/bin/activate`)
 
 ## Code style
 
 - Python 3.13 with functional patterns (DRY, YAGNI)
-- Use SQLAlchemy v2 style: import from `sqlalchemy`, use `text()` for SQL strings
-- Handle Result objects appropriately (`.scalar()`, `.scalars()`, `.mappings()`)
-- Single quotes, no semicolons where applicable
+- Use SQLAlchemy v2 style: import from `sqlalchemy`, use `text()` for SQL strings and handle Result objects appropriately (`.scalar()`, `.scalars()`, `.mappings()`)
 
 ## Testing instructions
 
 - Test at interface level (Dagster Job) rather than unit tests
-- Use `pytest.mark.parametrize` and AAA pattern
-- Avoid probing Dagster internals or private modules
-- Use modern APIs like `execute_in_process()`
-- Never use unittest-style classes; use plain functions and parametrization
-- Run `mise run test` for all tests, `mise run lint --fix` for auto-fixing
+- Avoid probing Dagster internals or private modules and use modern APIs like `execute_in_process()`
+- Never use unittest-style classes; use plain functions and parametrization; follow AAA pattern
+- Run `mise run test` for each subproject when making changes
 
 ## Project structure
 
 - `dagster-taskiq-demo/`: Full example application with Dagster jobs and TaskIQ executor
 - `dagster-celery-to-taskiq/`: direct reimplementation based on dagster-celery
-- `dagster-taskiq/`: implementation from scratch with custom SQS integrations
 - `taskiq-demo/`: Standalone TaskIQ and FastAPI demo (without Dagster)
 - `deploy/`: Pulumi infrastructure (components/ = reusable AWS primitives, modules/ = app-specific bundles)
-
-## Key implementation notes
-
-- Custom async worker implementation (not TaskIQ framework) for better Dagster integration
-- Exactly-once execution via PostgreSQL idempotency storage
-- Auto-scaling based on SQS queue depth
-- Load simulator for testing various scenarios
-- Use `mise` for tool orchestration, `uv` for Python packages
 
 ## Development workflow
 
 - Always use `zsh` shell for `mise` auto-loading
-- App changes: rebuild image with `./scripts/build-and-push.sh`
-- Infrastructure changes: update Pulumi code and run `pulumi up`
-- Pulumi commands need `--yes` for automation
-- If Pulumi hangs >10min: `cd deploy && pulumi cancel`

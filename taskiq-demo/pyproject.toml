@@ -19,14 +19,14 @@ description = "Minimal TaskIQ demo targeting LocalStack SQS"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-   "aioboto3>=13.0.0",
-   "fastapi>=0.115.0",
-   "pydantic-settings>=2.5.0",
-   "structlog>=25.4.0",
-   "taskiq>=0.11.0",
-   "taskiq-aio-sqs>=0.4.0",
-   "taskiq-fastapi>=0.3.5",
-   "uvicorn[standard]>=0.32.0"
+  "aioboto3>=13.0.0",
+  "fastapi>=0.115.0",
+  "pydantic-settings>=2.5.0",
+  "structlog>=25.4.0",
+  "taskiq>=0.11.0",
+  "taskiq-aio-sqs>=0.4.0",
+  "taskiq-fastapi>=0.3.5",
+  "uvicorn[standard]>=0.32.0"
 ]
 
 [project.scripts]
