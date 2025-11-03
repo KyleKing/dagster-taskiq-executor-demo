@@ -5,6 +5,7 @@ Distributed task execution for Dagster using Taskiq with AWS SQS.
 ## Overview
 
 This project migrates from Celery to Taskiq, providing:
+
 - ✅ Task execution and distribution
 - ✅ Worker management (CLI)
 - ✅ Run launching and management
@@ -45,6 +46,7 @@ def my_job():
 ### Configuration
 
 **Environment Variables:**
+
 ```bash
 # Required
 export DAGSTER_TASKIQ_SQS_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks"
@@ -59,6 +61,7 @@ export AWS_SECRET_ACCESS_KEY="your-secret-key"
 ```
 
 **YAML Configuration:**
+
 ```yaml
 execution:
   config:
@@ -156,18 +159,20 @@ export DAGSTER_TASKIQ_SQS_QUEUE_URL="<queue-url>"
 
 1. **Task Revocation**: Taskiq doesn't support direct task cancellation like Celery's `revoke()`. Tasks continue on interruption but results aren't processed.
 
-2. **Worker Hostname**: Uses placeholder "taskiq-worker" instead of actual hostname.
+1. **Worker Hostname**: Uses placeholder "taskiq-worker" instead of actual hostname.
 
-3. **Async/Sync Bridge**: Event loops created/closed per operation may impact performance.
+1. **Async/Sync Bridge**: Event loops created/closed per operation may impact performance.
 
 ## Troubleshooting
 
 ### Import Errors
+
 ```bash
 pip install -e .
 ```
 
 ### SQS Connection
+
 ```bash
 # Check credentials
 aws sts get-caller-identity
@@ -180,6 +185,7 @@ curl http://localhost:4566/_localstack/health
 ```
 
 ### Task Not Executing
+
 - Verify queue URL is correct
 - Check worker is running
 - Confirm AWS credentials have SQS permissions

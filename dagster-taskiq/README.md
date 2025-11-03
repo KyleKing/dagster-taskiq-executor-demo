@@ -5,6 +5,7 @@ A Dagster executor using TaskIQ and AWS SQS for distributed job execution with e
 ## Overview
 
 `dagster-taskiq` is a modern replacement for `dagster-celery` that provides:
+
 - **AWS Native**: SQS broker with ECS worker auto-scaling
 - **Exactly-Once**: PostgreSQL idempotency storage prevents duplicate execution
 - **Cloud Integration**: Native CloudWatch monitoring and AWS IAM security
@@ -74,6 +75,7 @@ python -m dagster dev
 ### AWS IAM Requirements
 
 Workers need these permissions:
+
 ```json
 {
     "Version": "2012-10-17",
@@ -105,17 +107,17 @@ Workers need these permissions:
 ### Components
 
 1. **Executor**: Submits Dagster steps to SQS as TaskIQ tasks
-2. **Worker**: Consumes SQS messages and executes Dagster steps
-3. **Idempotency Storage**: PostgreSQL table prevents duplicate execution
-4. **Auto-scaling**: ECS service scales based on SQS queue depth
+1. **Worker**: Consumes SQS messages and executes Dagster steps
+1. **Idempotency Storage**: PostgreSQL table prevents duplicate execution
+1. **Auto-scaling**: ECS service scales based on SQS queue depth
 
 ### Execution Flow
 
 1. Dagster executor creates `OpExecutionTask` payload
-2. Task submitted to SQS with unique idempotency key
-3. Worker receives message, checks idempotency storage
-4. If not executed, runs Dagster step and records completion
-5. Executor polls idempotency storage for completion status
+1. Task submitted to SQS with unique idempotency key
+1. Worker receives message, checks idempotency storage
+1. If not executed, runs Dagster step and records completion
+1. Executor polls idempotency storage for completion status
 
 ### Exactly-Once Semantics
 
@@ -130,6 +132,7 @@ Workers need these permissions:
 ### Local Development
 
 Use the demo application for local development:
+
 ```bash
 cd dagster-taskiq-demo
 # Follow demo README for setup
@@ -161,6 +164,7 @@ pytest tests/integration/
 ## Migration from Celery
 
 See the main project repository for:
+
 - [Migration Guide](../dagster-celery/README_MIGRATION.md)
 - [Migration Status](../dagster-celery/MIGRATION_STATUS.md)
 - [Performance Comparisons](../dagster-taskiq-demo/README.md)
@@ -204,6 +208,7 @@ Recommended production setup using ECS Fargate:
 ### Auto-scaling Configuration
 
 Configure ECS auto-scaling based on SQS queue depth:
+
 - Target: 5 messages per worker
 - Scale out: When queue depth > 50 messages
 - Scale in: When queue depth < 10 messages
@@ -214,7 +219,7 @@ Configure ECS auto-scaling based on SQS queue depth:
 ### CloudWatch Metrics
 
 - `ApproximateNumberOfMessagesVisible`: Queue depth
-- `ApproximateAgeOfOldestMessage: Processing lag
+- \`ApproximateAgeOfOldestMessage: Processing lag
 - `NumberOfMessagesReceived`: Throughput
 - `NumberOfMessagesDeleted`: Success rate
 

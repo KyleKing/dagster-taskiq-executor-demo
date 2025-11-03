@@ -5,6 +5,7 @@ Infrastructure as code for deploying the Dagster TaskIQ LocalStack demo using Pu
 ## Architecture
 
 Follows the [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practices/four-factors):
+
 - **Templates**: Reusable code patterns in `components/` and `modules/`
 - **Components**: Encapsulated AWS resources (ECS clusters, RDS instances)
 - **Environments**: Configuration via `Pulumi.<stack>.yaml` files
@@ -13,11 +14,13 @@ Follows the [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practi
 ## Directory Structure
 
 **`components/`** - Generic, reusable AWS primitives:
+
 - Technology-focused thin wrappers (VPC, ECS, RDS, SQS)
 - Functions returning dataclasses, independently importable
 - Examples: `sqs_fifo.py`, `ecs_helpers.py`, `rds_postgres.py`
 
 **`modules/`** - Application-specific infrastructure bundles:
+
 - Compose multiple components with application logic
 - Include Dagster, TaskIQ, and app-specific concerns
 - Examples: `dagster.py` (complete deployment), `taskiq.py` (queues + workers + IAM)
@@ -27,13 +30,14 @@ Follows the [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practi
 ## Quick Start
 
 1. **Prerequisites**: Pulumi CLI, Python dependencies via `uv`
-2. **Start LocalStack**: `docker compose up -d localstack`
-3. **Deploy infrastructure**: `mise run up`
-4. **Build and push images**: `./scripts/build-and-push.sh`
+1. **Start LocalStack**: `docker compose up -d localstack`
+1. **Deploy infrastructure**: `mise run up`
+1. **Build and push images**: `./scripts/build-and-push.sh`
 
 ## Configuration
 
 Uses `StackSettings` in `config.py` for structured configuration:
+
 - Override per-environment values in `Pulumi.<stack>.yaml`
 - Avoid hard-coding values; use configuration for environment-specific settings
 - All configuration managed through Pulumi.yaml (not ESC)
@@ -53,6 +57,7 @@ cd ..
 ```
 
 Deploy with:
+
 ```bash
 mise run push:taskiq-demo
 mise run demo:taskiq
@@ -81,6 +86,7 @@ mise run demo:taskiq # Build/push TaskIQ demo and deploy (requires taskiqDemo.en
 ## Development
 
 **Infrastructure changes**:
+
 ```bash
 cd deploy
 # Edit infrastructure code
@@ -88,6 +94,7 @@ mise run up
 ```
 
 **Configuration updates**:
+
 ```bash
 cd deploy
 uv run pulumi config set queueName my-new-queue --stack local
@@ -95,6 +102,7 @@ mise run up
 ```
 
 **Troubleshooting**:
+
 ```bash
 cd deploy
 pulumi cancel  # Release stuck locks

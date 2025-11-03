@@ -7,17 +7,20 @@ Minimal TaskIQ deployment targeting LocalStack SQS with FastAPI ingress service 
 ### Local Development
 
 1. **Configure environment**:
+
    ```bash
    cp .env.example .env
    # Defaults target LocalStack at http://localhost:4566
    ```
 
-2. **Install dependencies**:
+1. **Install dependencies**:
+
    ```bash
    uv sync
    ```
 
-3. **Run services**:
+1. **Run services**:
+
    ```bash
    # Terminal 1: API service
    uv run taskiq-demo-api
@@ -27,7 +30,8 @@ Minimal TaskIQ deployment targeting LocalStack SQS with FastAPI ingress service 
    uv run taskiq-demo-worker
    ```
 
-4. **Submit jobs**:
+1. **Submit jobs**:
+
    ```bash
    curl -X POST http://localhost:8000/tasks \
      -H 'content-type: application/json' \
@@ -35,6 +39,7 @@ Minimal TaskIQ deployment targeting LocalStack SQS with FastAPI ingress service 
    ```
 
 **Or use Mise tasks**:
+
 ```bash
 mise run app    # Start API
 mise run worker # Start worker
@@ -43,6 +48,7 @@ mise run worker # Start worker
 ### Container Deployment
 
 Build via project-wide Bake target:
+
 ```bash
 docker buildx bake taskiq-demo
 ```
@@ -60,6 +66,7 @@ uv run pytest    # Direct pytest
 ## Pulumi Deployment
 
 1. **Enable demo module**:
+
    ```bash
    cd deploy
    uv run pulumi config set --path taskiqDemo.enabled true --stack local
@@ -70,10 +77,12 @@ uv run pytest    # Direct pytest
    cd ..
    ```
 
-2. **Deploy stack**:
+1. **Deploy stack**:
+
    ```bash
    mise run demo:taskiq
    ```
+
    Builds image, pushes to LocalStack ECR, runs `pulumi up`, prints outputs.
 
 ## Verification
@@ -120,6 +129,7 @@ awslocal sqs get-queue-attributes \
 ## Configuration
 
 Environment variables in `.env`:
+
 - `AWS_DEFAULT_REGION`: AWS region (default: us-east-1)
 - `SQS_QUEUE_NAME`: TaskIQ queue name
 - `LOCALSTACK_ENDPOINT`: LocalStack URL (default: http://localhost:4566)

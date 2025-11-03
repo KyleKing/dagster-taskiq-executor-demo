@@ -9,6 +9,7 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 ## Completed ✅
 
 ### Core Implementation
+
 - ✅ Package renamed: `dagster-celery` → `dagster-taskiq`
 - ✅ Dependencies: Replaced Celery with Taskiq, aioboto3, aiobotocore, pydantic
 - ✅ SQS Broker: Custom `SQSBroker` implementing Taskiq's `AsyncBroker`
@@ -22,17 +23,20 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 - ✅ Module Exports: Public API available (`taskiq_executor`, `TaskiqRunLauncher`)
 
 ### Testing
+
 - ✅ Test Infrastructure: LocalStack/SQS fixtures
 - ✅ Unit Tests: CLI, config, version, utils (all passing)
 - ✅ Integration Test Files: Updated for Taskiq (require LocalStack to run)
 - ✅ Verification Script: All checks passing
 
 ### Documentation
+
 - ✅ README_MIGRATION.md: User-facing guide
 - ✅ MIGRATION_STATUS.md: This file
 - ✅ Code documentation and comments
 
 ### Example Migration
+
 - ✅ Docker Compose: Migrated from Redis/Celery to LocalStack/SQS
 - ✅ Configuration: Updated dagster.yaml and taskiq.yaml
 - ✅ Job Definitions: Updated to use taskiq_executor and dagster-taskiq tags
@@ -42,6 +46,7 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 ## Remaining 🚧
 
 ### Testing (~5%)
+
 - [🚧] Integration tests with LocalStack (~5%)
   - [✅] Execute tests - Tasks execute successfully, result retrieval fails
   - [ ] Queue routing tests
@@ -51,6 +56,7 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 **Current Issue**: Result backend event loop conflict. S3 backend initialized in one event loop, accessed from another causing "Event loop is closed" errors.
 
 ### Documentation
+
 - [ ] Production deployment guides
 - [ ] Performance tuning guide
 - [ ] Migration guide for users
@@ -58,6 +64,7 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 ## What's Working
 
 ✅ **Full distributed task execution:**
+
 - Task submission and execution
 - Worker management via CLI
 - Run launching
@@ -71,11 +78,13 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 ### Architecture
 
 **Before (Celery):**
+
 ```
 Dagster → Celery App → RabbitMQ/Redis → Celery Worker → Result Backend
 ```
 
 **After (Taskiq):**
+
 ```
 Dagster → Taskiq Broker → AWS SQS → Taskiq Worker → Result Backend
 ```
@@ -110,11 +119,13 @@ def _submit_task(broker, plan_context, step, queue, priority, known_state):
 ## Environment Variables
 
 ### Required
+
 ```bash
 export DAGSTER_TASKIQ_SQS_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks"
 ```
 
 ### Optional
+
 ```bash
 export AWS_DEFAULT_REGION="us-east-1"  # defaults to us-east-1
 export DAGSTER_TASKIQ_SQS_ENDPOINT_URL="http://localhost:4566"  # for LocalStack
@@ -125,24 +136,26 @@ export AWS_SECRET_ACCESS_KEY="your-secret"
 ## Known Limitations
 
 1. **Task Revocation**: Taskiq doesn't support direct task cancellation. Tasks continue on interruption but results aren't processed.
-2. **Worker Hostname**: Celery provided `self.request.hostname`. Taskiq uses placeholder "taskiq-worker".
-3. **Async/Sync Bridge**: Event loop creation/closure per operation may impact performance.
+1. **Worker Hostname**: Celery provided `self.request.hostname`. Taskiq uses placeholder "taskiq-worker".
+1. **Async/Sync Bridge**: Event loop creation/closure per operation may impact performance.
 
 ## Next Steps
 
 1. Run and verify integration tests with LocalStack
-2. Test launcher functionality
-3. Performance testing and optimization
-4. Production deployment documentation
+1. Test launcher functionality
+1. Performance testing and optimization
+1. Production deployment documentation
 
 ## Testing Instructions
 
 ### Verification
+
 ```bash
 python verify_migration.py
 ```
 
 ### Unit Tests
+
 ```bash
 pytest dagster_taskiq_tests/test_cli.py -v
 pytest dagster_taskiq_tests/test_config.py -v
@@ -151,6 +164,7 @@ pytest dagster_taskiq_tests/test_utils.py -v
 ```
 
 ### Integration Tests (requires LocalStack)
+
 ```bash
 # Start LocalStack
 docker run -d -p 4566:4566 localstack/localstack

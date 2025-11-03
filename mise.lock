@@ -10,6 +10,10 @@ backend = "core:node"
 version = "0.22.2"
 backend = "pipx:awscli-local"
 
+[[tools."pipx:mdformat"]]
+version = "1.0.0"
+backend = "pipx:mdformat"
+
 [[tools."pipx:toml-sort"]]
 version = "latest"
 backend = "pipx:toml-sort"

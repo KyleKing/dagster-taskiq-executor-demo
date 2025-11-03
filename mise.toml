@@ -8,6 +8,7 @@ experimental = true
 "asdf:postgres" = "17"
 node = "latest"
 "pipx:awscli-local" = "latest"
+"pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
 python = "3.13"
 
@@ -30,10 +31,16 @@ run = "mise up --bump"
 # General Utilities
 # ==============================================================================
 
+[tasks.mdformat]
+description = "Format all markdown files"
+run = "mdformat **/*.md"
+sources = ["**/*.md"]
+
 [tasks.toml-sort]
 description = "Format all toml files"
 # FYI: Currently only formats pyproject.toml because mise.toml are manually sorted
 run = "toml-sort --in-place **/pyproject.toml"
+sources = ["**/pyproject.toml"]
 
 # ==============================================================================
 # Monorepo Orchestration Tasks

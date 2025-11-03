@@ -20,8 +20,9 @@ See [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for detailed progress and remaini
 ## Documentation
 
 Complete migration documentation available in [README_MIGRATION.md](README_MIGRATION.md):
+
 - Installation instructions
-- Configuration guide  
+- Configuration guide
 - Usage examples
 - Testing instructions
 - Performance comparisons
@@ -29,6 +30,7 @@ Complete migration documentation available in [README_MIGRATION.md](README_MIGRA
 ## Quick Reference
 
 ### Original Celery Pattern
+
 ```python
 from dagster_celery import celery_executor
 
@@ -38,6 +40,7 @@ def legacy_job():
 ```
 
 ### New TaskIQ Pattern
+
 ```python
 from dagster_taskiq import taskiq_executor
 
@@ -59,12 +62,14 @@ def modern_job():
 ## Architecture Comparison
 
 ### Celery Architecture
+
 - Redis/RabbitMQ broker
 - Manual worker scaling
 - Celery Beat for scheduling
 - Flower for monitoring
 
-### TaskIQ Architecture  
+### TaskIQ Architecture
+
 - AWS SQS broker
 - Auto-scaling ECS workers
 - Dagster native scheduling
@@ -73,10 +78,10 @@ def modern_job():
 ## Migration Benefits
 
 1. **Cloud Native**: Full AWS integration with SQS, ECS, CloudWatch
-2. **Auto-scaling**: Queue depth-based worker scaling
-3. **Exactly-once**: PostgreSQL idempotency prevents duplicate execution
-4. **Cost Efficiency**: Pay-per-use SQS and ECS Fargate
-5. **Monitoring**: Unified observability through CloudWatch and Dagster
+1. **Auto-scaling**: Queue depth-based worker scaling
+1. **Exactly-once**: PostgreSQL idempotency prevents duplicate execution
+1. **Cost Efficiency**: Pay-per-use SQS and ECS Fargate
+1. **Monitoring**: Unified observability through CloudWatch and Dagster
 
 ## Development Reference
 
@@ -90,12 +95,14 @@ When implementing new features or debugging issues, use this directory as a refe
 ## Testing
 
 Run legacy tests for comparison:
+
 ```bash
 cd dagster-celery
 mise run test
 ```
 
 Compare with new TaskIQ tests:
+
 ```bash
 cd dagster-taskiq
 mise run test

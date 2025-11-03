@@ -18,20 +18,22 @@ Demo application showcasing Dagster with TaskIQ execution on LocalStack, featuri
 While using TaskIQ terminology, this project implements a custom async worker using aioboto3 for SQS message consumption instead of the TaskIQ framework. Reasons:
 
 1. **Dagster Integration**: TaskIQ's task model doesn't align with Dagster's op/step execution lifecycle
-2. **Idempotency Requirements**: Custom exactly-once execution with PostgreSQL storage
-3. **Payload Handling**: Structured `OpExecutionTask` payloads with run/step metadata
-4. **Result Reporting**: Polling via idempotency storage for better Dagster integration
-5. **Async Control**: Fine-grained control over execution, shutdown, and health checks
+1. **Idempotency Requirements**: Custom exactly-once execution with PostgreSQL storage
+1. **Payload Handling**: Structured `OpExecutionTask` payloads with run/step metadata
+1. **Result Reporting**: Polling via idempotency storage for better Dagster integration
+1. **Async Control**: Fine-grained control over execution, shutdown, and health checks
 
 ## Quick Start
 
 1. **Set up environment**:
+
    ```bash
    cp .env.example .env.test
    # Edit .env.test with your configuration
    ```
 
-2. **Start services**:
+1. **Start services**:
+
    ```bash
    # From project root
    mise run localstack:start
@@ -40,13 +42,14 @@ While using TaskIQ terminology, this project implements a custom async worker us
    ./scripts/build-and-push.sh
    ```
 
-3. **Run Dagster**:
+1. **Run Dagster**:
+
    ```bash
    cd dagster-taskiq-demo
    python -m dagster dev
    ```
 
-4. **Access UI**: Open http://localhost:3000 for Dagster webserver
+1. **Access UI**: Open http://localhost:3000 for Dagster webserver
 
 ## Load Testing
 
@@ -72,6 +75,7 @@ python -m dagster_taskiq_demo.load_simulator.cli network-partition --max-burst-s
 ### Verification
 
 Check exactly-once execution:
+
 ```bash
 # Export verification report
 python -m dagster_taskiq_demo.load_simulator.cli verify --output verification_report.json
@@ -106,28 +110,29 @@ mise run format
 ### Application Changes
 
 1. Modify code in `src/dagster_taskiq_demo/`
-2. Rebuild and push image: `./scripts/build-and-push.sh`
-3. Restart Dagster services
+1. Rebuild and push image: `./scripts/build-and-push.sh`
+1. Restart Dagster services
 
 ## Error Handling
 
 **Failure Scenarios and Recovery**:
 
 1. **Worker Crashes**: SQS visibility timeout triggers redelivery; new worker checks idempotency record
-2. **SQS Connection Failures**: Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s); circuit breaker after 5 failures
-3. **Dagster Daemon Failures**: ECS health checks and automatic restart; persistent PostgreSQL storage
-4. **Network Partitions**: Workers cache execution context locally; reconciliation on restoration
+1. **SQS Connection Failures**: Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s); circuit breaker after 5 failures
+1. **Dagster Daemon Failures**: ECS health checks and automatic restart; persistent PostgreSQL storage
+1. **Network Partitions**: Workers cache execution context locally; reconciliation on restoration
 
 ## Monitoring
 
 - **Dagster UI**: http://localhost:3000 - Job runs, execution logs, system health
-- **LocalStack UI**: http://localhost:4566/_localstack/health - AWS service metrics
+- **LocalStack UI**: http://localhost:4566/\_localstack/health - AWS service metrics
 - **Structured Logs**: Comprehensive logging across all components
 - **Auto-Scaling**: Monitor ECS service desired count during load scenarios
 
 ## Configuration
 
 Key configuration files:
+
 - `src/dagster_taskiq_demo/config/` - Application settings
 - `dagster.yaml` - Dagster configuration
 - `.env.test` - Test environment variables
@@ -135,12 +140,14 @@ Key configuration files:
 ## Troubleshooting
 
 **Common Issues**:
+
 - **Pulumi locks stuck**: `cd deploy && pulumi cancel`
 - **LocalStack not responding**: `mise run localstack:restart`
 - **Dagster connection issues**: Check webserver port (default 3000)
 - **Queue not processing**: Verify SQS configuration and worker health
 
 **Verification Procedures**:
+
 - **Exactly-Once**: Check for duplicate executions (should be 0)
 - **Auto-Scaling**: Monitor ECS desired count during load changes
 - **Failure Recovery**: Verify jobs retry on different workers
