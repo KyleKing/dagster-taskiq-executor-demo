@@ -10,6 +10,10 @@ sqs_endpoint_url = os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL")  # For LocalStac
 
 aws_region_name = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
+# S3 configuration for extended messages and results
+s3_bucket_name = os.getenv("DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results")
+s3_endpoint_url = os.getenv("DAGSTER_TASKIQ_S3_ENDPOINT_URL")  # For LocalStack
+
 # Task configuration
 task_default_priority = 5
 

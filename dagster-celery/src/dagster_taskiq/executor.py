@@ -106,6 +106,13 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
     """
     from dagster_taskiq.tasks import create_task
 
+    # Ensure broker is started
+    await broker.startup()
+
+    # Ensure result backend is started if it exists
+    if hasattr(broker, 'result_backend') and broker.result_backend:
+        await broker.result_backend.startup()
+
     execute_step_args = ExecuteStepArgs(
         job_origin=plan_context.reconstructable_job.get_python_origin(),
         run_id=plan_context.dagster_run.run_id,
@@ -128,7 +135,6 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
     task_result = await task.kiq(
         execute_step_args_packed=pack_value(execute_step_args),
         executable_dict=plan_context.reconstructable_job.to_dict(),
-        labels=labels,
     )
 
     return task_result

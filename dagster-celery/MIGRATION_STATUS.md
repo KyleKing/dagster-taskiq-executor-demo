@@ -42,11 +42,13 @@ Successfully migrated dagster-celery to dagster-taskiq, replacing Celery with Ta
 ## Remaining 🚧
 
 ### Testing (~5%)
-- [ ] Integration tests with LocalStack (~5%)
-  - Execute tests
-  - Queue routing tests
-  - Priority tests
+- [🚧] Integration tests with LocalStack (~5%)
+  - [✅] Execute tests - Tasks execute successfully, result retrieval fails
+  - [ ] Queue routing tests
+  - [ ] Priority tests
 - [ ] Performance benchmarking
+
+**Current Issue**: Result backend event loop conflict. S3 backend initialized in one event loop, accessed from another causing "Event loop is closed" errors.
 
 ### Documentation
 - [ ] Production deployment guides

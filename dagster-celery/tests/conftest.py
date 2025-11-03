@@ -48,7 +48,7 @@ def localstack():
         "docker", "run", "-d",
         "--name", "dagster-localstack",
         "-p", "4566:4566",
-        "-e", "SERVICES=sqs",
+        "-e", "SERVICES=sqs,s3",
         "localstack/localstack:latest"
     ])
 
@@ -82,6 +82,14 @@ def localstack():
     import json
     queue_data = json.loads(result)
     queue_url = queue_data["QueueUrl"]
+
+    # Create S3 bucket for results
+    bucket_name = "dagster-taskiq-results"
+    subprocess.check_output([
+        "aws", "--endpoint-url=http://localhost:4566",
+        "s3", "mb", f"s3://{bucket_name}",
+        "--region", "us-east-1"
+    ])
 
     # Set environment variables
     with environ({

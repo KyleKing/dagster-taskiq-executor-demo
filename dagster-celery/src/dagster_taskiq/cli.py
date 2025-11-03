@@ -195,12 +195,12 @@ def worker_start_command(
         "taskiq",
         "worker",
         broker,
-        "--log-level", loglevel.lower(),
+        "--log-level", loglevel.upper(),
         "--workers", str(workers),
+        "dagster_taskiq.tasks",  # Module containing tasks
     ]
 
-    # Add worker name as label
-    subprocess_args.extend(["--worker-name", worker_name])
+    # Note: Taskiq doesn't support worker names like Celery
 
     # Add any additional args
     subprocess_args.extend(additional_args)
