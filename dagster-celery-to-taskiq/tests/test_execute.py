@@ -109,8 +109,7 @@ def test_terminate_job_on_taskiq(dagster_taskiq_worker, instance: DagsterInstanc
     # At least one step succeeded (the one that was running when the interrupt fired)
     assert DagsterEventType.STEP_SUCCESS in result_types
 
-    # Taskiq doesn't support task revocation, so no revoke events are expected
-    # The job should still be marked as interrupted
+    # Cancellation requests are issued for in-flight tasks; ensure interrupt is logged.
     interrupt_events = [
         result
         for result in results

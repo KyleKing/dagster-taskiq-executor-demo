@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -80,6 +81,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
 
         # Create the Taskiq broker
         self.broker = make_app(app_args=self.app_args())
+        self._supports_cancellation = callable(getattr(self.broker, "cancel_task", None))
 
         super().__init__()
 
@@ -124,28 +126,74 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
     def terminate(self, run_id: str) -> bool:
         """Terminate a running task.
 
-        Note: Taskiq doesn't support task termination.
-        This method returns False to indicate termination is not supported.
-
         Args:
             run_id: ID of the run to terminate
 
         Returns:
-            False (termination not supported)
+            True if a cancellation request was issued, False otherwise.
         """
         run = self._instance.get_run_by_id(run_id)
         if run is None:
             return False
 
-        # Taskiq doesn't support task termination
-        # Workers will continue processing but we mark intent to stop
+        task_id = run.tags.get(DAGSTER_TASKIQ_TASK_ID_TAG)
+        if not task_id:
+            self._instance.report_engine_event(
+                "Taskiq task ID missing; unable to cancel run task.",
+                run,
+                cls=self.__class__,
+            )
+            return False
+
+        if not self._supports_cancellation:
+            self._instance.report_engine_event(
+                "Taskiq broker does not support task cancellation.",
+                run,
+                cls=self.__class__,
+            )
+            return False
+
+        cancel_callable = getattr(self.broker, "cancel_task", None)
+        if not callable(cancel_callable):
+            self._instance.report_engine_event(
+                "Taskiq broker does not expose cancel_task; unable to cancel.",
+                run,
+                cls=self.__class__,
+            )
+            return False
+
+        try:
+            task_uuid = uuid.UUID(str(task_id))
+        except (TypeError, ValueError):
+            self._instance.report_engine_event(
+                f"Invalid Taskiq task ID ({task_id}); cannot cancel run task.",
+                run,
+                cls=self.__class__,
+            )
+            return False
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.broker.startup())
+            loop.run_until_complete(cancel_callable(task_uuid))
+        except Exception as exc:
+            self._instance.report_engine_event(
+                f"Failed to submit Taskiq cancellation request: {exc}",
+                run,
+                cls=self.__class__,
+            )
+            return False
+        finally:
+            loop.close()
+
         self._instance.report_engine_event(
-            "Taskiq does not support task termination. Task will complete normally.",
+            "Requested Taskiq task cancellation.",
             run,
+            EngineEventData(interrupted=[task_id]),
             cls=self.__class__,
         )
-
-        return False
+        return True
 
     @property
     def supports_resume_run(self) -> bool:
@@ -209,6 +257,10 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
+            loop.run_until_complete(self.broker.startup())
+            if hasattr(self.broker, 'result_backend') and self.broker.result_backend:
+                loop.run_until_complete(self.broker.result_backend.startup())
+
             # Use kiq() to submit the task with labels
             result = loop.run_until_complete(
                 task.kiq(

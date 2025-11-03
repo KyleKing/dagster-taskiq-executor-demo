@@ -24,12 +24,13 @@ from typing import AsyncGenerator, Optional
 
 import aioboto3
 
+from taskiq import AsyncBroker
 from taskiq.message import TaskiqMessage
 
 from .broker import SqsBrokerConfig
 
 
-class CancellableSQSBroker:
+class CancellableSQSBroker(AsyncBroker):
     """SQS broker with SQS-based cancellation support."""
 
     def __init__(
@@ -39,29 +40,42 @@ class CancellableSQSBroker:
         result_backend: Optional[object] = None,
         cancel_queue_url: str | None = None,
     ):
+        super().__init__()
         self._config = broker_config
         self.sqs_broker = broker_config.create_broker(result_backend=result_backend)
         self.cancel_queue_url = cancel_queue_url or _derive_cancel_queue_url(broker_config.queue_url)
         self.cancel_sqs_client = None
+        self._cancel_client_cm = None
+        self.supports_cancellation = True
 
     async def startup(self):
         await self.sqs_broker.startup()
         # Setup SQS client for cancel queue
-        self.cancel_sqs_client = aioboto3.client(
+        if self.cancel_sqs_client:
+            return
+
+        session = aioboto3.Session()
+        client_cm = session.client(
             "sqs",
             endpoint_url=self._config.endpoint_url,
             region_name=self._config.region_name,
             aws_access_key_id=self._config.aws_access_key_id,
             aws_secret_access_key=self._config.aws_secret_access_key,
         )
+        self._cancel_client_cm = client_cm
+        self.cancel_sqs_client = await client_cm.__aenter__()
 
     async def shutdown(self):
         await self.sqs_broker.shutdown()
-        if self.cancel_sqs_client:
-            await self.cancel_sqs_client.close()
+        if self._cancel_client_cm is not None:
+            await self._cancel_client_cm.__aexit__(None, None, None)
+            self._cancel_client_cm = None
+            self.cancel_sqs_client = None
 
     async def cancel_task(self, task_id: uuid.UUID) -> None:
         """Send a cancellation message to the cancel queue."""
+        if not self.cancel_sqs_client:
+            await self.startup()
         if not self.cancel_sqs_client:
             return
 
@@ -81,6 +95,8 @@ class CancellableSQSBroker:
 
     async def listen_canceller(self) -> AsyncGenerator[bytes, None]:
         """Poll for cancellation messages from the cancel queue."""
+        if not self.cancel_sqs_client:
+            await self.startup()
         if not self.cancel_sqs_client:
             return
 
@@ -108,6 +124,13 @@ class CancellableSQSBroker:
     # Delegate other methods to sqs_broker
     def __getattr__(self, name):
         return getattr(self.sqs_broker, name)
+
+    async def kick(self, task):
+        return await self.sqs_broker.kick(task)
+
+    async def listen(self):
+        async for message in self.sqs_broker.listen():
+            yield message
 
 
 def _derive_cancel_queue_url(queue_url: str) -> str:

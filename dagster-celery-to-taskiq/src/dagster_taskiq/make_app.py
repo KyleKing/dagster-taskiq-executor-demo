@@ -5,6 +5,7 @@ from typing import Any, Optional
 from taskiq import AsyncBroker
 
 from dagster_taskiq.broker import SqsBrokerConfig
+from dagster_taskiq.cancellable_broker import CancellableSQSBroker
 from dagster_taskiq.defaults import (
     aws_region_name,
     sqs_endpoint_url,
@@ -94,6 +95,14 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     extra_options_raw = _resolve_value(
         config, source_overrides, 'extra_options', {}, 'broker_transport_options'
     )
+    env_enable_cancellation = os.getenv('DAGSTER_TASKIQ_ENABLE_CANCELLATION')
+    default_enable_cancellation = env_enable_cancellation
+    if default_enable_cancellation is None:
+        default_enable_cancellation = True
+    enable_cancellation_raw = _resolve_value(
+        config, source_overrides, 'enable_cancellation', default_enable_cancellation
+    )
+    enable_cancellation = _coerce_bool(enable_cancellation_raw)
 
     # Create S3 result backend
     try:
@@ -163,5 +172,8 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
         s3_extended_bucket_name=s3_bucket,
         extra_options=extra_options,
     )
+
+    if enable_cancellation:
+        return CancellableSQSBroker(broker_config, result_backend=result_backend)
 
     return broker_config.create_broker(result_backend=result_backend)

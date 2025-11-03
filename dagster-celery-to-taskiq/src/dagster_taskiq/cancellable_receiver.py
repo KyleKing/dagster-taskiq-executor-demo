@@ -8,12 +8,14 @@ from typing import Any
 
 import anyio
 
-from taskiq.abc.receiver import Receiver
+from taskiq.receiver import Receiver
 from taskiq.message import TaskiqMessage
 
 logger = logging.getLogger(__name__)
 
 CANCELLER_KEY = "__cancel_task_id__"
+
+logger.info("Loaded CancellableReceiver from %s", __file__)
 
 
 class CancellableReceiver(Receiver):
@@ -39,7 +41,7 @@ class CancellableReceiver(Receiver):
             return None
         return taskiq_msg
 
-    async def listen(self) -> None:
+    async def listen(self, finish_event: asyncio.Event) -> None:
         """Listen for messages and cancellations concurrently."""
         if self.run_startup:
             await self.broker.startup()
@@ -48,14 +50,14 @@ class CancellableReceiver(Receiver):
         queue: asyncio.Queue[bytes | Any] = asyncio.Queue()
 
         async with anyio.create_task_group() as gr:
-            gr.start_soon(self.prefetcher, queue)
+            gr.start_soon(self.prefetcher, queue, finish_event)
             gr.start_soon(self.runner, queue)
-            gr.start_soon(self.runner_canceller)
+            gr.start_soon(self.runner_canceller, finish_event)
 
         if self.on_exit is not None:
             self.on_exit(self)
 
-    async def runner_canceller(self) -> None:
+    async def runner_canceller(self, finish_event: asyncio.Event) -> None:
         """Listen for cancellation messages and cancel tasks."""
         def cancel_task(task_id: str) -> None:
             for task in self.tasks:
@@ -66,6 +68,8 @@ class CancellableReceiver(Receiver):
                         logger.warning("Cannot cancel task %s", task_id)
 
         async for message in self.broker.listen_canceller():
+            if finish_event.is_set():
+                break
             try:
                 taskiq_msg = self.parse_message(message)
                 if not taskiq_msg:

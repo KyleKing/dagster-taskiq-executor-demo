@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from collections.abc import Iterator, Mapping
 from typing import Any
@@ -25,8 +26,9 @@ def instance(tempdir):
                 "module": "dagster_taskiq.launcher",
                 "class": "TaskiqRunLauncher",
                 "config": {
-                    "broker": sqs_queue_url,
-                    "backend": "rpc://",
+                    "queue_url": sqs_queue_url,
+                    "endpoint_url": os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL"),
+                    "region_name": "us-east-1",
                     "default_queue": "custom-queue",
                 },
             },
@@ -252,6 +254,11 @@ def test_terminated_run(
 
     terminated_run = poll_for_finished_run(instance, run_id, timeout=30)
     assert terminated_run and terminated_run.status == DagsterRunStatus.FAILURE
+
+    event_records = list(instance.all_logs(run_id))
+    assert _message_exists(event_records, "Requested Taskiq task cancellation."), (
+        "Expected cancellation event to be logged for terminated run"
+    )
 
 
 def _message_exists(event_records, message_text):

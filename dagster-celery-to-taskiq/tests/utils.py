@@ -110,7 +110,16 @@ def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
         # We'll just start a regular worker
         pass
 
-    process = subprocess.Popen(cmd)
+    env = os.environ.copy()
+    src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        f"{src_path}{os.pathsep}{existing_pythonpath}"
+        if existing_pythonpath
+        else src_path
+    )
+
+    process = subprocess.Popen(cmd, env=env)
 
     # Give the worker a moment to start
     import time
@@ -126,4 +135,3 @@ def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
 
 def events_of_type(result: ExecutionResult, event_type: str) -> Sequence[DagsterEvent]:
     return [event for event in result.all_events if event.event_type_value == event_type]
-

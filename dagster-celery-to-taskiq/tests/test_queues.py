@@ -1,3 +1,5 @@
+import asyncio
+import os
 import threading
 import time
 
@@ -7,6 +9,8 @@ from dagster._core.test_utils import instance_for_test
 from dagster_taskiq.make_app import make_app
 
 from tests.utils import execute_on_thread, start_taskiq_worker
+from taskiq.result import TaskiqResult
+from taskiq_aio_sqs import S3Backend
 
 
 def test_multiqueue(localstack):
@@ -66,3 +70,34 @@ def test_make_app_fair_queue_detection(
         make_app(config)
 
     assert recorded['is_fair_queue'] is expected
+
+
+def test_s3_extended_payload_smoke(localstack):
+    async def _exercise() -> None:
+        backend = S3Backend(
+            bucket_name=os.environ['DAGSTER_TASKIQ_S3_BUCKET_NAME'],
+            endpoint_url=os.environ['DAGSTER_TASKIQ_S3_ENDPOINT_URL'],
+            region_name='us-east-1',
+            aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        )
+        await backend.startup()
+
+        payload = 'x' * (256 * 1024 + 2048)
+        task_id = 's3-extended-payload-smoke'
+
+        result = TaskiqResult(
+            is_err=False,
+            return_value=payload,
+            execution_time=0.0,
+            log=None,
+        )
+
+        try:
+            await backend.set_result(task_id, result)
+            stored = await backend.get_result(task_id)
+            assert stored.return_value == payload
+        finally:
+            await backend.shutdown()
+
+    asyncio.run(_exercise())

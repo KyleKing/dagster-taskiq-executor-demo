@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import uuid
 from typing import Any, AsyncGenerator, Callable, cast
 
 import dagster._check as check
@@ -67,6 +68,52 @@ async def core_taskiq_execution_loop(
 
     step_results = {}  # Dict[str, dict] {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
+    cancelled_task_ids: set[str] = set()
+
+    async def _request_task_cancellations(reason: str) -> None:
+        """Ask the broker to cancel any in-flight TaskIQ tasks."""
+        cancel_callable = getattr(broker, 'cancel_task', None)
+        if not callable(cancel_callable):
+            return
+
+        pending = []
+        for data in step_results.values():
+            task_id = data.get('task_id')
+            if not task_id or task_id in cancelled_task_ids:
+                continue
+            try:
+                task_uuid = uuid.UUID(str(task_id))
+            except (TypeError, ValueError):
+                continue
+            cancelled_task_ids.add(task_id)
+            pending.append(cancel_callable(task_uuid))
+
+        if not pending:
+            return
+
+        job_context.log.debug(
+            f"Requesting cancellation for {len(pending)} taskiq tasks ({reason})."
+        )
+        results = await asyncio.gather(*pending, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                job_context.log.warning(f"Taskiq task cancellation failed: {result}")
+
+    async def _cancel_waiters() -> None:
+        """Ensure waiter tasks are cancelled/awaited before exiting."""
+        waiters = [
+            data.get('waiter')
+            for data in list(step_results.values())
+            if isinstance(data.get('waiter'), asyncio.Task)
+        ]
+        if not waiters:
+            return
+
+        for waiter in waiters:
+            if not waiter.done():
+                waiter.cancel()
+
+        await asyncio.gather(*waiters, return_exceptions=True)
 
     with InstanceConcurrencyContext(
         job_context.instance, job_context.dagster_run
@@ -78,110 +125,110 @@ async def core_taskiq_execution_loop(
         ) as active_execution:
             stopping = False
 
-            while (not active_execution.is_complete and not stopping) or step_results:
-                if active_execution.check_for_interrupts():
-                    yield DagsterEvent.engine_event(
-                        job_context,
-                        "Taskiq executor: received termination signal",
-                        EngineEventData.interrupted(list(step_results.keys())),
-                    )
-                    stopping = True
-                    active_execution.mark_interrupted()
-                    # Cancel running tasks (not supported by current broker)
-                    # TODO: Implement cancellation when CancellableSQSBroker is used
-                    pass
+            try:
+                while (not active_execution.is_complete and not stopping) or step_results:
+                    if active_execution.check_for_interrupts():
+                        yield DagsterEvent.engine_event(
+                            job_context,
+                            "Taskiq executor: received termination signal",
+                            EngineEventData.interrupted(list(step_results.keys())),
+                        )
+                        stopping = True
+                        active_execution.mark_interrupted()
+                        await _request_task_cancellations(reason='termination signal')
 
-                results_to_pop = []
-                for step_key, data in sorted(
-                    step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
-                ):
-                    waiter = data['waiter']
-                    if not waiter.done():
+                    results_to_pop = []
+                    for step_key, data in sorted(
+                        step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
+                    ):
+                        waiter = data['waiter']
+                        if not waiter.done():
+                            continue
+
+                        try:
+                            task_result = waiter.result()
+                            if hasattr(task_result, 'raise_for_error'):
+                                task_result.raise_for_error()
+                            if hasattr(task_result, 'return_value'):
+                                step_events = task_result.return_value
+                            else:
+                                step_events = task_result
+                        except Exception:
+                            step_events = []
+                            step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
+                            await _request_task_cancellations(reason='step failure')
+
+                        for step_event in step_events:
+                            event = deserialize_value(step_event, DagsterEvent)
+                            yield event
+                            active_execution.handle_event(event)
+
+                        results_to_pop.append(step_key)
+
+                    for step_key in results_to_pop:
+                        if step_key in step_results:
+                            del step_results[step_key]
+                            active_execution.verify_complete(job_context, step_key)
+
+                    for event in active_execution.plan_events_iterator(job_context):
+                        yield event
+
+                    if stopping or step_errors:
+                        await asyncio.sleep(TICK_SECONDS)
                         continue
 
-                    try:
-                        task_result = waiter.result()
-                        if hasattr(task_result, 'raise_for_error'):
-                            task_result.raise_for_error()
-                        if hasattr(task_result, 'return_value'):
-                            step_events = task_result.return_value
-                        else:
-                            step_events = task_result
-                    except Exception:
-                        step_events = []
-                        step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
+                    for step in active_execution.get_steps_to_execute():  # type: ignore
+                        try:
+                            queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
+                            yield DagsterEvent.engine_event(
+                                job_context.for_step(step),
+                                f'Submitting taskiq task for step "{step.key}" to queue "{queue}".',
+                                EngineEventData(marker_start=DELEGATE_MARKER),
+                            )
 
-                    for step_event in step_events:
-                        event = deserialize_value(step_event, DagsterEvent)
-                        yield event
-                        active_execution.handle_event(event)
+                            priority = _get_step_priority(job_context, step)
 
-                    results_to_pop.append(step_key)
+                            step_results[step.key] = await step_execution_fn(
+                                broker,
+                                job_context,
+                                step,
+                                queue,
+                                priority,
+                                active_execution.get_known_state(),
+                            )
+                            result_handle = step_results[step.key]['result']
+                            wait_result_fn = getattr(result_handle, 'wait_result', None)
+                            check.invariant(
+                                callable(wait_result_fn),
+                                'Taskiq result handle missing wait_result() method.',
+                            )
+                            step_results[step.key]['waiter'] = asyncio.create_task(wait_result_fn())
 
-                for step_key in results_to_pop:
-                    if step_key in step_results:
-                        del step_results[step_key]
-                        active_execution.verify_complete(job_context, step_key)
+                        except Exception:
+                            yield DagsterEvent.engine_event(
+                                job_context,
+                                "Encountered error during taskiq task submission.",
+                                event_specific_data=EngineEventData.engine_error(
+                                    serializable_error_info_from_exc_info(sys.exc_info()),
+                                ),
+                            )
+                            raise
 
-                # process skips from failures or uncovered inputs
-                for event in active_execution.plan_events_iterator(job_context):
-                    yield event
+                    await asyncio.sleep(TICK_SECONDS)
 
-                # don't add any new steps if we are stopping
-                if stopping or step_errors:
-                    continue
-
-                # Submit new steps for execution
-                for step in active_execution.get_steps_to_execute():  # type: ignore
-                    try:
-                        queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
-                        yield DagsterEvent.engine_event(
-                            job_context.for_step(step),
-                            f'Submitting taskiq task for step "{step.key}" to queue "{queue}".',
-                            EngineEventData(marker_start=DELEGATE_MARKER),
-                        )
-
-                        # Get the priority for this step
-                        priority = _get_step_priority(job_context, step)
-
-                        # Submit the task
-                        step_results[step.key] = await step_execution_fn(
-                            broker,
-                            job_context,
-                            step,
-                            queue,
-                            priority,
-                            active_execution.get_known_state(),
-                        )
-                        result_handle = step_results[step.key]['result']
-                        wait_result_fn = getattr(result_handle, 'wait_result', None)
-                        check.invariant(
-                            callable(wait_result_fn),
-                            'Taskiq result handle missing wait_result() method.',
-                        )
-                        step_results[step.key]['waiter'] = asyncio.create_task(wait_result_fn())
-
-                    except Exception:
-                        yield DagsterEvent.engine_event(
-                            job_context,
-                            "Encountered error during taskiq task submission.",
-                            event_specific_data=EngineEventData.engine_error(
-                                serializable_error_info_from_exc_info(sys.exc_info()),
-                            ),
-                        )
-                        raise
-
-                await asyncio.sleep(TICK_SECONDS)
-
-            if step_errors:
-                raise DagsterSubprocessError(
-                    "During taskiq execution errors occurred in workers:\n{error_list}".format(
-                        error_list="\n".join(
-                            [f"[{key}]: {err.to_string()}" for key, err in step_errors.items()]
-                        )
-                    ),
-                    subprocess_error_infos=list(step_errors.values()),
-                )
+                if step_errors:
+                    raise DagsterSubprocessError(
+                        "During taskiq execution errors occurred in workers:\n{error_list}".format(
+                            error_list="\n".join(
+                                [f"[{key}]: {err.to_string()}" for key, err in step_errors.items()]
+                            )
+                        ),
+                        subprocess_error_infos=list(step_errors.values()),
+                    )
+            finally:
+                # Best-effort cancellation of any remaining remote tasks and waiter tasks.
+                await _request_task_cancellations(reason='loop shutdown')
+                await _cancel_waiters()
 
 
 

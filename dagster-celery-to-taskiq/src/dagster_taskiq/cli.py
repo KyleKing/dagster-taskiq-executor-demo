@@ -14,6 +14,14 @@ from dagster_shared.yaml_utils import load_yaml_from_path
 from dagster_taskiq.executor import taskiq_executor
 
 
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
+    return bool(value)
+
+
 def create_worker_parser(subparsers):
     """Create the worker subcommand parser."""
     worker_parser = subparsers.add_parser("worker", help="Worker management commands")
@@ -234,16 +242,24 @@ def worker_start_command(args):
 
     # Note: Taskiq doesn't support worker names like Celery
 
-    # Add any additional args
-    subprocess_args.extend(args.additional_args)
-
     # Set up environment with config
     env = os.environ.copy()
+    validated_config: Mapping[str, Any] = (
+        get_validated_config(args.config_yaml) if args.config_yaml else {}
+    )
+
+    config_source = validated_config.get("config_source") if isinstance(validated_config, Mapping) else None
+    enable_cancellation = True
+    if isinstance(config_source, Mapping) and "enable_cancellation" in config_source:
+        enable_cancellation = _coerce_bool(config_source["enable_cancellation"])
+
+    env_override = env.get("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
+    if env_override is not None:
+        enable_cancellation = _coerce_bool(env_override)
+    env["DAGSTER_TASKIQ_ENABLE_CANCELLATION"] = "1" if enable_cancellation else "0"
 
     # If config YAML provided, extract and set environment variables
     if args.config_yaml:
-        validated_config = get_validated_config(args.config_yaml)
-
         if validated_config.get("queue_url"):
             env["DAGSTER_TASKIQ_SQS_QUEUE_URL"] = str(validated_config["queue_url"])
 
@@ -260,6 +276,17 @@ def worker_start_command(args):
             if existing_pythonpath and not existing_pythonpath.endswith(os.pathsep):
                 existing_pythonpath += os.pathsep
             env["PYTHONPATH"] = f"{existing_pythonpath}{config_dir}{os.pathsep}"
+
+    has_receiver_override = any(
+        arg == "--receiver" or arg.startswith("--receiver=") for arg in args.additional_args
+    )
+    if enable_cancellation and not has_receiver_override:
+        subprocess_args.extend(
+            ["--receiver", "dagster_taskiq.cancellable_receiver:CancellableReceiver"]
+        )
+
+    # Add any additional args
+    subprocess_args.extend(args.additional_args)
 
     print(f"Starting Taskiq worker: {worker_name}")
     print(f"Broker: {args.broker}")

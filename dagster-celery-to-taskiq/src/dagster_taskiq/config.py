@@ -15,6 +15,7 @@ DEFAULT_CONFIG = {
     "is_fair_queue": None,
     "use_task_id_for_deduplication": False,
     "extra_options": {},
+    "enable_cancellation": True,
 }
 
 
