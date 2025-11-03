@@ -1,0 +1,125 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "ruff",
+  "pyright",
+  "pre-commit",
+  "genbadge[coverage]",
+  "pytest~=8.3.3",
+  "pytest-asyncio~=0.24.0",
+  "pytest-cov~=5.0.0",
+  "localstack~=3.7.2",
+  "types_aiobotocore[essential]>=2.23.1"
+]
+
+[project]
+name = "taskiq-aio-sqs"
+version = "0.3.1"
+description = "SQS/S3 Broker for TaskIQ using Aiobotocore"
+urls = {source = "https://github.com/vonsteer/taskiq-aio-sqs"}
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["taskiq", "broker", "aws", "sqs", "s3", "aiobotocore", "taskiq-broker", "queue"]
+license = {file = "LICENSE"}
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Framework :: AsyncIO",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development",
+  "Topic :: System :: Networking",
+  "Typing :: Typed",
+  "Operating System :: OS Independent"
+]
+dependencies = [
+  "annotated-types~=0.7.0",
+  "pydantic>=1.0,<=3.0",
+  "aiobotocore>=2.23.1,<3.0.0",
+  "taskiq[orjson]>=0.11.12,<1"
+]
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+  "ignore:The event_loop fixture provided by pytest-asyncio has been redefined:DeprecationWarning"
+]
+
+[tool.ruff]
+exclude = [".venv/"]
+line-length = 88
+# List of enabled rulsets.
+# See https://docs.astral.sh/ruff/rules/ for more information.
+lint.select = [
+  "E", # Error
+  "F", # Pyflakes
+  "W", # Pycodestyle
+  "C90", # McCabe complexity
+  "I", # Isort
+  "N", # pep8-naming
+  "D", # Pydocstyle
+  "ANN", # Pytype annotations
+  "S", # Bandit
+  "B", # Bugbear
+  "COM", # Commas
+  "C4", # Comprehensions
+  "ISC", # Implicit string concat
+  "PIE", # Unnecessary code
+  "T20", # Catch prints
+  "PYI", # validate pyi files
+  "Q", # Checks for quotes
+  "RSE", # Checks raise statements
+  "RET", # Checks return statements
+  "SLF", # Self checks
+  "SIM", # Simplificator
+  "PTH", # Pathlib checks
+  "ERA", # Checks for commented out code
+  "PL", # PyLint checks
+  "RUF" # Specific to Ruff checks
+]
+lint.ignore = [
+  "D105", # Missing docstring in magic method
+  "D107", # Missing docstring in __init__
+  "D212", # Multi-line docstring summary should start at the first line
+  "D401", # First line should be in imperative mood
+  "D104", # Missing docstring in public package
+  "D100", # Missing docstring in public module
+  "ANN401", # typing.Any are disallowed in `**kwargs
+  "PLR0913", # Too many arguments for function call
+  "D106", # Missing docstring in public nested class
+  "SIM210", # Unnecessary if-expr-with-true-false
+  "COM812" # Comma at the end of a list
+]
+lint.mccabe = {max-complexity = 10}
+
+[lint.per-file-ignores]
+"tests/*" = [
+  "S101", # Use of assert detected
+  "S301", # Use of pickle detected
+  "D103", # Missing docstring in public function
+  "SLF001", # Private member accessed
+  "S311", # Standard pseudo-random generators are not suitable for security/cryptographic purposes
+  "D101", # Missing docstring in public class
+  "PLR2004", # Magic value used in comparison
+  "PLC0415", # Import should be placed at the top of the file
+  "T201" # Print statement found
+]
+
+[lint.pydocstyle]
+convention = "pep257"
+ignore-decorators = ["typing.overload"]
