@@ -1,11 +1,6 @@
-from typing import Any, cast
+from typing import Any
 
-import celery
-from celery import Celery
-from dagster import (
-    DagsterInstance,
-    _check as check,
-)
+from dagster import DagsterInstance, _check as check
 from dagster._cli.api import _execute_run_command_body, _resume_run_command_body
 from dagster._core.definitions.reconstruct import ReconstructableJob
 from dagster._core.events import EngineEventData
@@ -13,19 +8,42 @@ from dagster._core.execution.api import create_execution_plan, execute_plan_iter
 from dagster._grpc.types import ExecuteRunArgs, ExecuteStepArgs, ResumeRunArgs
 from dagster._serdes import serialize_value, unpack_value
 from dagster_shared.serdes.serdes import JsonSerializableValue
+from taskiq import AsyncBroker
 
-from dagster_celery.config import (
+from dagster_taskiq.config import (
     TASK_EXECUTE_JOB_NAME,
     TASK_EXECUTE_PLAN_NAME,
     TASK_RESUME_JOB_NAME,
 )
-from dagster_celery.core_execution_loop import DELEGATE_MARKER
-from dagster_celery.executor import CeleryExecutor
+from dagster_taskiq.core_execution_loop import DELEGATE_MARKER
+from dagster_taskiq.executor import TaskiqExecutor
 
 
-def create_task(celery_app, **task_kwargs):
-    @celery_app.task(bind=True, name=TASK_EXECUTE_PLAN_NAME, **task_kwargs)
-    def _execute_plan(self, execute_step_args_packed, executable_dict):
+def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
+    """Create the execute_plan task for taskiq.
+
+    Args:
+        broker: The taskiq broker
+        **task_kwargs: Additional task keyword arguments
+
+    Returns:
+        The execute_plan task function
+    """
+
+    @broker.task(task_name=TASK_EXECUTE_PLAN_NAME, **task_kwargs)
+    def _execute_plan(
+        execute_step_args_packed: dict,
+        executable_dict: dict,
+    ) -> list:
+        """Execute a plan step in a taskiq worker.
+
+        Args:
+            execute_step_args_packed: Serialized ExecuteStepArgs
+            executable_dict: Serialized ReconstructableJob
+
+        Returns:
+            List of serialized DagsterEvent objects
+        """
         execute_step_args = unpack_value(
             check.dict_param(
                 execute_step_args_packed,
@@ -53,17 +71,21 @@ def create_task(celery_app, **task_kwargs):
             known_state=execute_step_args.known_state,
         )
 
+        # Get worker/task context info for reporting
+        # Taskiq doesn't provide the same context as Celery, so we'll use a placeholder
+        worker_name = "taskiq-worker"
+
         engine_event = instance.report_engine_event(
-            f"Executing steps {step_keys_str} in celery worker",
+            f"Executing steps {step_keys_str} in taskiq worker",
             dagster_run,
             EngineEventData(
                 {
                     "step_keys": step_keys_str,
-                    "Celery worker": self.request.hostname,
+                    "Taskiq worker": worker_name,
                 },
                 marker_end=DELEGATE_MARKER,
             ),
-            CeleryExecutor,
+            TaskiqExecutor,
             step_key=execution_plan.step_handle_for_single_step_plans().to_key(),  # pyright: ignore[reportOptionalMemberAccess]
         )
 
@@ -85,16 +107,32 @@ def create_task(celery_app, **task_kwargs):
 
 
 def _send_to_null(_event: Any) -> None:
+    """Null event sink."""
     pass
 
 
-def create_execute_job_task(celery: Celery, **task_kwargs: dict) -> celery.Task:
-    """Create a Celery task that executes a run and registers status updates with the
+def create_execute_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
+    """Create a Taskiq task that executes a run and registers status updates with the
     Dagster instance.
+
+    Args:
+        broker: The taskiq broker
+        **task_kwargs: Additional task keyword arguments
+
+    Returns:
+        The execute_job task function
     """
 
-    @celery.task(bind=True, name=TASK_EXECUTE_JOB_NAME, track_started=True, **task_kwargs)
-    def _execute_job(_self: Any, execute_job_args_packed: JsonSerializableValue) -> int:
+    @broker.task(task_name=TASK_EXECUTE_JOB_NAME, **task_kwargs)
+    def _execute_job(execute_job_args_packed: JsonSerializableValue) -> int:
+        """Execute a full Dagster job run.
+
+        Args:
+            execute_job_args_packed: Serialized ExecuteRunArgs
+
+        Returns:
+            Exit code (0 for success)
+        """
         args: ExecuteRunArgs = unpack_value(
             val=execute_job_args_packed,
             as_type=ExecuteRunArgs,
@@ -112,16 +150,31 @@ def create_execute_job_task(celery: Celery, **task_kwargs: dict) -> celery.Task:
                 ),
             )
 
-    return cast("celery.Task", _execute_job)
+    return _execute_job
 
 
-def create_resume_job_task(celery: Celery, **task_kwargs: dict) -> celery.Task:
-    """Create a Celery task that resumes a run and registers status updates with the
+def create_resume_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
+    """Create a Taskiq task that resumes a run and registers status updates with the
     Dagster instance.
+
+    Args:
+        broker: The taskiq broker
+        **task_kwargs: Additional task keyword arguments
+
+    Returns:
+        The resume_job task function
     """
 
-    @celery.task(bind=True, name=TASK_RESUME_JOB_NAME, track_started=True, **task_kwargs)
-    def _resume_job(_self: Any, resume_job_args_packed: JsonSerializableValue) -> int:
+    @broker.task(task_name=TASK_RESUME_JOB_NAME, **task_kwargs)
+    def _resume_job(resume_job_args_packed: JsonSerializableValue) -> int:
+        """Resume a Dagster job run.
+
+        Args:
+            resume_job_args_packed: Serialized ResumeRunArgs
+
+        Returns:
+            Exit code (0 for success)
+        """
         args: ResumeRunArgs = unpack_value(
             val=resume_job_args_packed,
             as_type=ResumeRunArgs,
@@ -139,4 +192,4 @@ def create_resume_job_task(celery: Celery, **task_kwargs: dict) -> celery.Task:
                 ),
             )
 
-    return cast("celery.Task", _resume_job)
+    return _resume_job

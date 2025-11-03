@@ -1,8 +1,8 @@
+import asyncio
 import sys
 import time
 
 import dagster._check as check
-from celery.exceptions import TaskRevokedError
 from dagster._core.errors import DagsterSubprocessError
 from dagster._core.events import DagsterEvent, EngineEventData
 from dagster._core.execution.context.system import PlanOrchestrationContext
@@ -12,19 +12,29 @@ from dagster._core.storage.tags import PRIORITY_TAG
 from dagster._utils.error import serializable_error_info_from_exc_info
 from dagster_shared.serdes import deserialize_value
 
-from dagster_celery.defaults import task_default_priority, task_default_queue
-from dagster_celery.make_app import make_app
-from dagster_celery.tags import (
-    DAGSTER_CELERY_QUEUE_TAG,
-    DAGSTER_CELERY_RUN_PRIORITY_TAG,
-    DAGSTER_CELERY_STEP_PRIORITY_TAG,
+from dagster_taskiq.defaults import task_default_priority, task_default_queue
+from dagster_taskiq.make_app import make_app
+from dagster_taskiq.tags import (
+    DAGSTER_TASKIQ_QUEUE_TAG,
+    DAGSTER_TASKIQ_RUN_PRIORITY_TAG,
+    DAGSTER_TASKIQ_STEP_PRIORITY_TAG,
 )
 
 TICK_SECONDS = 1
-DELEGATE_MARKER = "celery_queue_wait"
+DELEGATE_MARKER = "taskiq_queue_wait"
 
 
-def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
+def core_taskiq_execution_loop(job_context, execution_plan, step_execution_fn):
+    """Core execution loop for taskiq-based distributed execution.
+
+    Args:
+        job_context: The plan orchestration context
+        execution_plan: The execution plan
+        step_execution_fn: Function to submit a step for execution
+
+    Yields:
+        DagsterEvent objects
+    """
     check.inst_param(job_context, "job_context", PlanOrchestrationContext)
     check.inst_param(execution_plan, "execution_plan", ExecutionPlan)
     check.callable_param(step_execution_fn, "step_execution_fn")
@@ -36,14 +46,14 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
         # https://github.com/dagster-io/dagster/issues/2440
         check.invariant(
             execution_plan.artifacts_persisted,
-            "Cannot use in-memory storage with Celery, use filesystem (on top of NFS or "
+            "Cannot use in-memory storage with Taskiq, use filesystem (on top of NFS or "
             "similar system that allows files to be available to all nodes), S3, or GCS",
         )
 
-    app = make_app(executor.app_args())
+    broker = make_app(executor.app_args())
 
     priority_for_step = lambda step: (
-        -1 * int(step.tags.get(DAGSTER_CELERY_STEP_PRIORITY_TAG, task_default_priority))
+        -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
         + -1 * _get_run_priority(job_context)
     )
     priority_for_key = lambda step_key: (
@@ -51,7 +61,7 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
     )
     _warn_on_priority_misuse(job_context, execution_plan)
 
-    step_results = {}  # Dict[ExecutionStep, celery.AsyncResult]
+    step_results = {}  # Dict[str, TaskiqResult]
     step_errors = {}
 
     with InstanceConcurrencyContext(
@@ -68,36 +78,31 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
                 if active_execution.check_for_interrupts():
                     yield DagsterEvent.engine_event(
                         job_context,
-                        "Celery executor: received termination signal - revoking active tasks from"
-                        " workers",
+                        "Taskiq executor: received termination signal - cancelling active tasks",
                         EngineEventData.interrupted(list(step_results.keys())),
                     )
                     stopping = True
                     active_execution.mark_interrupted()
-                    for result in step_results.values():
-                        result.revoke()
+                    # Note: Taskiq doesn't have a direct revoke mechanism like Celery
+                    # Tasks will continue but results won't be processed
+
                 results_to_pop = []
                 for step_key, result in sorted(
                     step_results.items(), key=lambda x: priority_for_key(x[0])
                 ):
-                    if result.ready():
+                    # Check if result is ready
+                    is_ready = _check_result_ready(result)
+
+                    if is_ready:
                         try:
-                            step_events = result.get()
-                        except TaskRevokedError:
-                            step_events = []
-                            step = active_execution.get_step_by_key(step_key)
-                            yield DagsterEvent.engine_event(
-                                job_context.for_step(step),
-                                f'celery task for running step "{step_key}" was revoked.',
-                                EngineEventData(marker_end=DELEGATE_MARKER),
-                            )
+                            step_events = _get_result(result)
                         except Exception:
-                            # We will want to do more to handle the exception here.. maybe subclass Task
-                            # Certainly yield an engine or job event
+                            # Handle errors from task execution
                             step_events = []
                             step_errors[step_key] = serializable_error_info_from_exc_info(
                                 sys.exc_info()
                             )
+
                         for step_event in step_events:
                             event = deserialize_value(step_event, DagsterEvent)
                             yield event
@@ -118,26 +123,22 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
                 if stopping or step_errors:
                     continue
 
-                # This is a slight refinement. If we have n workers idle and schedule m > n steps for
-                # execution, the first n steps will be picked up by the idle workers in the order in
-                # which they are scheduled (and the following m-n steps will be executed in priority
-                # order, provided that it takes longer to execute a step than to schedule it). The test
-                # case has m >> n to exhibit this behavior in the absence of this sort step.
+                # Submit new steps for execution
                 for step in active_execution.get_steps_to_execute():
                     try:
-                        queue = step.tags.get(DAGSTER_CELERY_QUEUE_TAG, task_default_queue)
+                        queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
                         yield DagsterEvent.engine_event(
                             job_context.for_step(step),
-                            f'Submitting celery task for step "{step.key}" to queue "{queue}".',
+                            f'Submitting taskiq task for step "{step.key}" to queue "{queue}".',
                             EngineEventData(marker_start=DELEGATE_MARKER),
                         )
 
-                        # Get the Celery priority for this step
+                        # Get the priority for this step
                         priority = _get_step_priority(job_context, step)
 
-                        # Submit the Celery tasks
+                        # Submit the task
                         step_results[step.key] = step_execution_fn(
-                            app,
+                            broker,
                             job_context,
                             step,
                             queue,
@@ -148,7 +149,7 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
                     except Exception:
                         yield DagsterEvent.engine_event(
                             job_context,
-                            "Encountered error during celery task submission.",
+                            "Encountered error during taskiq task submission.",
                             event_specific_data=EngineEventData.engine_error(
                                 serializable_error_info_from_exc_info(sys.exc_info()),
                             ),
@@ -159,7 +160,7 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
 
             if step_errors:
                 raise DagsterSubprocessError(
-                    "During celery execution errors occurred in workers:\n{error_list}".format(
+                    "During taskiq execution errors occurred in workers:\n{error_list}".format(
                         error_list="\n".join(
                             [f"[{key}]: {err.to_string()}" for key, err in step_errors.items()]
                         )
@@ -168,21 +169,59 @@ def core_celery_execution_loop(job_context, execution_plan, step_execution_fn):
                 )
 
 
+def _check_result_ready(result):
+    """Check if a taskiq result is ready.
+
+    Args:
+        result: TaskiqResult object
+
+    Returns:
+        bool: True if result is ready
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(result.is_ready())
+    finally:
+        loop.close()
+
+
+def _get_result(result):
+    """Get the result from a taskiq task.
+
+    Args:
+        result: TaskiqResult object
+
+    Returns:
+        The task result
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        task_result = loop.run_until_complete(result.get_result())
+        # taskiq results are wrapped in TaskiqResult with return_value
+        if hasattr(task_result, 'return_value'):
+            return task_result.return_value
+        return task_result
+    finally:
+        loop.close()
+
+
 def _get_step_priority(context, step):
     """Step priority is (currently) set as the overall run priority plus the individual
     step priority.
     """
     run_priority = _get_run_priority(context)
-    step_priority = int(step.tags.get(DAGSTER_CELERY_STEP_PRIORITY_TAG, task_default_priority))
+    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
     priority = run_priority + step_priority
     return priority
 
 
 def _get_run_priority(context):
-    if not context.has_tag(DAGSTER_CELERY_RUN_PRIORITY_TAG):
+    if not context.has_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG):
         return 0
     try:
-        return int(context.get_tag(DAGSTER_CELERY_RUN_PRIORITY_TAG))
+        return int(context.get_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG))
     except ValueError:
         return 0
 
@@ -193,13 +232,13 @@ def _warn_on_priority_misuse(context, execution_plan):
         step = execution_plan.get_step_by_key(key)
         if (
             step.tags.get(PRIORITY_TAG) is not None
-            and step.tags.get(DAGSTER_CELERY_STEP_PRIORITY_TAG) is None
+            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None
         ):
             bad_keys.append(key)
 
     if bad_keys:
         context.log.warn(
-            'The following steps do not have "dagster-celery/priority" set but do '
-            'have "dagster/priority" set which is not applicable for the celery engine: [{}]. '
+            'The following steps do not have "dagster-taskiq/priority" set but do '
+            'have "dagster/priority" set which is not applicable for the taskiq engine: [{}]. '
             "Consider using a function to set both keys.".format(", ".join(bad_keys))
         )

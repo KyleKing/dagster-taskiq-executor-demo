@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 build/
 dist/
+*.egg-info
 
 # Unit test / coverage reports
 .tox/
@@ -42,3 +43,4 @@ venv.bak/
 
 # LocalStack
 volume/
+

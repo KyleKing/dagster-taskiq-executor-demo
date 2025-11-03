@@ -1,15 +1,17 @@
-from dagster_celery.defaults import (
-    broker_transport_options,
+from dagster_taskiq.defaults import (
     task_default_priority,
     task_default_queue,
+    worker_max_messages,
+    wait_time_seconds,
+    visibility_timeout,
 )
 
 DEFAULT_CONFIG = {
-    # 'task_queue_max_priority': 10,
-    "worker_prefetch_multiplier": 1,
-    "broker_transport_options": broker_transport_options,
     "task_default_priority": task_default_priority,
     "task_default_queue": task_default_queue,
+    "worker_max_messages": worker_max_messages,
+    "wait_time_seconds": wait_time_seconds,
+    "visibility_timeout": visibility_timeout,
 }
 
 
