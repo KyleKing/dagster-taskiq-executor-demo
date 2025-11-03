@@ -6,110 +6,141 @@ from typing import Any, Optional
 
 import click
 import dagster._check as check
-from celery.utils.nodenames import default_nodename, host_format
 from dagster._config import post_process_config, validate_config
 from dagster._core.errors import DagsterInvalidConfigError
 from dagster._core.instance import DagsterInstance
 from dagster._utils import mkdir_p
 from dagster_shared.yaml_utils import load_yaml_from_path
 
-from dagster_celery.executor import CeleryExecutor, celery_executor
-from dagster_celery.make_app import make_app
+from dagster_taskiq.executor import TaskiqExecutor, taskiq_executor
 
 
 def create_worker_cli_group():
+    """Create the worker CLI command group."""
     group = click.Group(name="worker")
     group.add_command(worker_start_command)
-    group.add_command(worker_terminate_command)
     group.add_command(worker_list_command)
     return group
 
 
 def get_config_value_from_yaml(yaml_path: Optional[str]) -> Mapping[str, Any]:
+    """Extract executor config from YAML file.
+
+    Args:
+        yaml_path: Path to YAML configuration file
+
+    Returns:
+        Configuration dictionary
+    """
     if yaml_path is None:
         return {}
     parsed_yaml = load_yaml_from_path(yaml_path) or {}
     assert isinstance(parsed_yaml, dict)
-    # Would be better not to hardcode this path
-    return (
-        parsed_yaml.get("execution", {}).get("config", {})
-        or parsed_yaml.get("execution", {}).get("celery", {})  # legacy config
-        or {}
-    )
-
-
-def get_app(config_yaml: Optional[str] = None) -> CeleryExecutor:
-    return make_app(
-        CeleryExecutor.for_cli(**get_config_value_from_yaml(config_yaml)).app_args()
-        if config_yaml
-        else CeleryExecutor.for_cli().app_args()
-    )
+    # Extract config from execution block
+    return parsed_yaml.get("execution", {}).get("config", {}) or {}
 
 
 def get_worker_name(name: Optional[str] = None) -> str:
-    return name + "@%h" if name is not None else f"dagster-{str(uuid.uuid4())[-6:]}@%h"
+    """Generate a worker name.
+
+    Args:
+        name: Optional custom worker name
+
+    Returns:
+        Worker name string
+    """
+    if name is not None:
+        return name
+    return f"dagster-taskiq-{str(uuid.uuid4())[-6:]}"
 
 
 def get_validated_config(config_yaml: Optional[str] = None) -> Any:
-    config_type = celery_executor.config_schema.config_type
+    """Validate configuration from YAML file.
+
+    Args:
+        config_yaml: Path to YAML configuration file
+
+    Returns:
+        Validated configuration dictionary
+
+    Raises:
+        DagsterInvalidConfigError: If configuration is invalid
+    """
+    config_type = taskiq_executor.config_schema.config_type
     config_value = get_config_value_from_yaml(config_yaml)
     config = validate_config(config_type, config_value)
     if not config.success:
         raise DagsterInvalidConfigError(
-            f"Errors while loading Celery executor config at {config_yaml}.",
+            f"Errors while loading Taskiq executor config at {config_yaml}.",
             config.errors,
             config_value,
         )
-    return post_process_config(config_type, config_value).value  # type: ignore  # (possible none)
+    return post_process_config(config_type, config_value).value  # type: ignore
 
 
-def get_config_dir(config_yaml=None):
+def get_config_module(config_yaml=None):
+    """Create a configuration module for the worker.
+
+    Args:
+        config_yaml: Path to YAML configuration file
+
+    Returns:
+        Path to configuration directory
+    """
     instance = DagsterInstance.get()
 
-    config_module_name = "dagster_celery_config"
+    config_module_name = "dagster_taskiq_config"
 
     config_dir = os.path.join(
-        instance.root_directory, "dagster_celery", "config", str(uuid.uuid4())
+        instance.root_directory, "dagster_taskiq", "config", str(uuid.uuid4())
     )
     mkdir_p(config_dir)
     config_path = os.path.join(config_dir, f"{config_module_name}.py")
 
     validated_config = get_validated_config(config_yaml)
     with open(config_path, "w", encoding="utf8") as fd:
-        if validated_config.get("broker"):
+        if validated_config.get("queue_url"):
             fd.write(
-                "broker_url = '{broker_url}'\n".format(broker_url=str(validated_config["broker"]))
+                f"QUEUE_URL = {validated_config['queue_url']!r}\n"
             )
-        if validated_config.get("backend"):
+        if validated_config.get("region_name"):
             fd.write(
-                "result_backend = '{result_backend}'\n".format(
-                    result_backend=str(validated_config["backend"])
-                )
+                f"REGION_NAME = {validated_config['region_name']!r}\n"
+            )
+        if validated_config.get("endpoint_url"):
+            fd.write(
+                f"ENDPOINT_URL = {validated_config['endpoint_url']!r}\n"
             )
         if validated_config.get("config_source"):
             for key, value in validated_config["config_source"].items():
                 fd.write(f"{key} = {value!r}\n")
 
-    # n.b. right now we don't attempt to clean up this cache, but it might make sense to delete
-    # any files older than some time if there are more than some number of files present, etc.
     return config_dir
 
 
 def launch_background_worker(subprocess_args, env):
+    """Launch a worker in background mode.
+
+    Args:
+        subprocess_args: Command line arguments
+        env: Environment variables
+
+    Returns:
+        Subprocess handle
+    """
     return subprocess.Popen(
-        subprocess_args + ["--detach", "--pidfile="], stdout=None, stderr=None, env=env
+        subprocess_args, stdout=None, stderr=None, env=env
     )
 
 
-@click.command(name="start", help="Start a dagster celery worker.")
+@click.command(name="start", help="Start a dagster-taskiq worker.")
 @click.option(
     "--name",
     "-n",
     type=click.STRING,
     default=None,
     help=(
-        'The name of the worker. Defaults to a unique name prefixed with "dagster-" and ending '
-        "with the hostname."
+        'The name of the worker. Defaults to a unique name prefixed with "dagster-taskiq-".'
     ),
 )
 @click.option(
@@ -119,118 +150,101 @@ def launch_background_worker(subprocess_args, env):
     default=None,
     help=(
         "Specify the path to a config YAML file with options for the worker. This is the same "
-        "config block that you provide to dagster_celery.celery_executor when configuring a "
-        "job for execution with Celery, with, e.g., the URL of the broker to use."
-    ),
-)
-@click.option(
-    "--queue",
-    "-q",
-    type=click.STRING,
-    multiple=True,
-    help=(
-        "Names of the queues on which this worker should listen for tasks.  Provide multiple -q "
-        "arguments to specify multiple queues. Note that each celery worker may listen on no more "
-        "than four queues."
+        "config block that you provide to dagster_taskiq.taskiq_executor when configuring a "
+        "job for execution with Taskiq, with, e.g., the URL of the SQS queue to use."
     ),
 )
 @click.option(
     "--background", "-d", is_flag=True, help="Set this flag to run the worker in the background."
 )
 @click.option(
-    "--includes",
-    "-i",
-    type=click.STRING,
-    multiple=True,
-    help=(
-        "Python modules the worker should import. Provide multiple -i arguments to specify "
-        "multiple modules."
-    ),
+    "--workers",
+    "-w",
+    type=click.INT,
+    default=1,
+    help="Number of worker processes to spawn.",
 )
 @click.option(
     "--loglevel", "-l", type=click.STRING, default="INFO", help="Log level for the worker."
 )
-@click.option("--app", "-A", type=click.STRING)
+@click.option(
+    "--broker",
+    "-b",
+    type=click.STRING,
+    default="dagster_taskiq.app:broker",
+    help="Python path to the broker instance (default: dagster_taskiq.app:broker).",
+)
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def worker_start_command(
     name,
     config_yaml,
     background,
-    queue,
-    includes,
+    workers,
     loglevel,
-    app,
+    broker,
     additional_args,
 ):
-    check.invariant(app, "App must be specified. E.g. dagster_celery.app or dagster_celery_k8s.app")
+    """Start a Taskiq worker.
 
-    loglevel_args = ["--loglevel", loglevel]
+    This wraps the taskiq CLI and adds Dagster-specific configuration.
+    """
+    worker_name = get_worker_name(name)
 
-    if len(queue) > 4:
-        check.failed(
-            "Can't start a dagster_celery worker that listens on more than four queues, due to a "
-            "bug in Celery 4."
-        )
-    queue_args = []
-    for q in queue:
-        queue_args += ["-Q", q]
+    # Build taskiq worker command
+    subprocess_args = [
+        "taskiq",
+        "worker",
+        broker,
+        "--log-level", loglevel.lower(),
+        "--workers", str(workers),
+    ]
 
-    includes_args = ["-I", ",".join(includes)] if includes else []
+    # Add worker name as label
+    subprocess_args.extend(["--worker-name", worker_name])
 
-    pythonpath = get_config_dir(config_yaml)
-    subprocess_args = (
-        ["celery", "-A", app, "worker", "--prefetch-multiplier=1"]
-        + loglevel_args
-        + queue_args
-        + includes_args
-        + ["-n", get_worker_name(name)]
-        + list(additional_args)
-    )
+    # Add any additional args
+    subprocess_args.extend(additional_args)
 
+    # Set up environment with config
     env = os.environ.copy()
-    if pythonpath is not None:
-        existing_pythonpath = env.get("PYTHONPATH", "")
-        if existing_pythonpath and not existing_pythonpath.endswith(os.pathsep):
-            existing_pythonpath += os.pathsep
-        env["PYTHONPATH"] = f"{existing_pythonpath}{pythonpath}{os.pathsep}"
+
+    # If config YAML provided, extract and set environment variables
+    if config_yaml:
+        validated_config = get_validated_config(config_yaml)
+
+        if validated_config.get("queue_url"):
+            env["DAGSTER_TASKIQ_SQS_QUEUE_URL"] = str(validated_config["queue_url"])
+
+        if validated_config.get("region_name"):
+            env["AWS_DEFAULT_REGION"] = str(validated_config["region_name"])
+
+        if validated_config.get("endpoint_url"):
+            env["DAGSTER_TASKIQ_SQS_ENDPOINT_URL"] = str(validated_config["endpoint_url"])
+
+        # Add config module to PYTHONPATH if needed
+        config_dir = get_config_module(config_yaml)
+        if config_dir:
+            existing_pythonpath = env.get("PYTHONPATH", "")
+            if existing_pythonpath and not existing_pythonpath.endswith(os.pathsep):
+                existing_pythonpath += os.pathsep
+            env["PYTHONPATH"] = f"{existing_pythonpath}{config_dir}{os.pathsep}"
+
+    click.echo(f"Starting Taskiq worker: {worker_name}")
+    click.echo(f"Broker: {broker}")
+    click.echo(f"Workers: {workers}")
+    click.echo(f"Log level: {loglevel}")
+
     if background:
+        click.echo("Running in background mode...")
         launch_background_worker(subprocess_args, env=env)
+        click.echo("Worker started in background.")
     else:
         return subprocess.check_call(subprocess_args, env=env)
 
 
-@click.command(name="status", help="wrapper around `celery status`")
-@click.option(
-    "--config-yaml",
-    "-y",
-    type=click.Path(exists=True),
-    required=True,
-    help=(
-        "Specify the path to a config YAML file with options for the worker. This is the same "
-        "config block that you provide to dagster_celery.celery_executor when configuring a "
-        "job for execution with Celery, with, e.g., the URL of the broker to use."
-    ),
-)
-@click.option("--app", "-A", type=click.STRING)
-@click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
-def status_command(
-    config_yaml,
-    app,
-    additional_args,
-):
-    check.invariant(app, "App must be specified. E.g. dagster_celery.app or dagster_celery_k8s.app")
-
-    config = get_validated_config(config_yaml)
-    subprocess_args = ["celery", "-A", app, "-b", str(config["broker"]), "status"] + list(
-        additional_args
-    )
-
-    subprocess.check_call(subprocess_args)
-
-
 @click.command(
     name="list",
-    help="List running dagster-celery workers. Note that we use the broker to contact the workers.",
+    help="List information about the Taskiq queue.",
 )
 @click.option(
     "--config-yaml",
@@ -238,63 +252,77 @@ def status_command(
     type=click.Path(exists=True),
     default=None,
     help=(
-        "Specify the path to a config YAML file with options for the workers you are trying to "
-        "manage. This is the same config block that you provide to dagster_celery.celery_executor "
-        "when configuring a job for execution with Celery, with, e.g., the URL of the broker "
-        "to use. Without this config file, you will not be able to find your workers (since the "
-        "CLI won't know how to reach the broker)."
+        "Specify the path to a config YAML file with SQS queue configuration."
     ),
 )
 def worker_list_command(config_yaml=None):
-    app = get_app(config_yaml)
+    """List SQS queue attributes.
 
-    print(app.control.inspect(timeout=1).active())  # noqa: T201  # pyright: ignore[reportAttributeAccessIssue]
+    Note: Unlike Celery, Taskiq doesn't have a built-in worker registry.
+    This command shows SQS queue statistics instead.
+    """
+    try:
+        import boto3
+    except ImportError:
+        click.echo("Error: boto3 is required for this command. Install it with: pip install boto3")
+        return
 
+    validated_config = get_validated_config(config_yaml) if config_yaml else {}
 
-@click.command(
-    name="terminate",
-    help=(
-        "Shut down dagster-celery workers. Note that we use the broker to send signals to the "
-        "workers to terminate -- if the broker is not running, this command is a no-op. "
-        "Provide the argument NAME to terminate a specific worker by name."
-    ),
-)
-@click.argument("name", default="dagster")
-@click.option(
-    "--all", "-a", "all_", is_flag=True, help="Set this flag to terminate all running workers."
-)
-@click.option(
-    "--config-yaml",
-    "-y",
-    type=click.Path(exists=True),
-    default=None,
-    help=(
-        "Specify the path to a config YAML file with options for the workers you are trying to "
-        "manage. This is the same config block that you provide to dagster_celery.celery_executor "
-        "when configuring a job for execution with Celery, with, e.g., the URL of the broker "
-        "to use. Without this config file, you will not be able to terminate your workers (since "
-        "the CLI won't know how to reach the broker)."
-    ),
-)
-def worker_terminate_command(name="dagster", config_yaml=None, all_=False):
-    app = get_app(config_yaml)
+    queue_url = validated_config.get(
+        "queue_url",
+        os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL")
+    )
+    endpoint_url = validated_config.get(
+        "endpoint_url",
+        os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL")
+    )
+    region_name = validated_config.get(
+        "region_name",
+        os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    )
 
-    if all_:
-        app.control.broadcast("shutdown")  # pyright: ignore[reportAttributeAccessIssue]
-    else:
-        app.control.broadcast(  # pyright: ignore[reportAttributeAccessIssue]
-            "shutdown", destination=[host_format(default_nodename(get_worker_name(name)))]
+    if not queue_url:
+        click.echo("Error: No queue URL configured. Set DAGSTER_TASKIQ_SQS_QUEUE_URL or provide --config-yaml")
+        return
+
+    click.echo(f"Queue URL: {queue_url}")
+    click.echo(f"Region: {region_name}")
+
+    try:
+        sqs = boto3.client(
+            "sqs",
+            endpoint_url=endpoint_url,
+            region_name=region_name,
         )
+
+        # Get queue attributes
+        response = sqs.get_queue_attributes(
+            QueueUrl=queue_url,
+            AttributeNames=[
+                "ApproximateNumberOfMessages",
+                "ApproximateNumberOfMessagesNotVisible",
+                "ApproximateNumberOfMessagesDelayed",
+            ]
+        )
+
+        attrs = response.get("Attributes", {})
+        click.echo("\nQueue Statistics:")
+        click.echo(f"  Messages available: {attrs.get('ApproximateNumberOfMessages', 'N/A')}")
+        click.echo(f"  Messages in flight: {attrs.get('ApproximateNumberOfMessagesNotVisible', 'N/A')}")
+        click.echo(f"  Messages delayed: {attrs.get('ApproximateNumberOfMessagesDelayed', 'N/A')}")
+
+    except Exception as e:
+        click.echo(f"Error querying SQS: {e}")
 
 
 worker_cli = create_worker_cli_group()
 
 
-@click.group(commands={"worker": worker_cli, "status": status_command})
+@click.group(commands={"worker": worker_cli})
 def main():
-    """dagster-celery."""
+    """dagster-taskiq CLI."""
 
 
 if __name__ == "__main__":
-    # pylint doesn't understand click
     main()

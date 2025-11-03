@@ -7,9 +7,9 @@ from collections import OrderedDict
 
 from dagster._core.storage.dagster_run import RunsFilter
 from dagster._core.test_utils import instance_for_test
-from dagster_celery.tags import DAGSTER_CELERY_RUN_PRIORITY_TAG
+from dagster_taskiq.tags import DAGSTER_TASKIQ_RUN_PRIORITY_TAG
 
-from dagster_celery_tests.utils import (
+from dagster_taskiq_tests.utils import (
     execute_eagerly_on_celery,
     execute_on_thread,
     start_celery_worker,
@@ -47,7 +47,7 @@ def test_run_priority_job(rabbitmq):
                 args=("low_job", low_done, instance.get_ref()),
                 kwargs={
                     "tempdir": tempdir,
-                    "tags": {DAGSTER_CELERY_RUN_PRIORITY_TAG: "-3"},
+                    "tags": {DAGSTER_TASKIQ_RUN_PRIORITY_TAG: "-3"},
                 },
                 daemon=True,
             )
@@ -61,7 +61,7 @@ def test_run_priority_job(rabbitmq):
                 args=("hi_job", hi_done, instance.get_ref()),
                 kwargs={
                     "tempdir": tempdir,
-                    "tags": {DAGSTER_CELERY_RUN_PRIORITY_TAG: "3"},
+                    "tags": {DAGSTER_TASKIQ_RUN_PRIORITY_TAG: "3"},
                 },
                 daemon=True,
             )

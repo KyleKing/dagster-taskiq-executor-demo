@@ -40,7 +40,7 @@ def _instance_wrapper(instance: Optional[DagsterInstance]) -> Iterator[DagsterIn
 
 
 @contextmanager
-def execute_job_on_celery(
+def execute_job_on_taskiq(
     job_name: str,
     instance: Optional[DagsterInstance] = None,
     run_config: Optional[Mapping[str, Any]] = None,
@@ -53,7 +53,7 @@ def execute_job_on_celery(
         with _instance_wrapper(instance) as wrapped_instance:
             run_config = run_config or {
                 "resources": {"io_manager": {"config": {"base_dir": tempdir}}},
-                # "execution": {"celery": {}},
+                # "execution": {"taskiq": {}},
             }
             with execute_job(
                 job_def,
@@ -65,7 +65,7 @@ def execute_job_on_celery(
 
 
 @contextmanager
-def execute_eagerly_on_celery(
+def execute_eagerly_on_taskiq(
     job_name: str,
     instance: Optional[DagsterInstance] = None,
     tempdir: Optional[str] = None,
@@ -78,7 +78,7 @@ def execute_eagerly_on_celery(
             "execution": {"config": {"config_source": {"task_always_eager": True}}},
         }
 
-        with execute_job_on_celery(
+        with execute_job_on_taskiq(
             job_name,
             instance=instance,
             run_config=run_config,
@@ -97,25 +97,38 @@ def execute_on_thread(
     tags: Optional[Mapping[str, str]] = None,
 ) -> None:
     with DagsterInstance.from_ref(instance_ref) as instance:
-        with execute_job_on_celery(job_name, tempdir=tempdir, tags=tags, instance=instance):
+        with execute_job_on_taskiq(job_name, tempdir=tempdir, tags=tags, instance=instance):
             done.set()
 
 
 @contextmanager
-def start_celery_worker(queue: Optional[str] = None) -> Iterator[None]:
-    process = subprocess.Popen(
-        ["dagster-celery", "worker", "start", "-A", "dagster_celery.app"]
-        + (["-q", queue] if queue else [])
-        + (["--", "--concurrency", "1"])
-    )
+def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
+    # Start a Taskiq worker using the dagster-taskiq CLI
+    cmd = ["dagster-taskiq", "worker", "start"]
+    if queue:
+        # Note: Taskiq doesn't have queue filtering like Celery
+        # We'll just start a regular worker
+        pass
+
+    process = subprocess.Popen(cmd)
+
+    # Give the worker a moment to start
+    import time
+    time.sleep(2)
 
     try:
         yield
     finally:
+        # Send interrupt signal to stop the worker
         os.kill(process.pid, signal.SIGINT)
-        process.wait()
-        subprocess.check_output(["dagster-celery", "worker", "terminate"])
+        process.wait(timeout=10)
 
 
 def events_of_type(result: ExecutionResult, event_type: str) -> Sequence[DagsterEvent]:
     return [event for event in result.all_events if event.event_type_value == event_type]
+
+
+# Backward-compatible aliases for migration
+execute_job_on_celery = execute_job_on_taskiq
+execute_eagerly_on_celery = execute_eagerly_on_taskiq
+start_celery_worker = start_taskiq_worker

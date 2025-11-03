@@ -11,55 +11,99 @@ from dagster._core.instance import DagsterInstance
 from dagster._core.test_utils import environ, instance_for_test
 from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 
-from dagster_celery_tests.utils import start_celery_worker
+from dagster_taskiq_tests.utils import start_taskiq_worker
 
 IS_BUILDKITE = os.getenv("BUILDKITE") is not None
 
 
 @pytest.fixture(scope="session")
-def rabbitmq():
+def localstack():
+    """Start LocalStack for SQS testing."""
     if IS_BUILDKITE:
-        # Set the enviornment variable that celery uses in the start_worker() test function
-        # to find the broker host
-        with environ({"TEST_BROKER": os.getenv("DAGSTER_CELERY_BROKER_HOST", "localhost")}):
-            yield
+        # On Buildkite, assume LocalStack is already running
+        queue_url = os.getenv(
+            "DAGSTER_TASKIQ_SQS_QUEUE_URL",
+            "https://sqs.us-east-1.amazonaws.com/000000000000/dagster-test-queue"
+        )
+        with environ({
+            "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_url,
+            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL", "http://localhost:4566"),
+            "AWS_DEFAULT_REGION": "us-east-1",
+            "AWS_ACCESS_KEY_ID": "test",
+            "AWS_SECRET_ACCESS_KEY": "test",
+        }):
+            yield queue_url
         return
 
-    docker_compose_file = file_relative_path(__file__, "../docker-compose.yaml")
-
-    service_name = "test-rabbitmq"
-
+    # Start LocalStack container
     try:
-        subprocess.check_output(
-            ["docker-compose", "-f", docker_compose_file, "stop", service_name],
-        )
-        subprocess.check_output(
-            ["docker-compose", "-f", docker_compose_file, "rm", "-f", service_name],
-        )
+        # Stop and remove existing container
+        subprocess.run(["docker", "stop", "dagster-localstack"], capture_output=True)
+        subprocess.run(["docker", "rm", "dagster-localstack"], capture_output=True)
     except Exception:
         pass
 
-    subprocess.check_output(["docker-compose", "-f", docker_compose_file, "up", "-d", service_name])
+    # Start fresh LocalStack container
+    subprocess.check_output([
+        "docker", "run", "-d",
+        "--name", "dagster-localstack",
+        "-p", "4566:4566",
+        "-e", "SERVICES=sqs",
+        "localstack/localstack:latest"
+    ])
 
-    print("Waiting for rabbitmq to be ready...")  # noqa: T201
-    while True:
-        logs = str(subprocess.check_output(["docker", "logs", service_name]))
-        if "started TCP listener on [::]:5672" in logs:
-            break
-        time.sleep(1)
-
-    try:
-        yield
-    finally:
+    print("Waiting for LocalStack to be ready...")  # noqa: T201
+    max_retries = 30
+    for i in range(max_retries):
         try:
-            subprocess.check_output(
-                ["docker-compose", "-f", docker_compose_file, "stop", service_name]
+            result = subprocess.run(
+                ["curl", "-s", "http://localhost:4566/_localstack/health"],
+                capture_output=True,
+                timeout=5
             )
-            subprocess.check_output(
-                ["docker-compose", "-f", docker_compose_file, "rm", "-f", service_name]
-            )
+            if b'"sqs":' in result.stdout and b'"available"' in result.stdout:
+                break
         except Exception:
             pass
+        time.sleep(1)
+    else:
+        raise RuntimeError("LocalStack failed to start")
+
+    # Create SQS queue
+    queue_name = "dagster-test-queue"
+    result = subprocess.check_output([
+        "aws", "--endpoint-url=http://localhost:4566",
+        "sqs", "create-queue",
+        "--queue-name", queue_name,
+        "--region", "us-east-1"
+    ])
+
+    # Extract queue URL from response
+    import json
+    queue_data = json.loads(result)
+    queue_url = queue_data["QueueUrl"]
+
+    # Set environment variables
+    with environ({
+        "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_url,
+        "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": "http://localhost:4566",
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "AWS_ACCESS_KEY_ID": "test",
+        "AWS_SECRET_ACCESS_KEY": "test",
+    }):
+        try:
+            yield queue_url
+        finally:
+            # Clean up
+            try:
+                subprocess.check_output(["docker", "stop", "dagster-localstack"])
+                subprocess.check_output(["docker", "rm", "dagster-localstack"])
+            except Exception:
+                pass
+
+
+# Backward-compatible alias
+rabbitmq = localstack
 
 
 @pytest.fixture(scope="function")
@@ -75,9 +119,13 @@ def instance(tempdir):
 
 
 @pytest.fixture(scope="function")
-def dagster_celery_worker(rabbitmq, instance: DagsterInstance) -> Iterator[None]:
-    with start_celery_worker():
+def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
+    with start_taskiq_worker():
         yield
+
+
+# Backward-compatible alias
+dagster_celery_worker = dagster_taskiq_worker
 
 
 @pytest.fixture(scope="session")

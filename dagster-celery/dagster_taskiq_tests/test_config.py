@@ -1,64 +1,41 @@
+"""Simplified configuration tests for dagster-taskiq.
+
+Note: Unlike Celery, Taskiq doesn't require dynamic config file generation.
+Configuration is handled via environment variables and YAML files directly.
+"""
 import os
 import tempfile
 
 from dagster._core.test_utils import environ, instance_for_test
-from dagster_celery.cli import get_config_dir
-
-CONFIG_YAML = """
-execution:
-  celery:
-    broker: "pyampqp://foo@bar:1234//"
-    config_source:
-      foo: "bar"
-"""
-
-ENV_CONFIG_YAML = """
-execution:
-  celery:
-    broker:
-      env: BROKER_URL
-    config_source:
-      foo: "bar"
-"""
 
 
-CONFIG_PY = """broker_url = \'pyampqp://foo@bar:1234//\'
-result_backend = \'rpc://\'
-foo = \'bar\'
-"""
-
-CONFIG_PYTHON_FILE = "{config_module_name}.py".format(config_module_name="dagster_celery_config")
-
-
-def test_config_value_from_yaml():
+def test_basic_environment_config():
+    """Test that basic environment configuration works."""
     with instance_for_test():
-        with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write(CONFIG_YAML.encode("utf-8"))
-            tmp.seek(0)
-            python_path = get_config_dir(config_yaml=tmp.name)
+        with environ({
+            "DAGSTER_TASKIQ_SQS_QUEUE_URL": "https://sqs.us-east-1.amazonaws.com/123/test",
+            "AWS_DEFAULT_REGION": "us-east-1",
+        }):
+            # Import here to pick up environment variables
+            from dagster_taskiq.defaults import sqs_queue_url, aws_region_name
 
-        with open(os.path.join(python_path, CONFIG_PYTHON_FILE), encoding="utf8") as fd:
-            assert str(fd.read()) == CONFIG_PY
+            assert sqs_queue_url == "https://sqs.us-east-1.amazonaws.com/123/test"
+            assert aws_region_name == "us-east-1"
 
 
-def test_config_value_from_empty_yaml():
+def test_endpoint_url_config():
+    """Test LocalStack endpoint URL configuration."""
     with instance_for_test():
-        with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write(b"")
-            tmp.seek(0)
-            python_path = get_config_dir(config_yaml=tmp.name)
+        with environ({
+            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": "http://localhost:4566",
+        }):
+            # Reload module to pick up new environment variables
+            import importlib
+            import dagster_taskiq.defaults
+            importlib.reload(dagster_taskiq.defaults)
+            from dagster_taskiq.defaults import sqs_endpoint_url
 
-        with open(os.path.join(python_path, CONFIG_PYTHON_FILE), encoding="utf8") as fd:
-            assert str(fd.read()) == "result_backend = 'rpc://'\n"
+            assert sqs_endpoint_url == "http://localhost:4566"
 
 
-def test_config_value_from_env_yaml():
-    with instance_for_test():
-        with environ({"BROKER_URL": "pyampqp://foo@bar:1234//"}):
-            with tempfile.NamedTemporaryFile() as tmp:
-                tmp.write(CONFIG_YAML.encode("utf-8"))
-                tmp.seek(0)
-                python_path = get_config_dir(config_yaml=tmp.name)
-
-            with open(os.path.join(python_path, CONFIG_PYTHON_FILE), encoding="utf8") as fd:
-                assert str(fd.read()) == CONFIG_PY
+# Note: Taskiq uses simpler configuration than Celery - no dynamic config file generation needed

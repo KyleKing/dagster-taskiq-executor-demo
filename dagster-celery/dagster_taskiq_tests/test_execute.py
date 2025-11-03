@@ -10,7 +10,7 @@ from dagster._core.execution.api import execute_job, execute_run_iterator
 from dagster._core.instance import DagsterInstance
 from dagster._utils import send_interrupt
 
-from dagster_celery_tests.utils import (
+from dagster_taskiq_tests.utils import (
     REPO_FILE,
     events_of_type,
     execute_eagerly_on_celery,
