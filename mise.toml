@@ -133,6 +133,10 @@ description = "Stop LocalStack container"
 alias = "stop"
 run = "docker compose down"
 
+[tasks."dashboard:start"]
+description = "Start TaskIQ dashboard (requires dev dependencies)"
+run = "./scripts/run-dashboard.sh"
+
 [tasks.mdformat]
 description = "Format all markdown files"
 run = "mdformat **/*.md"

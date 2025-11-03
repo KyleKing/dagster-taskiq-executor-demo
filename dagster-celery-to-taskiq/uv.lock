@@ -477,7 +477,6 @@ dependencies = [
     { name = "dagster" },
     { name = "pydantic" },
     { name = "taskiq-aio-sqs" },
-    { name = "taskiq-dashboard" },
 ]
 
 [package.optional-dependencies]
@@ -496,6 +495,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "taskiq-dashboard" },
 ]
 
 [package.metadata]
@@ -506,7 +506,6 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "taskiq-aio-sqs", specifier = ">=0.4.0" },
-    { name = "taskiq-dashboard", specifier = ">=0.2.0" },
 ]
 provides-extras = ["kubernetes", "test"]
 
@@ -517,6 +516,7 @@ dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "taskiq-dashboard", specifier = ">=0.2.0" },
 ]
 
 [[package]]

@@ -279,7 +279,9 @@ def dashboard_command(args):
     try:
         from taskiq_dashboard import TaskiqDashboard
     except ImportError:
-        print("Error: taskiq-dashboard is not installed. Install it with: pip install taskiq-dashboard")
+        print("Error: taskiq-dashboard is not installed.")
+        print("Install it with: uv pip install taskiq-dashboard")
+        print("Or install dev dependencies: uv sync --group dev")
         return
 
     print(f"Starting Taskiq dashboard on {args.host}:{args.port}")

@@ -46,8 +46,9 @@ Production-like AWS deployment of Dagster with TaskIQ execution running locally 
    ```
 
 6. **Access UIs**:
-   - Dagster: http://localhost:3000
-   - LocalStack: https://app.localstack.cloud
+    - Dagster: http://localhost:3000
+    - TaskIQ Dashboard: http://localhost:8080 (requires dev dependencies)
+    - LocalStack: https://app.localstack.cloud
 
 ## Development Tasks
 
@@ -58,6 +59,21 @@ mise run lint       # Lint code (pass --fix to auto-fix)
 mise run format     # Format code (pass --check to check only)
 mise run typecheck  # Run type checkers
 mise run checks     # Run all checks (lint + typecheck + test)
+```
+
+**TaskIQ Dashboard** (requires dev dependencies):
+```bash
+# Install dev dependencies (includes taskiq-dashboard)
+uv sync --group dev
+
+# Start dashboard (default: http://localhost:8080)
+./scripts/run-dashboard.sh
+
+# Custom host/port
+./scripts/run-dashboard.sh --host 127.0.0.1 --port 3001 --api-token my-secret
+
+# Or run directly
+cd dagster-celery-to-taskiq && uv run --group dev dagster-taskiq worker dashboard
 ```
 
 Pass custom arguments: `mise run test -- -v -k "test_name"`
