@@ -10,3 +10,10 @@ target "dagster-taskiq-demo" {
   tags       = ["dagster-taskiq-demo:latest"]
   platforms  = ["linux/amd64"]
 }
+
+target "taskiq-demo" {
+  context    = "./taskiq-demo"
+  dockerfile = "./Dockerfile"
+  tags       = ["taskiq-demo:latest"]
+  platforms  = ["linux/amd64"]
+}

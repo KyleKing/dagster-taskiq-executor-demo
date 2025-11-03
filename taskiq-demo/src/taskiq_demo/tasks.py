@@ -1,0 +1,50 @@
+"""TaskIQ task definitions and broker wiring."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from taskiq import TaskiqApp
+from taskiq.result import TaskiqResult
+from taskiq_aio_sqs import SQSBroker
+
+from .config import get_settings
+from .logging import configure_logging, get_logger
+
+settings = get_settings()
+configure_logging(settings.log_level_value)
+logger = get_logger(__name__)
+
+broker = SQSBroker(
+    endpoint_url=str(settings.sqs_endpoint_url),
+    sqs_queue_name=settings.sqs_queue_name,
+    region_name=settings.aws_region,
+    aws_access_key_id=settings.aws_access_key_id,
+    aws_secret_access_key=settings.aws_secret_access_key,
+    wait_time_seconds=settings.wait_time_seconds,
+    max_number_of_messages=1,
+    delay_seconds=settings.message_delay_seconds,
+)
+
+taskiq_app = TaskiqApp(broker=broker)
+
+
+@taskiq_app.task
+async def sleep_task(duration_seconds: float) -> dict[str, Any]:
+    """Sleep for a bounded duration to simulate work."""
+    duration = settings.clamp_duration(duration_seconds)
+    logger.info(
+        "task.start",
+        requested_duration=duration_seconds,
+        duration_seconds=duration,
+    )
+    await asyncio.sleep(duration)
+    logger.info("task.complete", duration_seconds=duration)
+    return {"duration_seconds": duration}
+
+
+async def enqueue_sleep(duration_seconds: float) -> TaskiqResult[Any]:
+    """Convenience helper to enqueue a sleep task."""
+    return await sleep_task.kiq(duration_seconds=duration_seconds)
+

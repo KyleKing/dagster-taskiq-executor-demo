@@ -1,0 +1,29 @@
+# TaskIQ demo specific tasks
+
+[env]
+PYTHONPATH = "src"
+
+[tasks.app]
+description = "Run the FastAPI service locally"
+run = "uv run taskiq-demo-api"
+sources = ["pyproject.toml", "src/taskiq_demo/**/*.py"]
+
+[tasks.worker]
+description = "Run the TaskIQ worker locally"
+run = "uv run taskiq-demo-worker"
+sources = ["pyproject.toml", "src/taskiq_demo/**/*.py"]
+
+[tasks.test]
+description = "Run tests with pytest"
+run = "uv run pytest"
+sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
+
+[tasks.format]
+description = "Format code with ruff"
+run = "uv run ruff format"
+sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
+
+[tasks.lint]
+description = "Lint code with ruff"
+run = "uv run ruff check"
+sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
