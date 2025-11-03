@@ -106,7 +106,10 @@ class LoadSimulator:
 
             # Record metrics
             metrics = get_metrics_collector()
-            metrics.increment_counter("runs_submitted", dimensions={"job_name": job_name, "scenario": getattr(self, "_current_scenario", "unknown")})
+            metrics.increment_counter(
+                "runs_submitted",
+                dimensions={"job_name": job_name, "scenario": getattr(self, "_current_scenario", "unknown")},
+            )
 
             return run_id
 

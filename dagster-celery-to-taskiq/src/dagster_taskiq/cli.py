@@ -4,24 +4,105 @@ import uuid
 from collections.abc import Mapping
 from typing import Any, Optional
 
-import click
-import dagster._check as check
+import argparse
 from dagster._config import post_process_config, validate_config
 from dagster._core.errors import DagsterInvalidConfigError
 from dagster._core.instance import DagsterInstance
 from dagster._utils import mkdir_p
 from dagster_shared.yaml_utils import load_yaml_from_path
 
-from dagster_taskiq.executor import TaskiqExecutor, taskiq_executor
+from dagster_taskiq.executor import taskiq_executor
 
 
-def create_worker_cli_group():
-    """Create the worker CLI command group."""
-    group = click.Group(name="worker")
-    group.add_command(worker_start_command)
-    group.add_command(worker_list_command)
-    group.add_command(dashboard_command)
-    return group
+def create_worker_parser(subparsers):
+    """Create the worker subcommand parser."""
+    worker_parser = subparsers.add_parser("worker", help="Worker management commands")
+    worker_subparsers = worker_parser.add_subparsers(dest="worker_command", help="Worker subcommands")
+
+    # start command
+    start_parser = worker_subparsers.add_parser("start", help="Start a dagster-taskiq worker.")
+    start_parser.add_argument(
+        "--name", "-n",
+        type=str,
+        default=None,
+        help='The name of the worker. Defaults to a unique name prefixed with "dagster-taskiq-".'
+    )
+    start_parser.add_argument(
+        "--config-yaml", "-y",
+        type=str,
+        default=None,
+        help=(
+            "Specify the path to a config YAML file with options for the worker. This is the same "
+            "config block that you provide to dagster_taskiq.taskiq_executor when configuring a "
+            "job for execution with Taskiq, with, e.g., the URL of the SQS queue to use."
+        ),
+    )
+    start_parser.add_argument(
+        "--background", "-d",
+        action="store_true",
+        help="Set this flag to run the worker in the background."
+    )
+    start_parser.add_argument(
+        "--workers", "-w",
+        type=int,
+        default=1,
+        help="Number of worker processes to spawn.",
+    )
+    start_parser.add_argument(
+        "--loglevel", "-l",
+        type=str,
+        default="INFO",
+        help="Log level for the worker."
+    )
+    start_parser.add_argument(
+        "--broker", "-b",
+        type=str,
+        default="dagster_taskiq.app:broker",
+        help="Python path to the broker instance (default: dagster_taskiq.app:broker).",
+    )
+    start_parser.add_argument(
+        "additional_args",
+        nargs="*",
+        help="Additional arguments to pass to the worker."
+    )
+
+    # dashboard command
+    dashboard_parser = worker_subparsers.add_parser("dashboard", help="Start the Taskiq dashboard server.")
+    dashboard_parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Host to bind the dashboard server to.",
+    )
+    dashboard_parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind the dashboard server to.",
+    )
+    dashboard_parser.add_argument(
+        "--api-token",
+        type=str,
+        default="default-token",
+        help="API token for dashboard authentication.",
+    )
+    dashboard_parser.add_argument(
+        "--broker", "-b",
+        type=str,
+        default="dagster_taskiq.app:broker",
+        help="Python path to the broker instance.",
+    )
+
+    # list command
+    list_parser = worker_subparsers.add_parser("list", help="List information about the Taskiq queue.")
+    list_parser.add_argument(
+        "--config-yaml", "-y",
+        type=str,
+        default=None,
+        help="Specify the path to a config YAML file with SQS queue configuration."
+    )
+
+    return worker_parser
 
 
 def get_config_value_from_yaml(yaml_path: Optional[str]) -> Mapping[str, Any]:
@@ -134,84 +215,34 @@ def launch_background_worker(subprocess_args, env):
     )
 
 
-@click.command(name="start", help="Start a dagster-taskiq worker.")
-@click.option(
-    "--name",
-    "-n",
-    type=click.STRING,
-    default=None,
-    help=(
-        'The name of the worker. Defaults to a unique name prefixed with "dagster-taskiq-".'
-    ),
-)
-@click.option(
-    "--config-yaml",
-    "-y",
-    type=click.Path(exists=True),
-    default=None,
-    help=(
-        "Specify the path to a config YAML file with options for the worker. This is the same "
-        "config block that you provide to dagster_taskiq.taskiq_executor when configuring a "
-        "job for execution with Taskiq, with, e.g., the URL of the SQS queue to use."
-    ),
-)
-@click.option(
-    "--background", "-d", is_flag=True, help="Set this flag to run the worker in the background."
-)
-@click.option(
-    "--workers",
-    "-w",
-    type=click.INT,
-    default=1,
-    help="Number of worker processes to spawn.",
-)
-@click.option(
-    "--loglevel", "-l", type=click.STRING, default="INFO", help="Log level for the worker."
-)
-@click.option(
-    "--broker",
-    "-b",
-    type=click.STRING,
-    default="dagster_taskiq.app:broker",
-    help="Python path to the broker instance (default: dagster_taskiq.app:broker).",
-)
-@click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
-def worker_start_command(
-    name,
-    config_yaml,
-    background,
-    workers,
-    loglevel,
-    broker,
-    additional_args,
-):
+def worker_start_command(args):
     """Start a Taskiq worker.
 
     This wraps the taskiq CLI and adds Dagster-specific configuration.
     """
-    worker_name = get_worker_name(name)
+    worker_name = get_worker_name(args.name)
 
     # Build taskiq worker command
     subprocess_args = [
         "taskiq",
         "worker",
-        broker,
-        "--log-level", loglevel.upper(),
-        "--workers", str(workers),
+        args.broker,
+        "--log-level", args.loglevel.upper(),
+        "--workers", str(args.workers),
         "dagster_taskiq.tasks",  # Module containing tasks
     ]
 
     # Note: Taskiq doesn't support worker names like Celery
 
     # Add any additional args
-    subprocess_args.extend(additional_args)
+    subprocess_args.extend(args.additional_args)
 
     # Set up environment with config
     env = os.environ.copy()
 
     # If config YAML provided, extract and set environment variables
-    if config_yaml:
-        validated_config = get_validated_config(config_yaml)
+    if args.config_yaml:
+        validated_config = get_validated_config(args.config_yaml)
 
         if validated_config.get("queue_url"):
             env["DAGSTER_TASKIQ_SQS_QUEUE_URL"] = str(validated_config["queue_url"])
@@ -223,94 +254,52 @@ def worker_start_command(
             env["DAGSTER_TASKIQ_SQS_ENDPOINT_URL"] = str(validated_config["endpoint_url"])
 
         # Add config module to PYTHONPATH if needed
-        config_dir = get_config_module(config_yaml)
+        config_dir = get_config_module(args.config_yaml)
         if config_dir:
             existing_pythonpath = env.get("PYTHONPATH", "")
             if existing_pythonpath and not existing_pythonpath.endswith(os.pathsep):
                 existing_pythonpath += os.pathsep
             env["PYTHONPATH"] = f"{existing_pythonpath}{config_dir}{os.pathsep}"
 
-    click.echo(f"Starting Taskiq worker: {worker_name}")
-    click.echo(f"Broker: {broker}")
-    click.echo(f"Workers: {workers}")
-    click.echo(f"Log level: {loglevel}")
+    print(f"Starting Taskiq worker: {worker_name}")
+    print(f"Broker: {args.broker}")
+    print(f"Workers: {args.workers}")
+    print(f"Log level: {args.loglevel}")
 
-    if background:
-        click.echo("Running in background mode...")
+    if args.background:
+        print("Running in background mode...")
         launch_background_worker(subprocess_args, env=env)
-        click.echo("Worker started in background.")
+        print("Worker started in background.")
     else:
         return subprocess.check_call(subprocess_args, env=env)
 
 
-@click.command(
-    name="dashboard",
-    help="Start the Taskiq dashboard server.",
-)
-@click.option(
-    "--host",
-    type=click.STRING,
-    default="0.0.0.0",
-    help="Host to bind the dashboard server to.",
-)
-@click.option(
-    "--port",
-    type=click.INT,
-    default=8080,
-    help="Port to bind the dashboard server to.",
-)
-@click.option(
-    "--api-token",
-    type=click.STRING,
-    default="default-token",
-    help="API token for dashboard authentication.",
-)
-@click.option(
-    "--broker",
-    "-b",
-    type=click.STRING,
-    default="dagster_taskiq.app:broker",
-    help="Python path to the broker instance.",
-)
-def dashboard_command(host, port, api_token, broker):
+def dashboard_command(args):
     """Start the Taskiq dashboard server."""
     try:
         from taskiq_dashboard import TaskiqDashboard
     except ImportError:
-        click.echo("Error: taskiq-dashboard is not installed. Install it with: pip install taskiq-dashboard")
+        print("Error: taskiq-dashboard is not installed. Install it with: pip install taskiq-dashboard")
         return
 
-    click.echo(f"Starting Taskiq dashboard on {host}:{port}")
-    click.echo(f"Broker: {broker}")
+    print(f"Starting Taskiq dashboard on {args.host}:{args.port}")
+    print(f"Broker: {args.broker}")
 
     # Import the broker
-    module_name, attr_name = broker.split(":")
+    module_name, attr_name = args.broker.split(":")
     module = __import__(module_name, fromlist=[attr_name])
     broker_instance = getattr(module, attr_name)
 
     # Create and run the dashboard
     dashboard = TaskiqDashboard(
-        api_token=api_token,
+        api_token=args.api_token,
         broker=broker_instance,
-        uvicorn_kwargs={"host": host, "port": port}
+        uvicorn_kwargs={"host": args.host, "port": args.port}
     )
     dashboard.run()
 
 
-@click.command(
-    name="list",
-    help="List information about the Taskiq queue.",
-)
-@click.option(
-    "--config-yaml",
-    "-y",
-    type=click.Path(exists=True),
-    default=None,
-    help=(
-        "Specify the path to a config YAML file with SQS queue configuration."
-    ),
-)
-def worker_list_command(config_yaml=None):
+def worker_list_command(args):
     """List SQS queue attributes.
 
     Note: Unlike Celery, Taskiq doesn't have a built-in worker registry.
@@ -319,10 +308,10 @@ def worker_list_command(config_yaml=None):
     try:
         import boto3
     except ImportError:
-        click.echo("Error: boto3 is required for this command. Install it with: pip install boto3")
+        print("Error: boto3 is required for this command. Install it with: pip install boto3")
         return
 
-    validated_config = get_validated_config(config_yaml) if config_yaml else {}
+    validated_config = get_validated_config(args.config_yaml) if args.config_yaml else {}
 
     queue_url = validated_config.get(
         "queue_url",
@@ -338,11 +327,11 @@ def worker_list_command(config_yaml=None):
     )
 
     if not queue_url:
-        click.echo("Error: No queue URL configured. Set DAGSTER_TASKIQ_SQS_QUEUE_URL or provide --config-yaml")
+        print("Error: No queue URL configured. Set DAGSTER_TASKIQ_SQS_QUEUE_URL or provide --config-yaml")
         return
 
-    click.echo(f"Queue URL: {queue_url}")
-    click.echo(f"Region: {region_name}")
+    print(f"Queue URL: {queue_url}")
+    print(f"Region: {region_name}")
 
     try:
         sqs = boto3.client(
@@ -362,21 +351,36 @@ def worker_list_command(config_yaml=None):
         )
 
         attrs = response.get("Attributes", {})
-        click.echo("\nQueue Statistics:")
-        click.echo(f"  Messages available: {attrs.get('ApproximateNumberOfMessages', 'N/A')}")
-        click.echo(f"  Messages in flight: {attrs.get('ApproximateNumberOfMessagesNotVisible', 'N/A')}")
-        click.echo(f"  Messages delayed: {attrs.get('ApproximateNumberOfMessagesDelayed', 'N/A')}")
+        print("\nQueue Statistics:")
+        print(f"  Messages available: {attrs.get('ApproximateNumberOfMessages', 'N/A')}")
+        print(f"  Messages in flight: {attrs.get('ApproximateNumberOfMessagesNotVisible', 'N/A')}")
+        print(f"  Messages delayed: {attrs.get('ApproximateNumberOfMessagesDelayed', 'N/A')}")
 
     except Exception as e:
-        click.echo(f"Error querying SQS: {e}")
+        print(f"Error querying SQS: {e}")
 
 
-worker_cli = create_worker_cli_group()
-
-
-@click.group(commands={"worker": worker_cli})
 def main():
     """dagster-taskiq CLI."""
+    parser = argparse.ArgumentParser(description="dagster-taskiq CLI")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Create worker subcommand
+    create_worker_parser(subparsers)
+
+    args = parser.parse_args()
+
+    if args.command == "worker":
+        if args.worker_command == "start":
+            worker_start_command(args)
+        elif args.worker_command == "dashboard":
+            dashboard_command(args)
+        elif args.worker_command == "list":
+            worker_list_command(args)
+        else:
+            parser.print_help()
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":

@@ -474,7 +474,6 @@ name = "dagster-taskiq"
 version = "1!0+dev"
 source = { editable = "." }
 dependencies = [
-    { name = "click" },
     { name = "dagster" },
     { name = "pydantic" },
     { name = "taskiq-aio-sqs" },
@@ -501,7 +500,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=5.0,<9.0" },
     { name = "dagster", specifier = ">=1.0.0" },
     { name = "docker", marker = "extra == 'test'" },
     { name = "kubernetes", marker = "extra == 'kubernetes'" },

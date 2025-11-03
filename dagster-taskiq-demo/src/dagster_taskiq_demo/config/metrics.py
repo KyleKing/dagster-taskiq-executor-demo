@@ -32,7 +32,9 @@ class MetricsCollector:
         """Record a timing metric in seconds."""
         self._record_metric(name, "timing", value, dimensions)
 
-    def _record_metric(self, name: str, metric_type: str, value: float, dimensions: dict[str, str] | None = None) -> None:
+    def _record_metric(
+        self, name: str, metric_type: str, value: float, dimensions: dict[str, str] | None = None
+    ) -> None:
         """Record a metric."""
         metric = {
             "name": name,
