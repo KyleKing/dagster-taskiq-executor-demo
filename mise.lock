@@ -1,5 +1,5 @@
 [[tools."asdf:postgres"]]
-version = "17.6"
+version = "18.0"
 backend = "asdf:postgres"
 
 [[tools.hadolint]]
@@ -32,13 +32,18 @@ version = "1.0.0"
 backend = "pipx:mdformat"
 
 [[tools."pipx:toml-sort"]]
-version = "latest"
+version = "0.24.3"
 backend = "pipx:toml-sort"
 
 [[tools.pkl]]
-version = "0.29.1"
+version = "0.30.0"
 backend = "aqua:apple/pkl"
 
+[tools.pkl.platforms.macos-arm64]
+checksum = "sha256:923a636f2c858029d9bf93f35aeae58ebd9783fbe0209f4787c4eed950142212"
+size = 97035920
+url = "https://github.com/apple/pkl/releases/download/0.30.0/pkl-macos-aarch64"
+
 [[tools.python]]
-version = "3.13.7"
+version = "3.13.9"
 backend = "core:python"

@@ -1,0 +1,12 @@
+# Full Docs: https://pitchfork.jdx.dev/cli
+#
+# pitchfork start --all
+# pitchfork logs --tail
+# pitchfork stop ??
+# pitchfork clean
+
+[daemons.localstack]
+run = "mise run localstack:start"
+# Maps to 127.0.0.1 (https://blog.localstack.cloud/2024-03-04-making-connecting-to-localstack-easier/)
+# Dashboard: https://app.localstack.cloud
+ready.http = { url = "localhost.localstack.cloud:4566" }

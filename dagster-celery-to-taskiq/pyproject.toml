@@ -11,7 +11,7 @@ dev = [
   "pytest>=8.4.2",
   "moto[s3,sqs,server]>=5.0.0",
   "taskiq-dashboard>=0.2.0",
-  "docker>=7.1.0" # Find alternative
+  "docker>=7.1.0", # Find alternative
 ]
 
 [project]
@@ -21,7 +21,7 @@ description = "Package for using Taskiq as Dagster's execution engine."
 requires-python = ">=3.11.11"
 license = "Apache-2.0"
 authors = [
-  {name = "Kyle King", email = "dev.act.kyle@gmail.com"}
+  {name = "Kyle King", email = "dev.act.kyle@gmail.com"},
 ]
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
@@ -33,7 +33,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
-  "Operating System :: OS Independent"
+  "Operating System :: OS Independent",
 ]
 dependencies = [
   "aioboto3>=13.0.0",
@@ -108,7 +108,7 @@ ignore = [
   "TD001", # Invalid TODO tag: `FIXME`
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
-  "TRY003" # Avoid specifying long messages outside the exception class
+  "TRY003", # Avoid specifying long messages outside the exception class
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -132,7 +132,7 @@ known-first-party = ["dagster_taskiq"]
   "S108", # Probable insecure usage of temporary file or directory
   "SLF001", # Private member accessed
   "ARG001", # Unused function argument
-  "ARG002" # Unused method argument
+  "ARG002", # Unused method argument
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -1,36 +1,31 @@
 [task_config]
-includes = [ "../tasks.toml" ]
+includes = ["../tasks.toml"]
 
-[tasks."pulumi:up"]
-description = "Deploy infrastructure with Pulumi (update)"
-run = "uv run pulumi up --yes --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
+[tasks."pulumi:config"]
+description = "Show Pulumi configuration"
+run = "uv run pulumi config --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:down"]
 description = "Destroy infrastructure with Pulumi"
 confirm = "Are you sure you want to destroy the infrastructure?"
 run = "uv run pulumi destroy --yes --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
-
-[tasks."pulumi:preview"]
-description = "Preview infrastructure changes"
-run = "uv run pulumi preview --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
-
-[tasks."pulumi:refresh"]
-description = "Refresh Pulumi state"
-run = "uv run pulumi refresh --yes --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:outputs"]
 description = "Show Pulumi stack outputs"
 run = "uv run pulumi stack output --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
-[tasks."pulumi:config"]
-description = "Show Pulumi configuration"
-run = "uv run pulumi config --stack local"
-env = { PULUMI_CONFIG_PASSPHRASE = "localstack" }
+[tasks."pulumi:preview"]
+description = "Preview infrastructure changes"
+run = "uv run pulumi preview --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."pulumi:refresh"]
+description = "Refresh Pulumi state"
+run = "uv run pulumi refresh --yes --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:reset"]
 description = "Reset LocalStack and Pulumi state"
@@ -41,3 +36,8 @@ run = [
 ]
 wait_for = ["localstack:stop"]
 depends_post = ["pulumi:refresh"]
+
+[tasks."pulumi:up"]
+description = "Deploy infrastructure with Pulumi (update)"
+run = "uv run pulumi up --yes --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}

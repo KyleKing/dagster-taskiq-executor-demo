@@ -45,7 +45,7 @@ run = [
   "mise -C dagster-celery-to-taskiq run checks",
   "mise -C dagster-celery-to-taskiq/example run checks",
   "mise -C dagster-taskiq-demo run checks",
-  "mise -C taskiq-aio-multi-sqs run checks",
+  # "mise -C taskiq-aio-multi-sqs run checks",
   "mise -C deploy run checks",
   "mise -C taskiq-demo run checks",
 ]
@@ -64,7 +64,7 @@ if [ -n "$REPO_URI" ]; then
   awslocal ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
     docker login --username AWS --password-stdin "${REPO_URI%%/*}"
 else
-  echo "ECR repository not found. Run 'mise run infra:up' first."
+  echo "ECR repository not found. Run 'mise --cd deploy run pulumi:up' first."
   exit 1
 fi
 '''
@@ -91,7 +91,7 @@ run = [
   "mise -C dagster-celery-to-taskiq run test",
   "mise -C dagster-celery-to-taskiq/example run test",
   "mise -C dagster-taskiq-demo run test",
-  "mise -C taskiq-aio-multi-sqs run test",
+  # "mise -C taskiq-aio-multi-sqs run test",
   "mise -C deploy run test",
   "mise -C taskiq-demo run test",
 ]
@@ -102,18 +102,18 @@ run = [
   "mise -C dagster-celery-to-taskiq run fixes",
   "mise -C dagster-celery-to-taskiq/example run fixes",
   "mise -C dagster-taskiq-demo run fixes",
-  "mise -C taskiq-aio-multi-sqs run fixes",
+  # "mise -C taskiq-aio-multi-sqs run fixes",
   "mise -C deploy run fixes",
   "mise -C taskiq-demo run fixes",
 ]
 
-[tasks.install]
+[tasks."install:all"]
 description = "Install all project dependencies"
 run = [
   "mise -C dagster-celery-to-taskiq run install",
   "mise -C dagster-celery-to-taskiq/example run install",
   "mise -C dagster-taskiq-demo run install",
-  "mise -C taskiq-aio-multi-sqs run install",
+  # "mise -C taskiq-aio-multi-sqs run install",
   "mise -C deploy run install",
   "mise -C taskiq-demo run install",
 ]
@@ -129,7 +129,7 @@ run = "mise run localstack:start --detach"
 wait_for = ["localstack:stop"]
 
 [tasks."localstack:start"]
-description = "Start LocalStack container"
+description = "Start LocalStack container (or run in background with `pitchfork start localstack`)"
 alias = "start"
 run = "docker compose up --build --remove-orphans"
 
@@ -158,20 +158,22 @@ sources = ["**/*.md"]
 description = "Bump all tool versions to latest and update mise.toml/lock"
 run = "mise up --bump"
 
+[tasks."pkl:format"]
+description = "Format all pkl files"
+run = "pkl format --write hk.pkl"
+sources = ["hk.pkl"]
+
 [tasks.toml-sort]
 description = "Format all toml files"
-# FYI: Currently only formats pyproject.toml because mise.toml are manually sorted
-run = "toml-sort --in-place **/pyproject.toml"
-sources = ["**/pyproject.toml"]
+run = "toml-sort --trailing-comma-inline-array --in-place **/*.toml"
+sources = ["**/*.toml"]
 
 [tools]
-"asdf:postgres" = "17"
+"asdf:postgres" = "18"
 hadolint = "latest"
-hk = "latest"
-node = "latest"
+node = "latest"  # Why do I need node?
 "pipx:awscli-local" = "latest"
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
 python = "3.13"
-pkl = "latest"
 "pipx:commitizen" = "latest"
