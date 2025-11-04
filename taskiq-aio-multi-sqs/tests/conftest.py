@@ -17,6 +17,7 @@ EXTENDED_BUCKET = "extendeded-bucket"
 FIFO_QUEUE_NAME = "test-request.fifo"
 
 QUEUE_NAME = "test-request-2"
+ADDITIONAL_QUEUE_NAME = "test-request-3"
 
 
 class AWSCredentials(TypedDict):
@@ -71,6 +72,14 @@ async def fifo_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
 @pytest.fixture(scope="function")
 async def sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     response = await sqs_client.create_queue(QueueName=QUEUE_NAME)
+    queue_url = response["QueueUrl"]
+    yield queue_url
+    await sqs_client.delete_queue(QueueUrl=queue_url)
+
+
+@pytest.fixture(scope="function")
+async def additional_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
+    response = await sqs_client.create_queue(QueueName=ADDITIONAL_QUEUE_NAME)
     queue_url = response["QueueUrl"]
     yield queue_url
     await sqs_client.delete_queue(QueueUrl=queue_url)
@@ -138,6 +147,25 @@ async def sqs_broker(
     assert broker._sqs_queue_url
     assert broker._s3_client
     yield broker
+    await broker.shutdown()
+
+
+@pytest.fixture(scope="function")
+async def sqs_multi_queue_broker(
+    aws_credentials: AWSCredentials,
+    sqs_queue: str,
+    additional_sqs_queue: str,
+    extended_s3_bucket: str,
+) -> AsyncGenerator[tuple[SQSBroker, dict[str, str]], Any]:
+    queue_names = [QUEUE_NAME, ADDITIONAL_QUEUE_NAME]
+    queue_urls = {QUEUE_NAME: sqs_queue, ADDITIONAL_QUEUE_NAME: additional_sqs_queue}
+    broker = SQSBroker(
+        sqs_queue_names=queue_names,
+        s3_extended_bucket_name=extended_s3_bucket,
+        **aws_credentials,
+    )
+    await broker.startup()
+    yield broker, queue_urls
     await broker.shutdown()
 
 

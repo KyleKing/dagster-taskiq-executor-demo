@@ -93,6 +93,41 @@ async def main():
 
 ```
 
+### Multiple Priority Queues
+
+You can supply several queue names to a single broker. The broker will always
+drain the first queue in the list before checking the next one, giving you a
+simple way to prioritise work without relying on per-message delays.
+
+```python
+from taskiq_aio_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
+
+broker = SQSBroker(
+    endpoint_url="http://localhost:4566",
+    sqs_queue_names=["sla-1m", "sla-5m", "sla-20m"],
+)
+
+
+@broker.task()
+async def urgent_task() -> None:
+    ...
+
+
+@broker.task()
+async def slow_path_task() -> None:
+    ...
+
+
+async def main() -> None:
+    await broker.startup()
+    # Routed to the first queue automatically.
+    await urgent_task.kiq()
+    # Explicitly target the slow queue via the queue label.
+    await slow_path_task.kicker().with_labels(
+        **{DEFAULT_PRIORITY_QUEUE_LABEL: "sla-20m"}
+    ).kiq()
+```
+
 ### Extended Messages with S3:
 
 You can also use S3 to store messages that are too large for SQS. To do this, you need to set the `s3_extended_bucket_name` parameter in the broker configuration.
@@ -140,6 +175,7 @@ async def main():
 SQS Broker parameters:
 * `endpoint_url` - url to access sqs, this is particularly useful if running on ECS.
 * `sqs_queue_name` - name of the sqs queue.
+* `sqs_queue_names` - ordered list of queue names to poll (highest priority first).
 * `region_name` - region name, defaults to `us-east-1`.
 * `aws_access_key_id` - aws access key id (Optional).
 * `aws_secret_access_key` - aws secret access key (Optional).
@@ -153,6 +189,7 @@ SQS Broker parameters:
 * `task_id_generator` - custom task_id generator (Optional).
 * `result_backend` - custom result backend (Optional).
 * `is_fair_queue` - : Whether the queue is a fair queue, if True, it will use the `task_name` as the MessageGroupId for all messages.
+* `queue_selector_label` - label key used to choose between configured queues when scheduling tasks.
 
 
 S3 Result Backend parameters:

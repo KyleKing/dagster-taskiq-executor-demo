@@ -2,3 +2,6 @@ DEFAULT_REGION = "us-east-1"
 
 MAX_NUMBER_OF_MESSAGES = 10
 MAX_SQS_MESSAGE_SIZE = 1048576  # 1 MB
+
+# Label key used to choose between configured priority queues.
+DEFAULT_PRIORITY_QUEUE_LABEL = "queue"

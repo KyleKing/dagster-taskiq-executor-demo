@@ -3,14 +3,8 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    AsyncGenerator,
-    Awaitable,
-    Callable,
-    Generator,
-)
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Annotated, AsyncGenerator, Awaitable, Callable, Generator
 
 from aiobotocore.session import get_session
 from annotated_types import Ge, Le
@@ -42,7 +36,9 @@ class SQSBroker(AsyncBroker):
     def __init__(
         self,
         endpoint_url: str,
-        sqs_queue_name: str,
+        sqs_queue_name: str | None = None,
+        *,
+        sqs_queue_names: Sequence[str] | None = None,
         region_name: str = constants.DEFAULT_REGION,
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
@@ -52,22 +48,24 @@ class SQSBroker(AsyncBroker):
         delay_seconds: int = 0,
         s3_extended_bucket_name: str | None = None,
         is_fair_queue: bool = False,
+        queue_selector_label: str = constants.DEFAULT_PRIORITY_QUEUE_LABEL,
     ) -> None:
         """Initialize the SQS broker.
 
         :param endpoint_url: The SQS endpoint URL.
-        :param sqs_queue_name: The name of the SQS queue.
+        :param sqs_queue_name: The primary SQS queue name (used when ``sqs_queue_names`` is not provided).
+        :param sqs_queue_names: Optional ordered queue names (highest priority first) to poll.
         :param region_name: The AWS region name.
         :param aws_access_key_id: The AWS access key ID.
         :param aws_secret_access_key: The AWS secret access key.
         :param use_task_id_for_deduplication: Whether to use task ID for deduplication.
         :param wait_time_seconds: The wait time for long polling.
-        :param max_number_of_messages: The maximum number of messages to retrieve
-        (0-10).
-        :param delay_seconds: The delay for message delivery (0-900), defatults to 0.
+        :param max_number_of_messages: The maximum number of messages to retrieve (0-10).
+        :param delay_seconds: The delay for message delivery (0-900), defaults to 0.
         :param s3_extended_bucket_name: The S3 bucket name for extended storage.
         :param is_fair_queue: Whether the queue is a fair queue, if True, it will use
         the task_name as the MessageGroupId for all messages.
+        :param queue_selector_label: Task label used to choose between configured queues when kicking.
 
 
         :raises BrokerInputConfigError: If the configuration is invalid.
@@ -78,11 +76,33 @@ class SQSBroker(AsyncBroker):
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_endpoint_url = endpoint_url
-        self._sqs_queue_name = sqs_queue_name
-        self._is_fifo_queue = True if ".fifo" in sqs_queue_name else False
+
+        candidate_names: list[str] = []
+        if sqs_queue_names:
+            candidate_names.extend([str(name) for name in sqs_queue_names if str(name)])
+        if sqs_queue_name:
+            candidate_names.insert(0, str(sqs_queue_name))
+        if not candidate_names:
+            raise exceptions.BrokerConfigError(error="At least one SQS queue name must be configured")
+
+        seen: set[str] = set()
+        queue_names: list[str] = []
+        for name in candidate_names:
+            if name in seen:
+                continue
+            seen.add(name)
+            queue_names.append(name)
+
+        self._queue_names = queue_names
+        self._primary_queue_name = queue_names[0]
+        self._queue_urls: dict[str, str] = {}
+
+        self._sqs_queue_name = self._primary_queue_name
+        self._is_fifo_queue = self._primary_queue_name.endswith(".fifo")
         self._is_fair_queue = is_fair_queue
         self._sqs_queue_url: str | None = None
         self._session = get_session()
+        self._queue_selector_label = queue_selector_label or constants.DEFAULT_PRIORITY_QUEUE_LABEL
 
         try:
             self.max_number_of_messages = MaxNumberOfMessages.validate_python(
@@ -163,21 +183,27 @@ class SQSBroker(AsyncBroker):
         if self.s3_extended_bucket_name:
             await self._s3_client_context_creator.__aexit__(None, None, None)
 
-    async def _get_queue_url(self) -> str:
-        if not self._sqs_queue_url:
+    async def _get_queue_url_for(self, queue_name: str) -> str:
+        if queue_name not in self._queue_urls:
             with self.handle_exceptions():
-                queue_result: "GetQueueUrlResultTypeDef" = (
-                    await self._sqs_client.get_queue_url(QueueName=self._sqs_queue_name)
+                queue_result: "GetQueueUrlResultTypeDef" = await self._sqs_client.get_queue_url(
+                    QueueName=queue_name
                 )
-                self._sqs_queue_url = queue_result["QueueUrl"]
+            queue_url = queue_result["QueueUrl"]
+            self._queue_urls[queue_name] = queue_url
+            if queue_name == self._primary_queue_name:
+                self._sqs_queue_url = queue_url
+        return self._queue_urls[queue_name]
 
-        return self._sqs_queue_url
+    async def _get_queue_url(self) -> str:
+        return await self._get_queue_url_for(self._primary_queue_name)
 
     async def startup(self) -> None:
         """Starts the SQS broker."""
         self._sqs_client = await self._get_sqs_client()
         self._s3_client = await self._get_s3_client()
-        await self._get_queue_url()
+        for name in self._queue_names:
+            await self._get_queue_url_for(name)
         await super().startup()
 
     async def shutdown(self) -> None:
@@ -195,7 +221,24 @@ class SQSBroker(AsyncBroker):
         add additional kwargs in the message delivery.
         :param message: BrokerMessage object.
         """
-        queue_url = await self._get_queue_url()
+        queue_name = self._primary_queue_name
+        if self._queue_selector_label in message.labels:
+            label_value = message.labels[self._queue_selector_label]
+            if isinstance(label_value, (list, tuple)):
+                if label_value:
+                    label_value = label_value[0]
+                else:
+                    label_value = None
+            if label_value is not None:
+                queue_name = str(label_value).strip()
+        if not queue_name:
+            queue_name = self._primary_queue_name
+        if queue_name not in self._queue_names:
+            raise exceptions.BrokerConfigError(
+                error=f"Queue '{queue_name}' is not configured for this broker"
+            )
+
+        queue_url = await self._get_queue_url_for(queue_name)
 
         kwargs: "SendMessageRequestTypeDef" = {
             "QueueUrl": queue_url,
@@ -281,35 +324,41 @@ class SQSBroker(AsyncBroker):
         :yield: incoming AckableMessages.
         :return: nothing.
         """
-        queue_url = await self._get_queue_url()
-
         while True:
-            results = await self._sqs_client.receive_message(
-                QueueUrl=queue_url,
-                MaxNumberOfMessages=self.max_number_of_messages,
-                MessageAttributeNames=["All"],
-                WaitTimeSeconds=self.wait_time_seconds,
-            )
-            messages: list["MessageTypeDef"] = results.get("Messages", [])
+            for index, queue_name in enumerate(self._queue_names):
+                queue_url = await self._get_queue_url_for(queue_name)
+                wait_time = self.wait_time_seconds if index == 0 else 0
 
-            for message in messages:
-                body = message.get("Body")
-                receipt_handle = message.get("ReceiptHandle")
-                attributes = message.get("MessageAttributes", {})
-                if body and receipt_handle:
-                    if attributes.get("s3_extended_message"):
-                        loaded_data = json.loads(body)
-                        s3_object = await self._s3_client.get_object(
-                            Bucket=loaded_data["s3_bucket"],
-                            Key=loaded_data["s3_key"],
-                        )
-                        async with s3_object["Body"] as s3_body:
+                results = await self._sqs_client.receive_message(
+                    QueueUrl=queue_url,
+                    MaxNumberOfMessages=self.max_number_of_messages,
+                    MessageAttributeNames=["All"],
+                    WaitTimeSeconds=wait_time,
+                )
+                messages: list["MessageTypeDef"] = results.get("Messages", [])
+
+                if not messages:
+                    continue
+
+                for message in messages:
+                    body = message.get("Body")
+                    receipt_handle = message.get("ReceiptHandle")
+                    attributes = message.get("MessageAttributes", {})
+                    if body and receipt_handle:
+                        if attributes.get("s3_extended_message"):
+                            loaded_data = json.loads(body)
+                            s3_object = await self._s3_client.get_object(
+                                Bucket=loaded_data["s3_bucket"],
+                                Key=loaded_data["s3_key"],
+                            )
+                            async with s3_object["Body"] as s3_body:
+                                yield AckableMessage(
+                                    data=await s3_body.read(),
+                                    ack=self.build_ack_fnx(queue_url, receipt_handle),
+                                )
+                        else:
                             yield AckableMessage(
-                                data=await s3_body.read(),
+                                data=body.encode("utf-8"),
                                 ack=self.build_ack_fnx(queue_url, receipt_handle),
                             )
-                    else:
-                        yield AckableMessage(
-                            data=body.encode("utf-8"),
-                            ack=self.build_ack_fnx(queue_url, receipt_handle),
-                        )
+                break

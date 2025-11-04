@@ -3,7 +3,7 @@ import json
 import pytest
 from taskiq import BrokerMessage
 
-from taskiq_aio_sqs import SQSBroker
+from taskiq_aio_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
 from taskiq_aio_sqs.exceptions import (
     BrokerConfigError,
     QueueNotFoundError,
@@ -162,3 +162,71 @@ async def test_kick_with_delay_incorrect_param(
         match="'DelaySeconds' must be between 0 and 900, got not-an-integer",
     ):
         await sqs_broker.kick(delayed_broker_message)
+
+
+@pytest.mark.asyncio
+async def test_kick_respects_queue_label(
+    sqs_multi_queue_broker: tuple[SQSBroker, dict[str, str]],
+) -> None:
+    broker, queue_urls = sqs_multi_queue_broker
+    queue_names = list(queue_urls.keys())
+    default_queue = queue_names[0]
+    secondary_queue = queue_names[1]
+
+    default_message = BrokerMessage(
+        task_id="default-task",
+        task_name="default-task",
+        message=b"default",
+        labels={},
+    )
+    await broker.kick(default_message)
+
+    labelled_message = BrokerMessage(
+        task_id="labelled-task",
+        task_name="labelled-task",
+        message=b"labelled",
+        labels={DEFAULT_PRIORITY_QUEUE_LABEL: secondary_queue},
+    )
+    await broker.kick(labelled_message)
+
+    # Default message should land on the primary queue.
+    default_response = await broker._sqs_client.receive_message(
+        QueueUrl=queue_urls[default_queue],
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=1,
+    )
+    assert "Messages" in default_response
+    assert default_response["Messages"][0]["Body"] == "default"
+    await broker._sqs_client.delete_message(
+        QueueUrl=queue_urls[default_queue],
+        ReceiptHandle=default_response["Messages"][0]["ReceiptHandle"],
+    )
+
+    # Labelled message should land on the requested queue.
+    labelled_response = await broker._sqs_client.receive_message(
+        QueueUrl=queue_urls[secondary_queue],
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=1,
+    )
+    assert "Messages" in labelled_response
+    assert labelled_response["Messages"][0]["Body"] == "labelled"
+    await broker._sqs_client.delete_message(
+        QueueUrl=queue_urls[secondary_queue],
+        ReceiptHandle=labelled_response["Messages"][0]["ReceiptHandle"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_kick_invalid_queue_label(
+    sqs_multi_queue_broker: tuple[SQSBroker, dict[str, str]],
+) -> None:
+    broker, _ = sqs_multi_queue_broker
+    invalid_message = BrokerMessage(
+        task_id="invalid-task",
+        task_name="invalid-task",
+        message=b"oops",
+        labels={DEFAULT_PRIORITY_QUEUE_LABEL: "not-configured"},
+    )
+
+    with pytest.raises(BrokerConfigError, match="Queue 'not-configured' is not configured"):
+        await broker.kick(invalid_message)

@@ -137,3 +137,34 @@ async def test_listen_with_delay_seconds_as_label(
 
     # Verify message content
     assert received_message.data == b"test_message"
+
+
+@pytest.mark.asyncio
+async def test_listen_prioritises_high_queue(
+    sqs_multi_queue_broker: tuple[SQSBroker, dict[str, str]],
+) -> None:
+    broker, queue_urls = sqs_multi_queue_broker
+    queue_names = list(queue_urls.keys())
+    high_queue = queue_names[0]
+    low_queue = queue_names[1]
+
+    # Enqueue a low-priority message first to ensure it is waiting in the queue.
+    await broker._sqs_client.send_message(
+        QueueUrl=queue_urls[low_queue],
+        MessageBody="low",
+    )
+
+    # Then enqueue a high-priority message.
+    await broker._sqs_client.send_message(
+        QueueUrl=queue_urls[high_queue],
+        MessageBody="high",
+    )
+
+    received_messages: list[str] = []
+    async for message in broker.listen():
+        received_messages.append(message.data.decode())
+        await message.ack()  # type: ignore[arg-type]
+        if len(received_messages) == 2:
+            break
+
+    assert received_messages == ["high", "low"]
