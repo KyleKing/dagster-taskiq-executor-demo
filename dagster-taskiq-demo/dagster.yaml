@@ -12,16 +12,3 @@ storage:
       port:
         env: POSTGRES_PORT
     should_autocreate_tables: true
-
-run_coordinator:
-  module: dagster._core.run_coordinator
-  class: DefaultRunCoordinator
-
-run_launcher:
-  module: dagster._core.launcher
-  class: DefaultRunLauncher
-
-compute_logs:
-  module: dagster._core.storage.noop_compute_log_manager
-  class: NoOpComputeLogManager
-

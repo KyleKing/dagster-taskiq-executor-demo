@@ -23,8 +23,8 @@ ENV PIP_NO_CACHE_DIR=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv
 
 ENV DAGSTER_HOME=/opt/dagster/dagster_home
-RUN mkdir -p $DAGSTER_HOME \
-    && chown -R nonroot:nonroot /opt/dagster
+COPY ./dagster.yaml /opt/dagster/dagster_home/dagster.yaml
+RUN chown -R nonroot:nonroot /opt/dagster
 
 COPY --from=dagster-celery-to-taskiq uv.lock /dagster-celery-to-taskiq/uv.lock
 COPY --from=dagster-celery-to-taskiq pyproject.toml /dagster-celery-to-taskiq/pyproject.toml
@@ -39,10 +39,5 @@ COPY --chown=nonroot:nonroot . /app
 RUN --mount=type=cache,id=uv-cache,sharing=locked,target=/root/.cache/uv \
     uv sync --locked --no-dev --offline
 
-# Copy and set up entrypoint script
-COPY --chown=nonroot:nonroot entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
 USER nonroot
-ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["dagster-daemon", "run", "-m", "dagster_taskiq_demo.main"]

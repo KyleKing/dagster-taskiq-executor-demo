@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from .settings import Settings, settings
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from .dagster import DagsterPostgreSQLConfig, get_dagster_instance_config
     from .database import (
         DatabaseConnectionManager,
         create_dagster_instance_with_retry,
@@ -18,12 +17,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from .metrics import MetricsCollector, get_metrics_collector
 
 __all__ = [
-    "DagsterPostgreSQLConfig",
     "DatabaseConnectionManager",
     "MetricsCollector",
     "Settings",
     "create_dagster_instance_with_retry",
-    "get_dagster_instance_config",
     "get_database_manager",
     "get_metrics_collector",
     "settings",
@@ -32,8 +29,6 @@ __all__ = [
 
 
 _LAZY_IMPORTS = {
-    "DagsterPostgreSQLConfig": ("dagster", "DagsterPostgreSQLConfig"),
-    "get_dagster_instance_config": ("dagster", "get_dagster_instance_config"),
     "DatabaseConnectionManager": ("database", "DatabaseConnectionManager"),
     "create_dagster_instance_with_retry": ("database", "create_dagster_instance_with_retry"),
     "get_database_manager": ("database", "get_database_manager"),
