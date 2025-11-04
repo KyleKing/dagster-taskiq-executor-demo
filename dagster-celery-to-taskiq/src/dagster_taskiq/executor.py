@@ -117,6 +117,15 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
     # Ensure result backend is started if it exists
     if hasattr(broker, 'result_backend') and broker.result_backend:
         await broker.result_backend.startup()
+        plan_context.log.debug(
+            f"Result backend configured: {type(broker.result_backend).__name__} "
+            f"for step '{step.key}'"
+        )
+    else:
+        plan_context.log.warning(
+            f"No result backend configured on broker for step '{step.key}'. "
+            f"Results may not be retrievable."
+        )
 
     execute_step_args = ExecuteStepArgs(
         job_origin=plan_context.reconstructable_job.get_python_origin(),
@@ -144,6 +153,13 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
         execute_step_args_packed=pack_value(execute_step_args),
         executable_dict=plan_context.reconstructable_job.to_dict(),
     )
+
+    # Verify task result has access to result backend
+    if hasattr(task_result, 'broker') and hasattr(task_result.broker, 'result_backend'):
+        plan_context.log.debug(
+            f"Task result for step '{step.key}' has result backend: "
+            f"{type(task_result.broker.result_backend).__name__ if task_result.broker.result_backend else 'None'}"
+        )
 
     return {'result': task_result, 'task_id': str(task_result.task_id)}
 

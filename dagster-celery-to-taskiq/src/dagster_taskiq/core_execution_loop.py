@@ -147,21 +147,37 @@ async def core_taskiq_execution_loop(
 
                         try:
                             task_result = waiter.result()
-                            if hasattr(task_result, 'raise_for_error'):
-                                task_result.raise_for_error()
-                            if hasattr(task_result, 'return_value'):
-                                step_events = task_result.return_value
+
+                            if task_result is not None:
+                                # Handle TaskiqResult objects that may wrap the actual return value
+                                if hasattr(task_result, 'raise_for_error'):
+                                    task_result.raise_for_error()
+                                if hasattr(task_result, 'return_value'):
+                                    step_events = task_result.return_value
+                                else:
+                                    step_events = task_result
                             else:
-                                step_events = task_result
-                        except Exception:
+                                step_events = None
+                        except Exception as e:
+                            job_context.log.error(
+                                f"Error getting result for step {step_key}: {e}",
+                                exc_info=True,
+                            )
                             step_events = []
                             step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
                             await _request_task_cancellations(reason='step failure')
 
                         # Handle None or non-iterable step_events
                         if step_events is None:
+                            job_context.log.warning(
+                                f"Step {step_key} returned None result. Events may be missing."
+                            )
                             step_events = []
                         elif not isinstance(step_events, (list, tuple)):
+                            job_context.log.warning(
+                                f"Step {step_key} returned non-list result: {type(step_events)}. "
+                                f"Attempting to convert to list."
+                            )
                             # If it's not a list/tuple, try to make it iterable
                             step_events = [step_events] if step_events else []
 
@@ -204,12 +220,62 @@ async def core_taskiq_execution_loop(
                                 active_execution.get_known_state(),
                             )
                             result_handle = step_results[step.key]['result']
-                            wait_result_fn = getattr(result_handle, 'wait_result', None)
-                            check.invariant(
-                                callable(wait_result_fn),
-                                'Taskiq result handle missing wait_result() method.',
-                            )
-                            step_results[step.key]['waiter'] = asyncio.create_task(wait_result_fn())
+                            task_id = step_results[step.key]['task_id']
+
+                            # Create a waiter that tries wait_result() first, then falls back to direct S3 backend access
+                            async def _wait_for_result():
+                                """Wait for task result, using S3 backend if wait_result() fails."""
+                                try:
+                                    # First try the standard wait_result() method
+                                    wait_result_fn = getattr(result_handle, 'wait_result', None)
+                                    if wait_result_fn:
+                                        result = await wait_result_fn()
+                                        if result is not None:
+                                            return result
+
+                                    # If wait_result() returned None or doesn't exist, use S3 backend directly
+                                    if hasattr(broker, 'result_backend') and broker.result_backend and task_id:
+                                        job_context.log.debug(
+                                            f"Using S3 result backend directly for step {step.key}, task {task_id}"
+                                        )
+                                        # Poll the S3 backend until result is ready
+                                        result_backend = broker.result_backend
+                                        max_wait_seconds = 300  # 5 minutes max wait
+                                        wait_interval = 0.5  # Check every 500ms
+                                        elapsed = 0
+
+                                        while elapsed < max_wait_seconds:
+                                            try:
+                                                if await result_backend.is_result_ready(task_id):
+                                                    backend_result = await result_backend.get_result(task_id)
+                                                    if hasattr(backend_result, 'return_value'):
+                                                        return backend_result.return_value
+                                                    return backend_result
+                                            except Exception as e:
+                                                # Result not ready yet, continue waiting
+                                                if "ResultIsMissingError" not in str(type(e)):
+                                                    job_context.log.debug(
+                                                        f"Error checking result for step {step.key}: {e}"
+                                                    )
+
+                                            await asyncio.sleep(wait_interval)
+                                            elapsed += wait_interval
+
+                                        raise TimeoutError(
+                                            f"Result for step {step.key} (task {task_id}) not available after {max_wait_seconds}s"
+                                        )
+
+                                    # No result backend available
+                                    return None
+
+                                except Exception as e:
+                                    job_context.log.error(
+                                        f"Error waiting for result for step {step.key}: {e}",
+                                        exc_info=True,
+                                    )
+                                    raise
+
+                            step_results[step.key]['waiter'] = asyncio.create_task(_wait_for_result())
 
                         except Exception:
                             yield DagsterEvent.engine_event(
