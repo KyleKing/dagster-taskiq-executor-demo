@@ -42,8 +42,8 @@ sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
 [tasks."checks:all"]
 description = "Check all projects"
 run = [
-  "mise -C dagster-celery-to-taskiq run checks",
-  "mise -C dagster-celery-to-taskiq/example run checks",
+  "mise -C dagster-taskiq run checks",
+  "mise -C dagster-taskiq/example run checks",
   "mise -C dagster-taskiq-demo run checks",
   "mise -C taskiq-aio-multi-sqs run checks",
   "mise -C deploy run checks",
@@ -88,8 +88,8 @@ run = [
 [tasks."test:all"]
 description = "Test all projects"
 run = [
-  "mise -C dagster-celery-to-taskiq run test",
-  "mise -C dagster-celery-to-taskiq/example run test",
+  "mise -C dagster-taskiq run test",
+  "mise -C dagster-taskiq/example run test",
   "mise -C dagster-taskiq-demo run test",
   "mise -C taskiq-aio-multi-sqs run test",
   "mise -C deploy run test",
@@ -99,8 +99,8 @@ run = [
 [tasks."fixes:all"]
 description = "Lint and auto-fix all projects"
 run = [
-  "mise -C dagster-celery-to-taskiq run fixes",
-  "mise -C dagster-celery-to-taskiq/example run fixes",
+  "mise -C dagster-taskiq run fixes",
+  "mise -C dagster-taskiq/example run fixes",
   "mise -C dagster-taskiq-demo run fixes",
   "mise -C taskiq-aio-multi-sqs run fixes",
   "mise -C deploy run fixes",
@@ -110,8 +110,8 @@ run = [
 [tasks."install:all"]
 description = "Install all project dependencies"
 run = [
-  "mise -C dagster-celery-to-taskiq run install",
-  "mise -C dagster-celery-to-taskiq/example run install",
+  "mise -C dagster-taskiq run install",
+  "mise -C dagster-taskiq/example run install",
   "mise -C dagster-taskiq-demo run install",
   "mise -C taskiq-aio-multi-sqs run install",
   "mise -C deploy run install",

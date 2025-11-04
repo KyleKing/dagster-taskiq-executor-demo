@@ -1,7 +1,7 @@
 """Exactly-once verification tooling for load simulation.
 
 NOTE: This verification was designed for the custom TaskIQ executor implementation
-that used PostgreSQL idempotency storage. The current dagster-celery-to-taskiq
+that used PostgreSQL idempotency storage. The current dagster-taskiq
 implementation uses taskiq's result backend instead. This verification is not
 compatible with the current executor.
 """
@@ -48,7 +48,7 @@ class ExactlyOnceVerifier:
         """
         raise NotImplementedError(
             "This verification was designed for the custom TaskIQ executor implementation "
-            "that used PostgreSQL idempotency storage. The current dagster-celery-to-taskiq "
+            "that used PostgreSQL idempotency storage. The current dagster-taskiq "
             "implementation uses taskiq's result backend instead and does not support this "
             "verification mechanism."
         )
@@ -66,7 +66,7 @@ class ExactlyOnceVerifier:
         """
         raise NotImplementedError(
             "This verification was designed for the custom TaskIQ executor implementation "
-            "that used PostgreSQL idempotency storage. The current dagster-celery-to-taskiq "
+            "that used PostgreSQL idempotency storage. The current dagster-taskiq "
             "implementation uses taskiq's result backend instead and does not support this "
             "verification mechanism."
         )

@@ -7,11 +7,11 @@ min_hk_version = "1.20.0"
 
 local linters = new Mapping<String, Step> {
   // ["actionlint"] = Builtins.actionlint // GitHub Actions
-  ["check-added-large-files"] = Builtins.check_added_large_files
+  // ["check-added-large-files"] = Builtins.check_added_large_files - flags uv.lock
   ["check-merge-conflict"] = Builtins.check_merge_conflict
   ["check-symlinks"] = Builtins.check_symlinks
   ["end-of-file-fixer"] = Builtins.newlines
-  // ["hadolint"] = Builtins.hadolint // Dockerfile
+  // ["hadolint"] = Builtins.hadolint // Dockerfile - flags `COPY --from=<>` from Bake
   ["mixed-line-ending"] = Builtins.mixed_line_ending
   ["pch-check-symlinks"] = Builtins.check_symlinks
   ["python-check-ast"] = Builtins.python_check_ast

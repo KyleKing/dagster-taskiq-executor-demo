@@ -28,7 +28,7 @@
 ## Project structure
 
 - `dagster-taskiq-demo/`: Full example application with Dagster jobs and TaskIQ executor
-- `dagster-celery-to-taskiq/`: direct reimplementation based on dagster-celery
+- `dagster-taskiq/`: direct reimplementation based on dagster-celery
 - `taskiq-demo/`: Standalone TaskIQ and FastAPI demo (without Dagster)
 - `deploy/`: Pulumi infrastructure (components/ = reusable AWS primitives, modules/ = app-specific bundles)
 

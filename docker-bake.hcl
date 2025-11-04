@@ -5,7 +5,7 @@ target "dagster-taskiq-demo" {
   context    = "./dagster-taskiq-demo"
   dockerfile = "./Dockerfile"
   contexts   = {
-    "dagster-celery-to-taskiq" = "./dagster-celery-to-taskiq"
+    "dagster-taskiq" = "./dagster-taskiq"
   }
   tags       = ["dagster-taskiq-demo:latest"]
   platforms  = ["linux/amd64"]

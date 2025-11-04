@@ -6,7 +6,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
-cd "$REPO_ROOT/dagster-celery-to-taskiq"
+cd "$REPO_ROOT/dagster-taskiq"
 
 echo "Starting TaskIQ Dashboard..."
 echo "Make sure dev dependencies are installed: uv sync --group dev"

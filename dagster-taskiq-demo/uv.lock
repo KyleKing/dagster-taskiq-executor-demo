@@ -417,7 +417,7 @@ wheels = [
 [[package]]
 name = "dagster-taskiq"
 version = "0.0.0"
-source = { editable = "../dagster-celery-to-taskiq" }
+source = { editable = "../dagster-taskiq" }
 dependencies = [
     { name = "aioboto3" },
     { name = "dagster" },
@@ -479,7 +479,7 @@ requires-dist = [
     { name = "aioboto3", specifier = ">=13.0.0" },
     { name = "dagster-graphql", specifier = ">=0.21.0" },
     { name = "dagster-postgres", specifier = ">=0.21.0" },
-    { name = "dagster-taskiq", editable = "../dagster-celery-to-taskiq" },
+    { name = "dagster-taskiq", editable = "../dagster-taskiq" },
     { name = "dagster-webserver", specifier = ">=1.5.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
