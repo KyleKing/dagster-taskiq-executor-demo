@@ -3,6 +3,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import sys
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any, Optional
@@ -51,10 +52,21 @@ def execute_job_on_taskiq(
     with tempdir_wrapper(tempdir) as tempdir:
         job_def = ReconstructableJob.for_file(REPO_FILE, job_name).get_subset(op_selection=subset)
         with _instance_wrapper(instance) as wrapped_instance:
-            run_config = run_config or {
-                "resources": {"io_manager": {"config": {"base_dir": tempdir}}},
-                # "execution": {"taskiq": {}},
-            }
+            if run_config is None:
+                endpoint_url = os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL")
+                execution_config = {
+                    "queue_url": os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL"),
+                    "region_name": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+                }
+                if endpoint_url:
+                    execution_config["endpoint_url"] = endpoint_url
+
+                run_config = {
+                    "resources": {"io_manager": {"config": {"base_dir": tempdir}}},
+                    "execution": {
+                        "config": execution_config,
+                    },
+                }
             with execute_job(
                 job_def,
                 run_config=run_config,
@@ -103,20 +115,23 @@ def execute_on_thread(
 
 @contextmanager
 def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
-    # Start a Taskiq worker using the dagster-taskiq CLI
-    cmd = ["dagster-taskiq", "worker", "start"]
+    # Start a Taskiq worker via a patched entrypoint that applies moto compatibility.
+    cmd = [sys.executable, "-m", "tests.worker_entrypoint", "worker", "start"]
     if queue:
-        # Note: Taskiq doesn't have queue filtering like Celery
-        # We'll just start a regular worker
+        # Taskiq does not support per-queue workers; placeholder to match Celery-era API.
         pass
 
     env = os.environ.copy()
-    src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+    roots = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")),
+        os.path.abspath(os.path.dirname(__file__)),
+    ]
     existing_pythonpath = env.get("PYTHONPATH")
+    python_path = os.pathsep.join(roots)
     env["PYTHONPATH"] = (
-        f"{src_path}{os.pathsep}{existing_pythonpath}"
+        f"{python_path}{os.pathsep}{existing_pythonpath}"
         if existing_pythonpath
-        else src_path
+        else python_path
     )
 
     process = subprocess.Popen(cmd, env=env)

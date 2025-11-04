@@ -27,7 +27,7 @@ def test_basic_environment_config():
 
 
 def test_endpoint_url_config():
-    """Test LocalStack endpoint URL configuration."""
+    """Test custom endpoint URL configuration used in tests (moto)."""
     with instance_for_test():
         with environ({
             "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": "http://localhost:4566",

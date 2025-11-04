@@ -16,7 +16,12 @@ from dagster._grpc.types import ExecuteStepArgs
 from dagster._serdes import pack_value
 
 from dagster_taskiq.config import DEFAULT_CONFIG, dict_wrapper
-from dagster_taskiq.defaults import sqs_queue_url, aws_region_name, task_default_priority
+from dagster_taskiq.defaults import (
+    sqs_queue_url,
+    sqs_endpoint_url,
+    aws_region_name,
+    task_default_priority,
+)
 
 TASKIQ_CONFIG = {
     "queue_url": Field(
@@ -157,7 +162,11 @@ class TaskiqExecutor(Executor):
     ):
         self.queue_url = check.opt_str_param(queue_url, "queue_url", default=sqs_queue_url)
         self.region_name = check.opt_str_param(region_name, "region_name", default=aws_region_name)
-        self.endpoint_url = check.opt_str_param(endpoint_url, "endpoint_url")
+        self.endpoint_url = check.opt_str_param(
+            endpoint_url,
+            "endpoint_url",
+            default=sqs_endpoint_url,
+        )
         self.config_source = dict_wrapper(
             dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source"))
         )

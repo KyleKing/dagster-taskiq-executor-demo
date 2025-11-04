@@ -1,197 +1,140 @@
-import json
 import os
 import socket
-import subprocess
 import tempfile
 import time
-import urllib.parse
-import urllib.request
 from collections.abc import Iterator
 
 import boto3
-from botocore.exceptions import ClientError
 import pytest
 from dagster._core.instance import DagsterInstance
 from dagster._core.test_utils import environ, instance_for_test
+from moto.server import ThreadedMotoServer
 # from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 
 from tests.utils import start_taskiq_worker
 
-IS_BUILDKITE = os.getenv("BUILDKITE") is not None
+AWS_TEST_ACCESS_KEY = "testing"
+AWS_TEST_SECRET_KEY = "testing"
+AWS_TEST_REGION = "us-east-1"
 
 
-def _service_ready(entry: object) -> bool:
-    if isinstance(entry, str):
-        return entry.lower() in {"running", "available", "ready"}
-    if isinstance(entry, dict):  # type: ignore[reportGeneralTypeIssues]
-        status = entry.get("status") or entry.get("state")
-        if isinstance(status, str):
-            return status.lower() in {"running", "available", "ready"}
-    return False
-
-
-def _wait_for_localstack(endpoint: str, timeout: int = 30) -> None:
-    for _ in range(timeout):
-        try:
-            with urllib.request.urlopen(f"{endpoint}/_localstack/health", timeout=2) as response:
-                payload = response.read()
-                data = json.loads(payload.decode("utf-8"))
-                services = data.get("services") or {}
-                if _service_ready(services.get("sqs")) and _service_ready(services.get("s3")):
-                    return
-        except Exception:
-            pass
-        time.sleep(1)
-    raise RuntimeError("LocalStack failed to report healthy status within timeout")
-
-
-def _allocate_localstack_port(preferred: int = 4567) -> int:
-    """Allocate a LocalStack port, avoiding 4566 which may be used by dagster-taskiq-demo."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(0.5)
-        if sock.connect_ex(("127.0.0.1", preferred)) != 0:
-            return preferred
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
-def _rewrite_queue_url_port(queue_url: str, port: int) -> str:
-    parsed = urllib.parse.urlparse(queue_url)
-    host = parsed.hostname or "localhost"
-    netloc = f"{host}:{port}"
-    if parsed.username or parsed.password:
-        auth = f"{parsed.username}:{parsed.password}@"
-        netloc = f"{auth}{netloc}"
-    return urllib.parse.urlunparse(parsed._replace(netloc=netloc))
+def find_free_port() -> int:
+    """Find an available port for the moto server."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
 
 
 @pytest.fixture(scope="session")
 def localstack():
-    """Start LocalStack for SQS testing."""
-    if IS_BUILDKITE:
-        endpoint = os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL", "http://localhost:4566")
-        queue_url = os.getenv(
-            "DAGSTER_TASKIQ_SQS_QUEUE_URL",
-            "https://sqs.us-east-1.amazonaws.com/000000000000/dagster-test-queue",
-        )
+    """Provide moto-backed AWS endpoints for tests expecting LocalStack."""
+    endpoint_override = os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL")
+    queue_override = os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL")
+
+    if endpoint_override and queue_override:
         env_vars = {
-            "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_url,
-            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint,
+            "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_override,
+            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint_override,
             "DAGSTER_TASKIQ_S3_ENDPOINT_URL": os.getenv(
-                "DAGSTER_TASKIQ_S3_ENDPOINT_URL", endpoint
+                "DAGSTER_TASKIQ_S3_ENDPOINT_URL", endpoint_override
             ),
             "DAGSTER_TASKIQ_S3_BUCKET_NAME": os.getenv(
                 "DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results"
             ),
-            "AWS_DEFAULT_REGION": "us-east-1",
-            "AWS_ACCESS_KEY_ID": "test",
-            "AWS_SECRET_ACCESS_KEY": "test",
+            "AWS_DEFAULT_REGION": os.getenv("AWS_DEFAULT_REGION", AWS_TEST_REGION),
+            "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", AWS_TEST_ACCESS_KEY),
+            "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", AWS_TEST_SECRET_KEY),
         }
         with environ(env_vars):
-            yield queue_url
+            yield queue_override
         return
 
-    host_port = _allocate_localstack_port()
-    container_name = f"dagster-localstack-{host_port}"
-    endpoint = f"http://127.0.0.1:{host_port}"
+    # Temporarily remove any global endpoint configuration for moto
+    removed_vars = {}
+    for var_name in ["AWS_ENDPOINT_URL", "AWS_SQS_ENDPOINT_URL", "AWS_S3_ENDPOINT_URL"]:
+        if var_name in os.environ:
+            removed_vars[var_name] = os.environ.pop(var_name)
 
+    # Find an available port (avoiding 5000 which conflicts with macOS AirPlay)
+    port = find_free_port()
+    server = ThreadedMotoServer(port=port, verbose=False)
+    server.start()
+    
+    endpoint_url = f"http://127.0.0.1:{port}"
+    
     try:
-        subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
-        subprocess.run(["docker", "rm", container_name], capture_output=True, check=False)
-    except FileNotFoundError:
-        pytest.skip("Docker CLI is required to run LocalStack-backed tests")
-
-    try:
-        subprocess.check_output(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--name",
-                container_name,
-                "-p",
-                f"{host_port}:4566",
-                "-e",
-                "SERVICES=sqs,s3",
-                "localstack/localstack:latest",
-            ],
-            stderr=subprocess.STDOUT,
+        sqs = boto3.client(
+            "sqs",
+            endpoint_url=endpoint_url,
+            region_name=AWS_TEST_REGION,
         )
-    except subprocess.CalledProcessError as exc:
-        pytest.skip(f"Unable to start LocalStack container: {exc.output.decode().strip()}")
-    except FileNotFoundError:
-        pytest.skip("Docker CLI is required to run LocalStack-backed tests")
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            region_name=AWS_TEST_REGION,
+        )
 
-    try:
-        _wait_for_localstack(endpoint)
-    except RuntimeError as exc:
-        subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
-        subprocess.run(["docker", "rm", container_name], capture_output=True, check=False)
-        pytest.skip(str(exc))
+        unique_suffix = int(time.time())
+        queue_name = f"dagster-tasks-test-{unique_suffix}"
+        queue_url = sqs.create_queue(QueueName=queue_name)["QueueUrl"]
+        cancel_queue_name = f"{queue_name}-cancels"
+        sqs.create_queue(QueueName=cancel_queue_name)
 
-    sqs = boto3.client(
-        "sqs",
-        endpoint_url=endpoint,
-        region_name="us-east-1",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-    )
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        region_name="us-east-1",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-    )
-
-    # Use unique queue name to avoid conflicts with other instances
-    queue_name = f"dagster-tasks-test-{host_port}"
-    queue_url = _rewrite_queue_url_port(
-        sqs.create_queue(QueueName=queue_name)["QueueUrl"], host_port
-    )
-
-    for _ in range(10):
-        try:
-            sqs.get_queue_url(QueueName=queue_name)
-            break
-        except ClientError:
-            time.sleep(1)
-    else:
-        raise RuntimeError("LocalStack SQS queue was not ready in time")
-
-    cancel_queue_name = f"{queue_name}-cancels"
-    sqs.create_queue(QueueName=cancel_queue_name)
-
-    # Use unique bucket name to avoid conflicts
-    bucket_name = f"dagster-taskiq-test-{host_port}"
-    try:
+        bucket_name = f"dagster-taskiq-test-{unique_suffix}"
         s3.create_bucket(Bucket=bucket_name)
-    except ClientError as exc:
-        error_code = exc.response.get("Error", {}).get("Code")
-        if error_code not in {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}:
-            raise
 
-    env_vars = {
-        "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_url,
-        "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint,
-        "DAGSTER_TASKIQ_S3_ENDPOINT_URL": endpoint,
-        "DAGSTER_TASKIQ_S3_BUCKET_NAME": bucket_name,
-        "AWS_DEFAULT_REGION": "us-east-1",
-        "AWS_ACCESS_KEY_ID": "test",
-        "AWS_SECRET_ACCESS_KEY": "test",
-    }
+        env_vars = {
+            "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_url,
+            "DAGSTER_TASKIQ_S3_BUCKET_NAME": bucket_name,
+            "AWS_DEFAULT_REGION": AWS_TEST_REGION,
+            "AWS_ACCESS_KEY_ID": AWS_TEST_ACCESS_KEY,
+            "AWS_SECRET_ACCESS_KEY": AWS_TEST_SECRET_KEY,
+            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint_url,
+            "DAGSTER_TASKIQ_S3_ENDPOINT_URL": endpoint_url,
+        }
 
-    with environ(env_vars):
-        try:
-            yield queue_url
-        finally:
+        with environ(env_vars):
+            import importlib
+
+            import dagster_taskiq  # type: ignore
+            import dagster_taskiq.defaults as taskiq_defaults  # type: ignore
+            importlib.reload(taskiq_defaults)  # reload defaults first
+
+            import dagster_taskiq.app as taskiq_app  # type: ignore
+            import dagster_taskiq.executor as taskiq_executor_module  # type: ignore
+            import dagster_taskiq.launcher as taskiq_launcher  # type: ignore
+            import dagster_taskiq.make_app as taskiq_make_app  # type: ignore
+            import dagster_taskiq.tasks as taskiq_tasks  # type: ignore
+
+            for module in (
+                taskiq_executor_module,
+                taskiq_launcher,
+                taskiq_make_app,
+                taskiq_app,
+                taskiq_tasks,
+            ):
+                importlib.reload(module)
+
+            importlib.reload(dagster_taskiq)
+
             try:
-                subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
-                subprocess.run(["docker", "rm", container_name], capture_output=True, check=False)
-            except FileNotFoundError:
+                import tests.repo as taskiq_test_repo  # type: ignore
+            except ModuleNotFoundError:
+                taskiq_test_repo = None  # type: ignore[assignment]
+            else:
+                importlib.reload(taskiq_test_repo)  # type: ignore[arg-type]
+
+            try:
+                yield queue_url
+            finally:
                 pass
+    finally:
+        # Stop the server after all tests complete
+        server.stop()
+        # Restore the environment variables
+        os.environ.update(removed_vars)
 
 
 @pytest.fixture(scope="function")

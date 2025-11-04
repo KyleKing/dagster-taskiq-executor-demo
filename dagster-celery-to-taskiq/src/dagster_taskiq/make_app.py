@@ -6,15 +6,7 @@ from taskiq import AsyncBroker
 
 from dagster_taskiq.broker import SqsBrokerConfig
 from dagster_taskiq.cancellable_broker import CancellableSQSBroker
-from dagster_taskiq.defaults import (
-    aws_region_name,
-    sqs_endpoint_url,
-    sqs_queue_url,
-    s3_bucket_name,
-    s3_endpoint_url,
-    wait_time_seconds,
-    worker_max_messages,
-)
+from dagster_taskiq import defaults
 
 
 def _dict_from_source(config_source: Any) -> dict[str, Any]:
@@ -64,14 +56,14 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     config = app_args or {}
 
     # Get SQS configuration
-    queue_url = config.get("queue_url", sqs_queue_url)
-    sqs_endpoint = config.get("endpoint_url", sqs_endpoint_url)
-    region_name = config.get("region_name", aws_region_name)
+    queue_url = config.get("queue_url", defaults.sqs_queue_url)
+    sqs_endpoint = config.get("endpoint_url", defaults.sqs_endpoint_url)
+    region_name = config.get("region_name", defaults.aws_region_name)
     source_overrides = _dict_from_source(config.get('config_source'))
 
     # Get S3 configuration
-    s3_bucket = _resolve_value(config, source_overrides, 's3_bucket_name', s3_bucket_name)
-    s3_endpoint = _resolve_value(config, source_overrides, 's3_endpoint_url', s3_endpoint_url)
+    s3_bucket = _resolve_value(config, source_overrides, 's3_bucket_name', defaults.s3_bucket_name)
+    s3_endpoint = _resolve_value(config, source_overrides, 's3_endpoint_url', defaults.s3_endpoint_url)
 
     # Get AWS credentials from environment or config
     aws_access_key_id = _resolve_value(
@@ -83,10 +75,10 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
 
     # Get worker configuration
     max_messages_raw = _resolve_value(
-        config, source_overrides, 'max_number_of_messages', worker_max_messages, 'worker_max_messages'
+        config, source_overrides, 'max_number_of_messages', defaults.worker_max_messages, 'worker_max_messages'
     )
     wait_time_raw = _resolve_value(
-        config, source_overrides, 'wait_time_seconds', wait_time_seconds
+        config, source_overrides, 'wait_time_seconds', defaults.wait_time_seconds
     )
     delay_seconds_raw = _resolve_value(config, source_overrides, 'delay_seconds', 0)
     use_task_id_for_dedup = _resolve_value(
