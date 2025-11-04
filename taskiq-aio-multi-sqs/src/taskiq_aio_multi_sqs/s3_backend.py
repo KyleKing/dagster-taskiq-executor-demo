@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Optional,
     TypeVar,
 )
 
@@ -12,8 +11,7 @@ from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.compat import model_dump, model_validate
 from taskiq.result import TaskiqResult
 from taskiq.serializers import ORJSONSerializer
-
-from taskiq_aio_sqs import constants, exceptions
+from taskiq_aio_multi_sqs import constants, exceptions
 
 if TYPE_CHECKING:  # pragma: no cover
     from types_aiobotocore_s3.client import S3Client
@@ -32,10 +30,9 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
         region_name: str = constants.DEFAULT_REGION,
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
-        serializer: Optional[TaskiqSerializer] = None,
+        serializer: TaskiqSerializer | None = None,
     ) -> None:
-        """
-        Constructs a new S3 result backend.
+        """Constructs a new S3 result backend.
 
         :param bucket_name: name of the bucket.
         :param base_path: base path for results.
@@ -55,8 +52,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
         self._serializer = serializer or ORJSONSerializer()
 
     async def _get_client(self) -> "S3Client":
-        """
-        Retrieves the S3 client, creating it if necessary.
+        """Retrieves the S3 client, creating it if necessary.
 
         Returns:
             S3Client: The initialized S3 client.
@@ -89,8 +85,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
         task_id: str,
         result: TaskiqResult[_ReturnType],
     ) -> None:
-        """
-        Set result in your backend.
+        """Set result in your backend.
 
         :param task_id: current task id.
         :param result: result of execution.
@@ -109,8 +104,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
         task_id: str,
         with_logs: bool = False,
     ) -> TaskiqResult[_ReturnType]:
-        """
-        Here you must retrieve result by id.
+        """Here you must retrieve result by id.
 
         Logs is a part of a result.
         Here we have a parameter whether you want to
@@ -134,7 +128,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
                     result = await stream.read()
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code")
-            if code in ["NoSuchKey", "404"]:
+            if code in {"NoSuchKey", "404"}:
                 raise exceptions.ResultIsMissingError(task_id=task_id) from e
             raise exceptions.S3ResultBackendError(code=code) from e  # pragma: no cover
         if result is None:
@@ -151,8 +145,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
         return taskiq_result
 
     async def is_result_ready(self, task_id: str) -> bool:
-        """
-        Check if result exists.
+        """Check if result exists.
 
         :param task_id: id of a task.
         :return: True if result is ready.
@@ -164,7 +157,7 @@ class S3Backend(AsyncResultBackend[_ReturnType]):
                 return True
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code")
-            if code in ["NoSuchKey", "404"]:
+            if code in {"NoSuchKey", "404"}:
                 pass
             else:
                 raise exceptions.S3ResultBackendError(

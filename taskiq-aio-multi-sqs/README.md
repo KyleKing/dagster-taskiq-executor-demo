@@ -26,7 +26,7 @@ Here is an example of how to use the SQS broker with the S3 backend:
 ```python
 # broker.py
 import asyncio
-from taskiq_aio_sqs import SQSBroker, S3Backend
+from taskiq_aio_multi_sqs import SQSBroker, S3Backend
 
 s3_result_backend = S3Backend(
     endpoint_url="http://localhost:4566",
@@ -103,7 +103,7 @@ drain the first queue in the list before checking the next one, giving you a
 simple way to prioritise work without relying on per-message delays.
 
 ```python
-from taskiq_aio_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
+from taskiq_aio_multi_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
 
 broker = SQSBroker(
     endpoint_url="http://localhost:4566",

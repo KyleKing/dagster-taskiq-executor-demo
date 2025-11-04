@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, AsyncGenerator, TypedDict
+from collections.abc import AsyncGenerator
+from typing import Any, TypedDict
 
 import pytest
 from aiobotocore.session import get_session
@@ -33,12 +34,12 @@ def aws_credentials() -> AWSCredentials:
     return AWSCredentials(
         endpoint_url=ENDPOINT_URL,
         aws_access_key_id="your-aws-id",
-        aws_secret_access_key="your-aws-access-key",  # noqa: S106
+        aws_secret_access_key="your-aws-access-key",
         region_name="us-east-1",
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_client(aws_credentials: AWSCredentials) -> AsyncGenerator[SQSClient, Any]:
     client_context = get_session().create_client(
         "sqs",
@@ -48,7 +49,7 @@ async def sqs_client(aws_credentials: AWSCredentials) -> AsyncGenerator[SQSClien
     await client_context.__aexit__(None, None, None)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def s3_client(aws_credentials: AWSCredentials) -> AsyncGenerator[S3Client, Any]:
     client_context = get_session().create_client(
         "s3",
@@ -58,7 +59,7 @@ async def s3_client(aws_credentials: AWSCredentials) -> AsyncGenerator[S3Client,
     await client_context.__aexit__(None, None, None)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def fifo_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     response = await sqs_client.create_queue(
         QueueName=FIFO_QUEUE_NAME,
@@ -69,7 +70,7 @@ async def fifo_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     await sqs_client.delete_queue(QueueUrl=queue_url)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     response = await sqs_client.create_queue(QueueName=QUEUE_NAME)
     queue_url = response["QueueUrl"]
@@ -77,7 +78,7 @@ async def sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     await sqs_client.delete_queue(QueueUrl=queue_url)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def additional_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any]:
     response = await sqs_client.create_queue(QueueName=ADDITIONAL_QUEUE_NAME)
     queue_url = response["QueueUrl"]
@@ -85,7 +86,7 @@ async def additional_sqs_queue(sqs_client: SQSClient) -> AsyncGenerator[str, Any
     await sqs_client.delete_queue(QueueUrl=queue_url)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def s3_bucket(s3_client: S3Client) -> AsyncGenerator[str, Any]:
     response = await s3_client.create_bucket(Bucket=TEST_BUCKET)
     assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
@@ -111,7 +112,7 @@ async def s3_bucket(s3_client: S3Client) -> AsyncGenerator[str, Any]:
     await s3_client.delete_bucket(Bucket=TEST_BUCKET)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def extended_s3_bucket(s3_client: S3Client) -> AsyncGenerator[str, Any]:
     response = await s3_client.create_bucket(Bucket=EXTENDED_BUCKET)
     yield EXTENDED_BUCKET
@@ -132,7 +133,7 @@ async def extended_s3_bucket(s3_client: S3Client) -> AsyncGenerator[str, Any]:
     await s3_client.delete_bucket(Bucket=EXTENDED_BUCKET)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker(
     aws_credentials: AWSCredentials,
     sqs_queue: str,
@@ -150,7 +151,7 @@ async def sqs_broker(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_multi_queue_broker(
     aws_credentials: AWSCredentials,
     sqs_queue: str,
@@ -169,7 +170,7 @@ async def sqs_multi_queue_broker(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker_fifo(
     aws_credentials: AWSCredentials,
     fifo_sqs_queue: str,
@@ -186,7 +187,7 @@ async def sqs_broker_fifo(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker_fair(
     aws_credentials: AWSCredentials,
     sqs_queue: str,
@@ -205,7 +206,7 @@ async def sqs_broker_fair(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker_fifo_no_dedup(
     aws_credentials: AWSCredentials,
     fifo_sqs_queue: str,
@@ -222,7 +223,7 @@ async def sqs_broker_fifo_no_dedup(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker_with_delay_seconds(
     aws_credentials: AWSCredentials,
     sqs_queue: str,
@@ -240,7 +241,7 @@ async def sqs_broker_with_delay_seconds(
     await broker.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def s3_backend(
     aws_credentials: AWSCredentials,
     s3_bucket: str,
@@ -252,7 +253,7 @@ async def s3_backend(
     await backend.shutdown()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def sqs_broker_with_backend(
     aws_credentials: AWSCredentials,
     sqs_queue: str,

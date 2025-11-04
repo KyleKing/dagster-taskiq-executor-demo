@@ -228,5 +228,7 @@ async def test_kick_invalid_queue_label(
         labels={DEFAULT_PRIORITY_QUEUE_LABEL: "not-configured"},
     )
 
-    with pytest.raises(BrokerConfigError, match="Queue 'not-configured' is not configured"):
+    with pytest.raises(
+        BrokerConfigError, match="Queue 'not-configured' is not configured"
+    ):
         await broker.kick(invalid_message)

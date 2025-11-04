@@ -3,8 +3,11 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, AsyncGenerator, Awaitable, Callable, Generator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+)
 
 from aiobotocore.session import get_session
 from annotated_types import Ge, Le
@@ -13,8 +16,7 @@ from pydantic import TypeAdapter
 from taskiq import AsyncBroker
 from taskiq.acks import AckableMessage
 from taskiq.message import BrokerMessage
-
-from taskiq_aio_sqs import constants, exceptions
+from taskiq_aio_multi_sqs import constants, exceptions
 
 if TYPE_CHECKING:  # pragma: no cover
     from types_aiobotocore_s3.client import S3Client
@@ -83,7 +85,9 @@ class SQSBroker(AsyncBroker):
         if sqs_queue_name:
             candidate_names.insert(0, str(sqs_queue_name))
         if not candidate_names:
-            raise exceptions.BrokerConfigError(error="At least one SQS queue name must be configured")
+            raise exceptions.BrokerConfigError(
+                error="At least one SQS queue name must be configured"
+            )
 
         seen: set[str] = set()
         queue_names: list[str] = []
@@ -102,7 +106,9 @@ class SQSBroker(AsyncBroker):
         self._is_fair_queue = is_fair_queue
         self._sqs_queue_url: str | None = None
         self._session = get_session()
-        self._queue_selector_label = queue_selector_label or constants.DEFAULT_PRIORITY_QUEUE_LABEL
+        self._queue_selector_label = (
+            queue_selector_label or constants.DEFAULT_PRIORITY_QUEUE_LABEL
+        )
 
         try:
             self.max_number_of_messages = MaxNumberOfMessages.validate_python(
@@ -140,14 +146,13 @@ class SQSBroker(AsyncBroker):
                 raise exceptions.QueueNotFoundError(
                     queue_name=self._sqs_queue_name,
                 ) from e
-            elif code in ["InvalidParameterValue", "NoSuchBucket"]:
+            elif code in {"InvalidParameterValue", "NoSuchBucket"}:
                 raise exceptions.BrokerConfigError(error=error_message) from e
             else:
                 raise exceptions.SQSBrokerError(error=code) from e  # pragma: no cover
 
-    async def _get_s3_client(self) -> "S3Client":
-        """
-        Retrieves the S3 client, creating it if necessary.
+    async def _get_s3_client(self) -> S3Client:
+        """Retrieves the S3 client, creating it if necessary.
 
         Returns:
             SQSClient: The initialized SQS client.
@@ -161,9 +166,8 @@ class SQSBroker(AsyncBroker):
         )
         return await self._s3_client_context_creator.__aenter__()
 
-    async def _get_sqs_client(self) -> "SQSClient":
-        """
-        Retrieves the SQS client, creating it if necessary.
+    async def _get_sqs_client(self) -> SQSClient:
+        """Retrieves the SQS client, creating it if necessary.
 
         Returns:
             SQSClient: The initialized SQS client.
@@ -186,8 +190,8 @@ class SQSBroker(AsyncBroker):
     async def _get_queue_url_for(self, queue_name: str) -> str:
         if queue_name not in self._queue_urls:
             with self.handle_exceptions():
-                queue_result: "GetQueueUrlResultTypeDef" = await self._sqs_client.get_queue_url(
-                    QueueName=queue_name
+                queue_result: GetQueueUrlResultTypeDef = (
+                    await self._sqs_client.get_queue_url(QueueName=queue_name)
                 )
             queue_url = queue_result["QueueUrl"]
             self._queue_urls[queue_name] = queue_url
@@ -214,7 +218,7 @@ class SQSBroker(AsyncBroker):
     async def build_kick_kwargs(
         self,
         message: BrokerMessage,
-    ) -> "SendMessageRequestTypeDef":
+    ) -> SendMessageRequestTypeDef:
         """Build the kwargs for the SQS client kick method.
 
         This function can be extended by the end user to
@@ -225,10 +229,7 @@ class SQSBroker(AsyncBroker):
         if self._queue_selector_label in message.labels:
             label_value = message.labels[self._queue_selector_label]
             if isinstance(label_value, (list, tuple)):
-                if label_value:
-                    label_value = label_value[0]
-                else:
-                    label_value = None
+                label_value = label_value[0] if label_value else None
             if label_value is not None:
                 queue_name = str(label_value).strip()
         if not queue_name:
@@ -240,7 +241,7 @@ class SQSBroker(AsyncBroker):
 
         queue_url = await self._get_queue_url_for(queue_name)
 
-        kwargs: "SendMessageRequestTypeDef" = {
+        kwargs: SendMessageRequestTypeDef = {
             "QueueUrl": queue_url,
             "MessageBody": message.message.decode("utf-8"),
         }
@@ -301,8 +302,7 @@ class SQSBroker(AsyncBroker):
         queue_url: str,
         receipt_handle: str,
     ) -> Callable[[], Awaitable[None]]:
-        """
-        This method is used to build an ack for the message.
+        """This method is used to build an ack for the message.
 
         :param queue_url: queue url where the message is located
         :param receipt_handle: message to build ack for.
@@ -318,8 +318,7 @@ class SQSBroker(AsyncBroker):
         return ack
 
     async def listen(self) -> AsyncGenerator[AckableMessage, None]:
-        """
-        This function listens to new messages and yields them.
+        """This function listens to new messages and yields them.
 
         :yield: incoming AckableMessages.
         :return: nothing.
@@ -335,7 +334,7 @@ class SQSBroker(AsyncBroker):
                     MessageAttributeNames=["All"],
                     WaitTimeSeconds=wait_time,
                 )
-                messages: list["MessageTypeDef"] = results.get("Messages", [])
+                messages: list[MessageTypeDef] = results.get("Messages", [])
 
                 if not messages:
                     continue

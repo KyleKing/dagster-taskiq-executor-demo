@@ -36,9 +36,8 @@ run = "uv run pyright"
 
 [checks]
 description = "Run all read-only checks (lint + typechecks + test)"
-wait_for = ["lint", "mypy", "pyright", "test"]
+depends = ["lint", "mypy", "pyright", "test"]
 
 [fixes]
 description = "Run all fixes (ruff format and linter)"
-wait_for = ["format", "lint:power-fix"]
-
+depends = ["format", "lint:power-fix"]
