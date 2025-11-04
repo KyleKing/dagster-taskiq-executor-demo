@@ -15,11 +15,16 @@ logger = logging.getLogger(__name__)
 
 CANCELLER_KEY = "__cancel_task_id__"
 
+# Sentinel object to indicate queue is done
+_QUEUE_DONE = object()
+
 logger.info("Loaded CancellableReceiver from %s", __file__)
 
 
 class CancellableReceiver(Receiver):
     """Receiver that supports cancelling running tasks."""
+
+    QUEUE_DONE = _QUEUE_DONE
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -40,6 +45,17 @@ class CancellableReceiver(Receiver):
             )
             return None
         return taskiq_msg
+
+    async def prefetcher(self, queue: asyncio.Queue[bytes | Any], finish_event: asyncio.Event) -> None:
+        """Override prefetcher to ensure QUEUE_DONE is sent when finished."""
+        try:
+            await super().prefetcher(queue, finish_event)
+        finally:
+            # Ensure QUEUE_DONE is sent to signal completion
+            try:
+                queue.put_nowait(self.QUEUE_DONE)
+            except Exception:
+                pass  # Queue might be closed, that's fine
 
     async def listen(self, finish_event: asyncio.Event) -> None:
         """Listen for messages and cancellations concurrently."""

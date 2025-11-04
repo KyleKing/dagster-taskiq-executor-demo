@@ -88,9 +88,13 @@ class CancellableSQSBroker(AsyncBroker):
             kwargs={"__cancel_task_id__": str(task_id)},
         )
         broker_message = self.sqs_broker.formatter.dumps(taskiq_message)
+        # Ensure MessageBody is a string, not bytes
+        message_body = broker_message.message
+        if isinstance(message_body, bytes):
+            message_body = message_body.decode('utf-8')
         await self.cancel_sqs_client.send_message(
             QueueUrl=self.cancel_queue_url,
-            MessageBody=broker_message.message,
+            MessageBody=message_body,
         )
 
     async def listen_canceller(self) -> AsyncGenerator[bytes, None]:

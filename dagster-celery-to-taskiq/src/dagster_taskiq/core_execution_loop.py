@@ -158,6 +158,13 @@ async def core_taskiq_execution_loop(
                             step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
                             await _request_task_cancellations(reason='step failure')
 
+                        # Handle None or non-iterable step_events
+                        if step_events is None:
+                            step_events = []
+                        elif not isinstance(step_events, (list, tuple)):
+                            # If it's not a list/tuple, try to make it iterable
+                            step_events = [step_events] if step_events else []
+
                         for step_event in step_events:
                             event = deserialize_value(step_event, DagsterEvent)
                             yield event

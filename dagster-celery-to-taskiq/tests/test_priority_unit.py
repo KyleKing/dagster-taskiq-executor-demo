@@ -1,9 +1,10 @@
 """Unit tests for priority/delay functionality without LocalStack."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
 import pytest
+from dagster._core.origin import JobPythonOrigin
 
 from dagster_taskiq.defaults import task_default_priority
 from dagster_taskiq.executor import _priority_to_delay_seconds
@@ -55,7 +56,10 @@ def test_delay_label_passed_to_broker():
 
         # Create a mock plan context
         mock_plan_context = MagicMock()
-        mock_plan_context.reconstructable_job.get_python_origin.return_value = MagicMock()
+        # Create a proper JobPythonOrigin instance that will pass isinstance checks
+        # Use create_autospec with instance=True to create a mock that is an actual instance
+        mock_job_origin = create_autospec(JobPythonOrigin, instance=True, spec_set=False)
+        mock_plan_context.reconstructable_job.get_python_origin.return_value = mock_job_origin
         mock_plan_context.reconstructable_job.to_dict.return_value = {}
         mock_plan_context.dagster_run.run_id = "test-run-id"
         mock_plan_context.instance.get_ref.return_value = MagicMock()
