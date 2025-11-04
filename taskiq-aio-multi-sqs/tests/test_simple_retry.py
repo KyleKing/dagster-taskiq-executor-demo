@@ -5,7 +5,7 @@ from taskiq import SimpleRetryMiddleware
 from taskiq.message import TaskiqMessage
 from taskiq.result import TaskiqResult
 
-from taskiq_aio_sqs.sqs_broker import SQSBroker
+from taskiq_aio_multi_sqs.sqs_broker import SQSBroker
 
 
 @pytest.mark.anyio

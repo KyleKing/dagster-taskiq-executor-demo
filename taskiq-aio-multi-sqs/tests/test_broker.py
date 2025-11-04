@@ -1,7 +1,7 @@
 import pytest
 
-from taskiq_aio_sqs import SQSBroker
-from taskiq_aio_sqs.exceptions import (
+from taskiq_aio_multi_sqs import SQSBroker
+from taskiq_aio_multi_sqs.exceptions import (
     BrokerConfigError,
     QueueNotFoundError,
 )

@@ -4,7 +4,7 @@ import asyncio
 async def test_smoke_s3_backend() -> None:
     """Smoke test for S3Backend initialization."""
     try:
-        from taskiq_aio_sqs import S3Backend
+        from taskiq_aio_multi_sqs import S3Backend
 
         S3Backend(
             bucket_name="test-bucket",
@@ -18,7 +18,7 @@ async def test_smoke_s3_backend() -> None:
 async def test_smoke_sqs_broker() -> None:
     """Smoke test for SQSBroker initialization."""
     try:
-        from taskiq_aio_sqs import SQSBroker
+        from taskiq_aio_multi_sqs import SQSBroker
 
         SQSBroker(
             sqs_queue_name="test-queue",

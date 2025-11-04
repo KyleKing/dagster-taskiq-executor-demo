@@ -3,8 +3,8 @@ import json
 import pytest
 from taskiq import BrokerMessage
 
-from taskiq_aio_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
-from taskiq_aio_sqs.exceptions import (
+from taskiq_aio_multi_sqs import DEFAULT_PRIORITY_QUEUE_LABEL, SQSBroker
+from taskiq_aio_multi_sqs.exceptions import (
     BrokerConfigError,
     QueueNotFoundError,
     TaskLabelConfigError,

@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 import pytest
 from taskiq.result import TaskiqResult
 
-from taskiq_aio_sqs import S3Backend
-from taskiq_aio_sqs.exceptions import ResultIsMissingError
+from taskiq_aio_multi_sqs import S3Backend
+from taskiq_aio_multi_sqs.exceptions import ResultIsMissingError
 
 
 @pytest.fixture

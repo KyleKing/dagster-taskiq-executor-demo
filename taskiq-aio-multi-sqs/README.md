@@ -20,6 +20,7 @@ pip install taskiq-aio-sqs
 ```
 
 ## General Usage:
+
 Here is an example of how to use the SQS broker with the S3 backend:
 
 ```python
@@ -54,12 +55,14 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 ```
+
 ### Delayed Tasks:
 
 Delayed tasks can be created in 3 ways:
- - by using the `delay` parameter in the task decorator
- - by using the kicker with the `delay` label
- - by setting the `delay_seconds` parameter in the broker, which will apply to all tasks processed by the broker.
+
+- by using the `delay` parameter in the task decorator
+- by using the kicker with the `delay` label
+- by setting the `delay_seconds` parameter in the broker, which will apply to all tasks processed by the broker.
 
 Here's an example of how to use delayed tasks:
 
@@ -133,6 +136,7 @@ async def main() -> None:
 You can also use S3 to store messages that are too large for SQS. To do this, you need to set the `s3_extended_bucket_name` parameter in the broker configuration.
 
 Here's an example of this behaviour:
+
 ```python
 pub_broker = SQSBroker(
     endpoint_url="http://localhost:4566",
@@ -173,63 +177,31 @@ async def main():
 ## Configuration:
 
 SQS Broker parameters:
-* `endpoint_url` - url to access sqs, this is particularly useful if running on ECS.
-* `sqs_queue_name` - name of the sqs queue.
-* `sqs_queue_names` - ordered list of queue names to poll (highest priority first).
-* `region_name` - region name, defaults to `us-east-1`.
-* `aws_access_key_id` - aws access key id (Optional).
-* `aws_secret_access_key` - aws secret access key (Optional).
-* `use_task_id_for_deduplication` - use task_id for deduplication, this is useful when using a Fifo queue without content based deduplication, defaults to False.
-* `wait_time_seconds` - wait time in seconds for long polling, defaults to 0.
-* `max_number_of_messages` - maximum number of messages to receive, defaults to 1 (max 10).
-* `delay_seconds` - default delay for message delivery (0-900), defaults to 0.
-* `s3_extended_bucket_name` - extended bucket name for the s3 objects,
+
+- `endpoint_url` - url to access sqs, this is particularly useful if running on ECS.
+- `sqs_queue_name` - name of the sqs queue.
+- `sqs_queue_names` - ordered list of queue names to poll (highest priority first).
+- `region_name` - region name, defaults to `us-east-1`.
+- `aws_access_key_id` - aws access key id (Optional).
+- `aws_secret_access_key` - aws secret access key (Optional).
+- `use_task_id_for_deduplication` - use task_id for deduplication, this is useful when using a Fifo queue without content based deduplication, defaults to False.
+- `wait_time_seconds` - wait time in seconds for long polling, defaults to 0.
+- `max_number_of_messages` - maximum number of messages to receive, defaults to 1 (max 10).
+- `delay_seconds` - default delay for message delivery (0-900), defaults to 0.
+- `s3_extended_bucket_name` - extended bucket name for the s3 objects,
   adding this will allow the broker to kick messages that are too large for SQS by using S3 as well,
   by default the listen function handles this behaviour, defaults to None.
-* `task_id_generator` - custom task_id generator (Optional).
-* `result_backend` - custom result backend (Optional).
-* `is_fair_queue` - : Whether the queue is a fair queue, if True, it will use the `task_name` as the MessageGroupId for all messages.
-* `queue_selector_label` - label key used to choose between configured queues when scheduling tasks.
-
+- `task_id_generator` - custom task_id generator (Optional).
+- `result_backend` - custom result backend (Optional).
+- `is_fair_queue` - : Whether the queue is a fair queue, if True, it will use the `task_name` as the MessageGroupId for all messages.
+- `queue_selector_label` - label key used to choose between configured queues when scheduling tasks.
 
 S3 Result Backend parameters:
-* `bucket_name` - name of the s3 bucket.
-* `base_path` - base path for the s3 objects, defaults to "".
-* `endpoint_url` - url to access s3, this is particularly useful if running on ECS.
-* `region_name` - region name, defaults to `us-east-1`.
-* `aws_access_key_id` - aws access key id (Optional).
-* `aws_secret_access_key` - aws secret access key (Optional).
-* `serializer` - custom serializer, defaults to `OrjsonSerializer`.
 
-# Local Development:
-We use make to handle the commands for the project, you can see the available commands by running this in the root directory:
-```bash
-make
-```
-
-## Setup
-To setup the project, you can run the following commands:
-```bash
-make install
-```
-This will install the required dependencies for the project just using pip.
-
-## Linting
-We use pre-commit to do linting locally, this will be included in the dev dependencies.
-We use ruff for linting and formatting, and pyright for static type checking.
-To install the pre-commit hooks, you can run the following command:
-```bash
-pre-commit install
-```
-If you for some reason hate pre-commit, you can run the following command to lint the code:
-```bash
-make check
-```
-
-## Testing
-To run tests, you can use the following command:
-```bash
-make test
-```
-In the background this will setup localstack to replicate the AWS services, and run the tests.
-It will also generate the coverage report and the badge.
+- `bucket_name` - name of the s3 bucket.
+- `base_path` - base path for the s3 objects, defaults to "".
+- `endpoint_url` - url to access s3, this is particularly useful if running on ECS.
+- `region_name` - region name, defaults to `us-east-1`.
+- `aws_access_key_id` - aws access key id (Optional).
+- `aws_secret_access_key` - aws secret access key (Optional).
+- `serializer` - custom serializer, defaults to `OrjsonSerializer`.

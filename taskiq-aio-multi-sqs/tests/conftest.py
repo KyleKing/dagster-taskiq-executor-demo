@@ -7,8 +7,8 @@ from taskiq import BrokerMessage
 from types_aiobotocore_s3.client import S3Client
 from types_aiobotocore_sqs.client import SQSClient
 
-from taskiq_aio_sqs import S3Backend, SQSBroker
-from taskiq_aio_sqs.constants import MAX_SQS_MESSAGE_SIZE
+from taskiq_aio_multi_sqs import S3Backend, SQSBroker
+from taskiq_aio_multi_sqs.constants import MAX_SQS_MESSAGE_SIZE
 
 ENDPOINT_URL = "http://localhost:4566"
 TEST_BUCKET = "test-bucket"

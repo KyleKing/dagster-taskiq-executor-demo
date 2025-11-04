@@ -3,7 +3,7 @@ import time
 import pytest
 from taskiq import BrokerMessage
 
-from taskiq_aio_sqs import SQSBroker
+from taskiq_aio_multi_sqs import SQSBroker
 
 
 @pytest.mark.asyncio
