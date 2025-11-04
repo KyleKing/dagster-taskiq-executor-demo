@@ -11,6 +11,7 @@
 ### Phase 1 - Stabilise Existing Behaviour ✅
 
 1. **Delay/priority mapping** (`src/dagster_taskiq/executor.py:210-224`)
+
    - ✅ Implemented `_priority_to_delay_seconds()` function
    - ✅ Maps Dagster priority to SQS DelaySeconds: higher priority = lower delay
    - ✅ Default priority (5) = 0 delay, decreasing priority adds 10s per level
@@ -18,13 +19,15 @@
    - ✅ Unit tests passing (`tests/test_priority.py::test_priority_delay_translation`)
    - ⚠️ Integration test failing due to LocalStack DelaySeconds limitations
 
-2. **Fair queue guards** (`src/dagster_taskiq/make_app.py:129-143`)
+1. **Fair queue guards** (`src/dagster_taskiq/make_app.py:129-143`)
+
    - ✅ Auto-detects `.fifo` suffix in queue URL
    - ✅ Warns if `is_fair_queue=True` requested on non-FIFO queue
    - ✅ Defaults `is_fair_queue` based on queue type
    - ✅ Prevents misconfiguration that would cause SQS errors
 
-3. **Waiter task cleanup** (`src/dagster_taskiq/core_execution_loop.py:102-116, 228-231`)
+1. **Waiter task cleanup** (`src/dagster_taskiq/core_execution_loop.py:102-116, 228-231`)
+
    - ✅ Implemented `_cancel_waiters()` function
    - ✅ Called in `finally` block to prevent resource leaks
    - ✅ Gracefully cancels pending asyncio tasks on shutdown
@@ -32,18 +35,21 @@
 ### Phase 2 - TaskIQ API Adoption (In Progress)
 
 1. **Broker simplification**
+
    - ✅ Replaced custom `create_sqs_broker` with `SqsBrokerConfig` dataclass
    - ✅ Direct `taskiq_aio_sqs.SQSBroker` construction via `create_broker()`
    - ✅ Unsupported options (e.g. `visibility_timeout`) now warn instead of silently ignoring
    - ✅ Result backend integration with S3Backend
 
-2. **Cancellation preparation**
+1. **Cancellation preparation**
+
    - ✅ Draft `CancellableSQSBroker` implementation (`src/dagster_taskiq/cancellable_broker.py`)
    - ✅ Disabled by default (`enable_cancellation=False` in `make_app.py:102`)
    - ✅ Added `aioboto3>=13.0.0` as optional dependency `[cancellation]`
    - ⏸️ Not wired to executor yet (Phase 3)
 
-3. **Test infrastructure**
+1. **Test infrastructure**
+
    - ✅ Made test suite independent: unique queue names `dagster-tasks-test-{port}`
    - ✅ Uses port 4567+ to avoid conflicts with dagster-taskiq-demo
    - ✅ Basic executor tests passing (config, CLI)
@@ -61,16 +67,19 @@
 ### Immediate Priorities
 
 1. **S3 Extended Payloads** - High Priority
+
    - Configuration implemented but untested
    - Need smoke test against LocalStack
    - Verify large message (>256KB) handling
 
-2. **LocalStack Test Stability** - Medium Priority
+1. **LocalStack Test Stability** - Medium Priority
+
    - `test_run_priority_job` fails due to DelaySeconds not being honored
    - Options: upgrade LocalStack, mock SQS delays, or skip test in LocalStack
    - Document LocalStack limitations for contributors
 
-3. **Documentation** - Medium Priority
+1. **Documentation** - Medium Priority
+
    - Add config examples showing FIFO queue usage
    - Document `is_fair_queue` toggle behavior
    - Update README with cancellation roadmap
@@ -78,11 +87,13 @@
 ### Phase 2 Completion (Optional Improvements)
 
 1. **Result handling simplification**
+
    - Current `is_ready()`/`wait_result()` pattern works correctly
    - Could explore TaskIQ async helpers for cleaner code
    - Low priority - current implementation is stable
 
-2. **Broker configuration ergonomics**
+1. **Broker configuration ergonomics**
+
    - Current config schema functional
    - Could add validation for common misconfigurations
    - Could improve error messages for queue/broker mismatch
@@ -143,6 +154,7 @@ See original Phase 3 plan below - blocked until Phases 1-2 complete and LocalSta
 ## Success Criteria
 
 ### Phase 1 & 2 (Current) ✅ Mostly Met
+
 - ✅ Delay/priority logic respects Dagster priority contract (unit tests pass)
 - ✅ Broker factories use TaskIQ APIs directly (`SqsBrokerConfig.create_broker()`)
 - ✅ Configuration errors surface clearly (warnings for unsupported options)
@@ -150,6 +162,7 @@ See original Phase 3 plan below - blocked until Phases 1-2 complete and LocalSta
 - ⚠️ Integration test flaky in LocalStack (DelaySeconds limitation)
 
 ### Phase 3 (Future) - Not Yet Started
+
 - ⏸️ Cancellation requests propagate from Dagster through SQS to workers
 - ⏸️ Workers short-circuit cancelled tasks gracefully
 - ⏸️ Idempotency preserved after cancellation
@@ -157,6 +170,7 @@ See original Phase 3 plan below - blocked until Phases 1-2 complete and LocalSta
 ## Quick Reference
 
 ### Files Modified
+
 - `src/dagster_taskiq/executor.py` - Priority-to-delay mapping, debug logging
 - `src/dagster_taskiq/make_app.py` - Fair queue guards, cancellation toggle
 - `src/dagster_taskiq/broker.py` - SqsBrokerConfig dataclass
@@ -166,6 +180,7 @@ See original Phase 3 plan below - blocked until Phases 1-2 complete and LocalSta
 - `pyproject.toml` - Added `[cancellation]` extra for aioboto3
 
 ### Test Status
+
 - ✅ Config tests passing (6/6)
 - ✅ Unit tests passing (priority delay calculation)
 - ⚠️ Integration tests flaky (LocalStack SQS delays)

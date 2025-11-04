@@ -37,9 +37,10 @@ classifiers = [
 ]
 dependencies = [
   "aioboto3>=13.0.0",
-  "dagster>=1.0.0",
+  "dagster>=1.5.0",
+  "taskiq>=0.11.0",
   "taskiq-aio-sqs>=0.4.0",
-  "pydantic>=2.0",
+  "pydantic>=2.10.0,<=2.11.0", # FYI: issues with dependencies
   "pytest-timeout>=2.4.0",
 ]
 

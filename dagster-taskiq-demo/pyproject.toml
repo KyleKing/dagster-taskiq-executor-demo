@@ -17,16 +17,12 @@ dev = [
 name = "dagster-taskiq-demo"
 version = "0.0.0"
 description = "Demo of Dagster with TaskIQ execution on LocalStack"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13"
 dependencies = [
   "dagster-taskiq",
-  "dagster>=1.5.0",
   "dagster-webserver>=1.5.0",
   "dagster-postgres>=0.21.0",
   "dagster-graphql>=0.21.0",
-  "taskiq>=0.11.0",
-  "taskiq-aio-sqs>=0.4.0",
-  "pydantic>=2.10.0,<=2.11.0", # FYI: issues with dependencies
   "pydantic-settings>=2.0.0",
   "aioboto3>=13.0.0",
   "sqlalchemy>=2.0.0",
