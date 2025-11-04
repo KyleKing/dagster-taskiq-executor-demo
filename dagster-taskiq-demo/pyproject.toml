@@ -9,8 +9,7 @@ dev = [
   "pyright>=1.1.390",
   "mypy>=1.18.2",
   "pytest>=8.4.2",
-  "types-pyyaml>=6.0.12.20250915",
-  "pytest-postgresql>=7",
+  "pytest-postgresql>=7"
 ]
 
 [project]
@@ -26,8 +25,7 @@ dependencies = [
   "pydantic-settings>=2.0.0",
   "aioboto3>=13.0.0",
   "sqlalchemy>=2.0.0",
-  "PyYAML>=6.0.0",
-  "structlog>=25.5.0",
+  "structlog>=25.5.0"
 ]
 
 [tool.mypy]
@@ -91,7 +89,7 @@ ignore = [
   "TD001", # Invalid TODO tag: `FIXME`
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
-  "TRY003", # Avoid specifying long messages outside the exception class
+  "TRY003" # Avoid specifying long messages outside the exception class
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -115,7 +113,7 @@ known-first-party = ["dagster_taskiq_demo"]
   "S108", # Probable insecure usage of temporary file or directory
   "SLF001", # Private member accessed
   "ARG001", # Unused function argument
-  "ARG002", # Unused method argument
+  "ARG002" # Unused method argument
 ]
 
 [tool.ruff.lint.pydocstyle]

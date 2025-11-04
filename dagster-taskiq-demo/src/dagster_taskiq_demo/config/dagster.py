@@ -7,7 +7,6 @@ import time
 from typing import Any
 
 import structlog
-import yaml
 from dagster_postgres import DagsterPostgresStorage
 
 from .exceptions import DagsterDatabaseConnectionError
@@ -165,23 +164,6 @@ class RetryablePostgresStorage:
 
         msg = f"Failed to connect to PostgreSQL after {self._max_retries} attempts. Last error: {last_error}"
         raise DagsterDatabaseConnectionError(msg) from last_error
-
-
-# FIXME: manually create the file and track in git instead of doing so dynamically to simplify the
-#  implementation (here, entrypoint, etc.) and remove the PyYAML dependency
-def create_dagster_yaml_file(output_path: str | pathlib.Path = "dagster.yaml") -> None:
-    """Create `dagster.yaml` configuration file on disk.
-
-    Args:
-        output_path: Path where to write the dagster.yaml file
-    """
-    config = DagsterPostgreSQLConfig.get_dagster_yaml_config()
-
-    path_obj = pathlib.Path(output_path)
-    path_obj.parent.mkdir(exist_ok=True, parents=True)
-
-    with path_obj.open("w", encoding="utf-8") as file:
-        yaml.dump(config, file, default_flow_style=False, sort_keys=False)
 
 
 def get_dagster_instance_config() -> dict[str, Any]:

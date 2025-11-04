@@ -11,7 +11,6 @@ from dagster import DagsterInstance
 
 from .config import (
     create_dagster_instance_with_retry,
-    create_dagster_yaml_file,
     get_database_manager,
     settings,
     wait_for_database_ready,
@@ -43,14 +42,21 @@ def setup_logging() -> None:
 
 
 def ensure_dagster_home() -> None:
-    """Ensure DAGSTER_HOME directory exists and create dagster.yaml if needed."""
+    """Ensure DAGSTER_HOME directory exists and dagster.yaml is present."""
+    import importlib.resources
+
     dagster_home = Path(settings.dagster_home)
     dagster_home.mkdir(parents=True, exist_ok=True)
 
     dagster_yaml_path = dagster_home / "dagster.yaml"
     if not dagster_yaml_path.exists():
-        logger.info("creating_dagster_yaml", path=str(dagster_yaml_path))
-        create_dagster_yaml_file(dagster_yaml_path)
+        logger.info("copying_dagster_yaml", path=str(dagster_yaml_path))
+        # Copy the static dagster.yaml from package to DAGSTER_HOME
+        package = "dagster_taskiq_demo.config"
+        template_path = importlib.resources.files(package) / "dagster.yaml"
+        template_content = template_path.read_text(encoding="utf-8")
+        dagster_yaml_path.write_text(template_content, encoding="utf-8")
+        logger.info("dagster_yaml_copied", path=str(dagster_yaml_path))
     else:
         logger.info("dagster_yaml_exists", path=str(dagster_yaml_path))
 

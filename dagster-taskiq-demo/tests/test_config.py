@@ -12,7 +12,6 @@ import yaml
 from dagster_taskiq_demo.config.dagster import (
     DagsterPostgreSQLConfig,
     RetryablePostgresStorage,
-    create_dagster_yaml_file,
     get_dagster_instance_config,
 )
 from dagster_taskiq_demo.config.exceptions import DagsterDatabaseConnectionError
@@ -182,21 +181,6 @@ def test_create_storage_failure_after_max_retries() -> None:
     assert mock_storage_class.call_count == 2
 
 
-def test_create_dagster_yaml_file(test_settings: Settings) -> None:
-    """Creation of dagster.yaml file."""
-    with patch("dagster_taskiq_demo.config.dagster.settings", test_settings), tempfile.TemporaryDirectory() as temp_dir:
-        output_path = pathlib.Path(temp_dir) / "test_dagster.yaml"
-
-        create_dagster_yaml_file(output_path)
-
-        assert output_path.exists()
-
-        with output_path.open("r", encoding="utf-8") as file:
-            config = yaml.safe_load(file)
-
-    assert "storage" in config
-    assert "postgres" in config["storage"]
-    assert config["storage"]["postgres"]["postgres_url"] == test_settings.dagster_postgres_url
 
 
 def test_get_dagster_instance_config(test_settings: Settings) -> None:
