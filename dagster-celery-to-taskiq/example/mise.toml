@@ -1,9 +1,6 @@
 # Dagster TaskIQ Example mise configuration
 # This file defines tasks for the Dagster TaskIQ example
 
-[env]
-PYTHONPATH = "src"
-
 # ==============================================================================
 # Common Development Tasks
 # ==============================================================================

@@ -1,9 +1,6 @@
 # App-specific mise configuration
 # This file defines tasks for the Dagster TaskIQ application
 
-[env]
-PYTHONPATH = "src"
-
 # ==============================================================================
 # Common Development Tasks
 # ==============================================================================
@@ -12,21 +9,19 @@ PYTHONPATH = "src"
 description = "Install deploy dependencies"
 run = "uv sync --all-groups"
 sources = ["pyproject.toml", "uv.lock"]
+outputs = [".venv"]
 
 [tasks.test]
 description = "Run deploy tests with pytest (pass additional args)"
 run = "uv run pytest"
-sources = ["**/*.py"]
 
 [tasks.format]
 description = "Format deploy code with ruff (pass --check to check only)"
 run = "uv run ruff format"
-sources = ["**/*.py"]
 
 [tasks.lint]
 description = "Lint deploy code with ruff (pass --fix to auto-fix)"
 run = "uv run ruff check"
-sources = ["**/*.py"]
 
 [tasks."lint:power-fix"]
 description = "Attempt to fix all lint errors"
@@ -35,17 +30,15 @@ run = "mise run lint --fix --unsafe-fixes"
 [tasks.mypy]
 description = "Run mypy type checker (pass additional args)"
 run = "uv run mypy"
-sources = ["**/*.py"]
 
 [tasks.pyright]
 description = "Run pyright type checker (pass additional args)"
 run = "uv run pyright"
-sources = ["**/*.py"]
 
 [tasks.checks]
 description = "Run all read-only checks (lint + typechecks + test)"
-depends = ["lint", "mypy", "pyright", "test"]
+wait_for = ["lint", "mypy", "pyright", "test"]
 
 [tasks.fixes]
 description = "Run all fixes (ruff format and linter)"
-depends = ["format", "lint:power-fix"]
+wait_for = ["format", "lint:power-fix"]

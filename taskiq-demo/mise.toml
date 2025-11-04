@@ -1,29 +1,53 @@
-# TaskIQ demo specific tasks
+# ==============================================================================
+# Common Development Tasks
+# ==============================================================================
 
-[env]
-PYTHONPATH = "src"
-
-[tasks.app]
-description = "Run the FastAPI service locally"
-run = "uv run taskiq-demo-api"
-sources = ["pyproject.toml", "src/taskiq_demo/**/*.py"]
-
-[tasks.worker]
-description = "Run the TaskIQ worker locally"
-run = "uv run taskiq-demo-worker"
-sources = ["pyproject.toml", "src/taskiq_demo/**/*.py"]
+[tasks.install]
+description = "Install deploy dependencies"
+run = "uv sync --all-groups"
+sources = ["pyproject.toml", "uv.lock"]
+outputs = [".venv"]
 
 [tasks.test]
-description = "Run tests with pytest"
+description = "Run deploy tests with pytest (pass additional args)"
 run = "uv run pytest"
-sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
 
 [tasks.format]
-description = "Format code with ruff"
+description = "Format deploy code with ruff (pass --check to check only)"
 run = "uv run ruff format"
-sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
 
 [tasks.lint]
-description = "Lint code with ruff"
+description = "Lint deploy code with ruff (pass --fix to auto-fix)"
 run = "uv run ruff check"
-sources = ["pyproject.toml", "src/taskiq_demo/**/*.py", "tests/**/*.py"]
+
+[tasks."lint:power-fix"]
+description = "Attempt to fix all lint errors"
+run = "mise run lint --fix --unsafe-fixes"
+
+[tasks.mypy]
+description = "Run mypy type checker (pass additional args)"
+run = "uv run mypy"
+
+[tasks.pyright]
+description = "Run pyright type checker (pass additional args)"
+run = "uv run pyright"
+
+[tasks.checks]
+description = "Run all read-only checks (lint + typechecks + test)"
+wait_for = ["lint", "mypy", "pyright", "test"]
+
+[tasks.fixes]
+description = "Run all fixes (ruff format and linter)"
+wait_for = ["format", "lint:power-fix"]
+
+# ==============================================================================
+# TaskIQ demo specific tasks
+# ==============================================================================
+
+[tasks."run:app"]
+description = "Run the FastAPI service locally"
+run = "uv run taskiq-demo-api"
+
+[tasks."run:worker"]
+description = "Run the TaskIQ worker locally"
+run = "uv run taskiq-demo-worker"

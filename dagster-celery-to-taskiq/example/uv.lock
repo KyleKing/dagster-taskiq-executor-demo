@@ -310,49 +310,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dagster-celery-to-taskiq-example"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "dagster" },
-    { name = "dagster-postgres" },
-    { name = "dagster-taskiq" },
-    { name = "dagster-webserver" },
-    { name = "pyyaml" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-postgresql" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "dagster", specifier = ">=1.7.10" },
-    { name = "dagster-postgres", specifier = ">=0.23.10" },
-    { name = "dagster-taskiq", editable = "../" },
-    { name = "dagster-webserver", specifier = ">=1.7.10" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.18.2" },
-    { name = "pyright", specifier = ">=1.1.390" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=0.24.0" },
-    { name = "pytest-postgresql", specifier = ">=7" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
-]
-
-[[package]]
 name = "dagster-graphql"
 version = "1.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -409,32 +366,68 @@ wheels = [
 
 [[package]]
 name = "dagster-taskiq"
-version = "1!0+dev"
+version = "0.0.0"
 source = { editable = "../" }
 dependencies = [
     { name = "aioboto3" },
-    { name = "aiobotocore" },
-    { name = "click" },
     { name = "dagster" },
     { name = "pydantic" },
-    { name = "taskiq" },
-    { name = "taskiq-redis" },
+    { name = "pytest-timeout" },
+    { name = "taskiq-aio-sqs" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", specifier = ">=13.0.0" },
-    { name = "aiobotocore", specifier = ">=2.23.1,<3.0.0" },
-    { name = "click", specifier = ">=5.0,<9.0" },
     { name = "dagster", specifier = ">=1.0.0" },
-    { name = "docker", marker = "extra == 'test'" },
-    { name = "kubernetes", marker = "extra == 'kubernetes'" },
-    { name = "pydantic", specifier = ">=1.0,<3.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'" },
-    { name = "taskiq", specifier = ">=0.11.12,<1.0.0" },
-    { name = "taskiq-redis", specifier = ">=1.1.2" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "taskiq-aio-sqs", specifier = ">=0.4.0" },
 ]
-provides-extras = ["kubernetes", "test"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "moto", extras = ["s3", "sqs", "server"], specifier = ">=5.0.0" },
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "pyright", specifier = ">=1.1.390" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
+    { name = "taskiq-dashboard", specifier = ">=0.2.0" },
+]
+
+[[package]]
+name = "dagster-taskiq-example"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "dagster" },
+    { name = "dagster-postgres" },
+    { name = "dagster-taskiq" },
+    { name = "dagster-webserver" },
+    { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-postgresql" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dagster", specifier = ">=1.7.10" },
+    { name = "dagster-postgres", specifier = ">=0.23.10" },
+    { name = "dagster-taskiq", editable = "../" },
+    { name = "dagster-webserver", specifier = ">=1.7.10" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -442,7 +435,9 @@ dev = [
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "pytest-postgresql", specifier = ">=7" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
 
 [[package]]
@@ -892,6 +887,29 @@ wheels = [
 ]
 
 [[package]]
+name = "orjson"
+version = "3.11.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/fe/ed708782d6709cc60eb4c2d8a361a440661f74134675c72990f2c48c785f/orjson-3.11.4.tar.gz", hash = "sha256:39485f4ab4c9b30a3943cfe99e1a213c4776fb69e8abd68f66b83d5a0b0fdc6d", size = 5945188, upload-time = "2025-10-24T15:50:38.027Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/15/c52aa7112006b0f3d6180386c3a46ae057f932ab3425bc6f6ac50431cca1/orjson-3.11.4-cp313-cp313-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl", hash = "sha256:2d6737d0e616a6e053c8b4acc9eccea6b6cce078533666f32d140e4f85002534", size = 243525, upload-time = "2025-10-24T15:49:29.737Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/38/05340734c33b933fd114f161f25a04e651b0c7c33ab95e9416ade5cb44b8/orjson-3.11.4-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:afb14052690aa328cc118a8e09f07c651d301a72e44920b887c519b313d892ff", size = 128871, upload-time = "2025-10-24T15:49:31.109Z" },
+    { url = "https://files.pythonhosted.org/packages/55/b9/ae8d34899ff0c012039b5a7cb96a389b2476e917733294e498586b45472d/orjson-3.11.4-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:38aa9e65c591febb1b0aed8da4d469eba239d434c218562df179885c94e1a3ad", size = 130055, upload-time = "2025-10-24T15:49:33.382Z" },
+    { url = "https://files.pythonhosted.org/packages/33/aa/6346dd5073730451bee3681d901e3c337e7ec17342fb79659ec9794fc023/orjson-3.11.4-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f2cf4dfaf9163b0728d061bebc1e08631875c51cd30bf47cb9e3293bfbd7dcd5", size = 129061, upload-time = "2025-10-24T15:49:34.935Z" },
+    { url = "https://files.pythonhosted.org/packages/39/e4/8eea51598f66a6c853c380979912d17ec510e8e66b280d968602e680b942/orjson-3.11.4-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:89216ff3dfdde0e4070932e126320a1752c9d9a758d6a32ec54b3b9334991a6a", size = 136541, upload-time = "2025-10-24T15:49:36.923Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/47/cb8c654fa9adcc60e99580e17c32b9e633290e6239a99efa6b885aba9dbc/orjson-3.11.4-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:9daa26ca8e97fae0ce8aa5d80606ef8f7914e9b129b6b5df9104266f764ce436", size = 137535, upload-time = "2025-10-24T15:49:38.307Z" },
+    { url = "https://files.pythonhosted.org/packages/43/92/04b8cc5c2b729f3437ee013ce14a60ab3d3001465d95c184758f19362f23/orjson-3.11.4-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:5c8b2769dc31883c44a9cd126560327767f848eb95f99c36c9932f51090bfce9", size = 136703, upload-time = "2025-10-24T15:49:40.795Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/fd/d0733fcb9086b8be4ebcfcda2d0312865d17d0d9884378b7cffb29d0763f/orjson-3.11.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1469d254b9884f984026bd9b0fa5bbab477a4bfe558bba6848086f6d43eb5e73", size = 136293, upload-time = "2025-10-24T15:49:42.347Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/d7/3c5514e806837c210492d72ae30ccf050ce3f940f45bf085bab272699ef4/orjson-3.11.4-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:68e44722541983614e37117209a194e8c3ad07838ccb3127d96863c95ec7f1e0", size = 140131, upload-time = "2025-10-24T15:49:43.638Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/dd/ba9d32a53207babf65bd510ac4d0faaa818bd0df9a9c6f472fe7c254f2e3/orjson-3.11.4-cp313-cp313-musllinux_1_2_armv7l.whl", hash = "sha256:8e7805fda9672c12be2f22ae124dcd7b03928d6c197544fe12174b86553f3196", size = 406164, upload-time = "2025-10-24T15:49:45.498Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/f9/f68ad68f4af7c7bde57cd514eaa2c785e500477a8bc8f834838eb696a685/orjson-3.11.4-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:04b69c14615fb4434ab867bf6f38b2d649f6f300af30a6705397e895f7aec67a", size = 149859, upload-time = "2025-10-24T15:49:46.981Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/d2/7f847761d0c26818395b3d6b21fb6bc2305d94612a35b0a30eae65a22728/orjson-3.11.4-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:639c3735b8ae7f970066930e58cf0ed39a852d417c24acd4a25fc0b3da3c39a6", size = 139926, upload-time = "2025-10-24T15:49:48.321Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/37/acd14b12dc62db9a0e1d12386271b8661faae270b22492580d5258808975/orjson-3.11.4-cp313-cp313-win32.whl", hash = "sha256:6c13879c0d2964335491463302a6ca5ad98105fc5db3565499dcb80b1b4bd839", size = 136007, upload-time = "2025-10-24T15:49:49.938Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/a9/967be009ddf0a1fffd7a67de9c36656b28c763659ef91352acc02cbe364c/orjson-3.11.4-cp313-cp313-win_amd64.whl", hash = "sha256:09bf242a4af98732db9f9a1ec57ca2604848e16f132e3f72edfd3c5c96de009a", size = 131314, upload-time = "2025-10-24T15:49:51.248Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/db/399abd6950fbd94ce125cb8cd1a968def95174792e127b0642781e040ed4/orjson-3.11.4-cp313-cp313-win_arm64.whl", hash = "sha256:a85f0adf63319d6c1ba06fb0dbf997fced64a01179cf17939a6caca662bf92de", size = 126152, upload-time = "2025-10-24T15:49:52.922Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1180,6 +1198,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-timeout"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/82/4c9ecabab13363e72d880f2fb504c5f750433b2b6f16e99f4ec21ada284c/pytest_timeout-2.4.0.tar.gz", hash = "sha256:7e68e90b01f9eff71332b25001f85c75495fc4e3a836701876183c4bcfd0540a", size = 17973, upload-time = "2025-05-05T19:44:34.99Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/b6/3127540ecdf1464a00e5a01ee60a1b09175f6913f0644ac748494d9c4b21/pytest_timeout-2.4.0-py3-none-any.whl", hash = "sha256:c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2", size = 14382, upload-time = "2025-05-05T19:44:33.502Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -1235,15 +1265,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/de/94/980b50a6531b3019e45ddeada0626d45fa85cbe22300844a7983285bed3b/pyyaml-6.0.3-cp313-cp313-win32.whl", hash = "sha256:d0eae10f8159e8fdad514efdc92d74fd8d682c933a6dd088030f3834bc8e6b26", size = 137427, upload-time = "2025-09-25T21:32:32.58Z" },
     { url = "https://files.pythonhosted.org/packages/97/c9/39d5b874e8b28845e4ec2202b5da735d0199dbe5b8fb85f91398814a9a46/pyyaml-6.0.3-cp313-cp313-win_amd64.whl", hash = "sha256:79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c", size = 154090, upload-time = "2025-09-25T21:32:33.659Z" },
     { url = "https://files.pythonhosted.org/packages/73/e8/2bdf3ca2090f68bb3d75b44da7bbc71843b19c9f2b9cb9b0f4ab7a5a4329/pyyaml-6.0.3-cp313-cp313-win_arm64.whl", hash = "sha256:5498cd1645aa724a7c71c8f378eb29ebe23da2fc0d7a08071d89469bf1d2defb", size = 140246, upload-time = "2025-09-25T21:32:34.663Z" },
-]
-
-[[package]]
-name = "redis"
-version = "6.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0d/d6/e8b92798a5bd67d659d51a18170e91c16ac3b59738d91894651ee255ed49/redis-6.4.0.tar.gz", hash = "sha256:b01bc7282b8444e28ec36b261df5375183bb47a07eb9c603f284e89cbc5ef010", size = 4647399, upload-time = "2025-08-07T08:10:11.441Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/02/89e2ed7e85db6c93dfa9e8f691c5087df4e3551ab39081a4d7c6d1f90e05/redis-6.4.0-py3-none-any.whl", hash = "sha256:f0544fa9604264e9464cdf4814e7d4830f74b165d52f2a330a760a88dd248b7f", size = 279847, upload-time = "2025-08-07T08:10:09.84Z" },
 ]
 
 [[package]]
@@ -1423,6 +1444,26 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/70/b5f91b22e7b6ca8b467f7a933fd7e1d4b5016186720729bb6a40bfa2251a/taskiq-0.11.20-py3-none-any.whl", hash = "sha256:29521bbd580af1b98052d4c24a33f6d4a6060bba73dcae4ce9c69c63b937cf87", size = 81873, upload-time = "2025-10-30T13:15:14.311Z" },
 ]
 
+[package.optional-dependencies]
+orjson = [
+    { name = "orjson" },
+]
+
+[[package]]
+name = "taskiq-aio-sqs"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiobotocore" },
+    { name = "annotated-types" },
+    { name = "pydantic" },
+    { name = "taskiq", extra = ["orjson"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/0d/cfc3fac19f7252af6b35cab7ebcefb493a6c23fdcb9906586eea93decdd4/taskiq_aio_sqs-0.4.0.tar.gz", hash = "sha256:3e20df1c2e37b4cd83975c9c3f8dab751d33947030cdb565b6723f5fc600b1c8", size = 142191, upload-time = "2025-08-16T15:10:10.861Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ed/69/076cfb9033232afaec3ef4548df1bd36dc0a9e317d00cb7318fa045f0358/taskiq_aio_sqs-0.4.0-py3-none-any.whl", hash = "sha256:a642788d273c654c7dba60da42b4cd3e6557cea8ffbb0363246c76015193beff", size = 11796, upload-time = "2025-08-16T15:10:09.623Z" },
+]
+
 [[package]]
 name = "taskiq-dependencies"
 version = "1.5.7"
@@ -1430,19 +1471,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/47/90/47a627696e53bfdcacabc3e8c05b73bf1424685bcb5f17209cb8b12da1bf/taskiq_dependencies-1.5.7.tar.gz", hash = "sha256:0d3b240872ef152b719153b9526d866d2be978aeeaea6600e878414babc2dcb4", size = 14875, upload-time = "2025-02-26T22:07:39.876Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/6d/4a012f2de002c2e93273f5e7d3e3feea02f7fdbb7b75ca2ca1dd10703091/taskiq_dependencies-1.5.7-py3-none-any.whl", hash = "sha256:6fcee5d159bdb035ef915d4d848826169b6f06fe57cc2297a39b62ea3e76036f", size = 13801, upload-time = "2025-02-26T22:07:38.622Z" },
-]
-
-[[package]]
-name = "taskiq-redis"
-version = "1.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "redis" },
-    { name = "taskiq" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/0b/5006792cbdf6e78abaab45407968d96e2a1ffd0238cd41b13a62b33880cf/taskiq_redis-1.1.2.tar.gz", hash = "sha256:f878a047abc1a0fa0ddda6e4b063d742f030858d5a4409de96261a00a992c9c9", size = 16225, upload-time = "2025-10-07T10:46:13.666Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/20/9bf19b05eb7cb275a04871f3c38bf088c108579c4c19ea2a1358d2a81334/taskiq_redis-1.1.2-py3-none-any.whl", hash = "sha256:3b69468ff99da33243314c84acfa137a4a014abad10dd44e62195bc5e4ae9947", size = 20424, upload-time = "2025-10-07T10:46:12.779Z" },
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import uuid
 from collections.abc import Mapping
 from typing import Any, Optional
@@ -231,7 +232,10 @@ def worker_start_command(args):
     worker_name = get_worker_name(args.name)
 
     # Build taskiq worker command
+    # Use sys.executable to ensure we use the same Python interpreter
     subprocess_args = [
+        sys.executable,
+        "-m",
         "taskiq",
         "worker",
         args.broker,
