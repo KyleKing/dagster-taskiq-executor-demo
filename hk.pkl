@@ -34,7 +34,7 @@ local commit_msg_checks = new Mapping<String, Step> {
 }
 local pre_push_checks = new Mapping<String, Step> {
     ["checks"] {
-        check = "mise run checks"
+        check = "mise run checks:all"
     }
     ["commitizen-branch"] {
         check = "cz check --rev-range origin/HEAD..HEAD"

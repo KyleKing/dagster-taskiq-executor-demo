@@ -1,0 +1,44 @@
+# ==============================================================================
+# Common Development Tasks
+# Use with 'task_config.includes'
+# https://mise.jdx.dev/tasks/task-configuration.html#task-config-includes
+# ==============================================================================
+
+[install]
+description = "Install deploy dependencies"
+run = "uv sync --all-groups"
+sources = ["pyproject.toml", "uv.lock"]
+outputs = [".venv"]
+
+[test]
+description = "Run deploy tests with pytest (pass additional args)"
+run = "uv run pytest"
+
+[format]
+description = "Format deploy code with ruff (pass --check to check only)"
+run = "uv run ruff format"
+
+[lint]
+description = "Lint deploy code with ruff (pass --fix to auto-fix)"
+run = "uv run ruff check"
+
+["lint:power-fix"]
+description = "Attempt to fix all lint errors"
+run = "mise run lint --fix --unsafe-fixes"
+
+[mypy]
+description = "Run mypy type checker (pass additional args)"
+run = "uv run mypy"
+
+[pyright]
+description = "Run pyright type checker (pass additional args)"
+run = "uv run pyright"
+
+[checks]
+description = "Run all read-only checks (lint + typechecks + test)"
+wait_for = ["lint", "mypy", "pyright", "test"]
+
+[fixes]
+description = "Run all fixes (ruff format and linter)"
+wait_for = ["format", "lint:power-fix"]
+
