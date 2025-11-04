@@ -9,8 +9,8 @@ import pytest
 from dagster._core.instance import DagsterInstance
 from dagster._core.test_utils import environ, instance_for_test
 from moto.server import ThreadedMotoServer
-# from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 
+# from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 from tests.utils import start_taskiq_worker
 
 AWS_TEST_ACCESS_KEY = "testing"
@@ -23,8 +23,7 @@ def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         s.listen(1)
-        port = s.getsockname()[1]
-    return port
+        return s.getsockname()[1]
 
 
 @pytest.fixture(scope="session")
@@ -37,12 +36,8 @@ def localstack():
         env_vars = {
             "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_override,
             "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint_override,
-            "DAGSTER_TASKIQ_S3_ENDPOINT_URL": os.getenv(
-                "DAGSTER_TASKIQ_S3_ENDPOINT_URL", endpoint_override
-            ),
-            "DAGSTER_TASKIQ_S3_BUCKET_NAME": os.getenv(
-                "DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results"
-            ),
+            "DAGSTER_TASKIQ_S3_ENDPOINT_URL": os.getenv("DAGSTER_TASKIQ_S3_ENDPOINT_URL", endpoint_override),
+            "DAGSTER_TASKIQ_S3_BUCKET_NAME": os.getenv("DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results"),
             "AWS_DEFAULT_REGION": os.getenv("AWS_DEFAULT_REGION", AWS_TEST_REGION),
             "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", AWS_TEST_ACCESS_KEY),
             "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", AWS_TEST_SECRET_KEY),
@@ -104,6 +99,7 @@ def localstack():
 
             import dagster_taskiq  # type: ignore
             import dagster_taskiq.defaults as taskiq_defaults  # type: ignore
+
             importlib.reload(taskiq_defaults)  # reload defaults first
 
             import dagster_taskiq.app as taskiq_app  # type: ignore
@@ -141,19 +137,19 @@ def localstack():
         os.environ.update(removed_vars)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def tempdir():
     with tempfile.TemporaryDirectory() as the_dir:
         yield the_dir
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def instance(tempdir):
     with instance_for_test(temp_dir=tempdir) as test_instance:
         yield test_instance
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker():
         yield
@@ -167,7 +163,7 @@ def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[Non
 #         try:
 #             client = docker.from_env()
 #             client.images.get(docker_image)
-#             print(  # noqa: T201
+#             print(
 #                 f"Found existing image tagged {docker_image}, skipping image build. To rebuild, first run: "
 #                 f"docker rmi {docker_image}"
 #             )

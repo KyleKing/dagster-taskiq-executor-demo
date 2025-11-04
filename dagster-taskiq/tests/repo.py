@@ -4,6 +4,7 @@ from dagster import Int, OpExecutionContext, Output, RetryRequested, job
 from dagster._core.definitions.decorators import op
 from dagster._core.definitions.output import Out
 from dagster._core.test_utils import nesting_graph
+
 from dagster_taskiq import taskiq_executor
 
 # test_execute jobs
@@ -84,14 +85,18 @@ def test_optional_outputs():
     bar.alias("third_consumer")(input_arg=foo_res.out_3)
 
 
+class TestFailureError(Exception):
+    """Custom exception for test failures."""
+
+
 @op
 def fails():
-    raise Exception("argjhgjh")
+    raise TestFailureError("argjhgjh")
 
 
 @op
 def should_never_execute(foo):
-    assert False  # should never execute
+    raise AssertionError  # should never execute
 
 
 @job(executor_def=taskiq_executor)
@@ -101,7 +106,7 @@ def test_fails():
 
 @op
 def retry_request():
-    raise RetryRequested()
+    raise RetryRequested
 
 
 @job(executor_def=taskiq_executor)
@@ -111,7 +116,7 @@ def test_retries():
 
 @op(config_schema=str)
 def destroy(context, x):
-    raise ValueError()
+    raise ValueError
 
 
 @job(executor_def=taskiq_executor)

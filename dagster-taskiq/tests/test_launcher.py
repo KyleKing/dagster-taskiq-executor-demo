@@ -6,18 +6,18 @@ from typing import Any
 
 import pytest
 from dagster import DagsterInstance, DagsterRunStatus, file_relative_path, instance_for_test
-from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext
-from dagster._core.workspace.load_target import PythonFileTarget
-from dagster._daemon import execute_run_monitoring_iteration
-from dagster_taskiq.defaults import sqs_queue_url
+from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext  # noqa: PLC2701
+from dagster._core.workspace.load_target import PythonFileTarget  # noqa: PLC2701
+from dagster._daemon import execute_run_monitoring_iteration  # noqa: PLC2701
 from dagster_shared import seven
 
+from dagster_taskiq.defaults import sqs_queue_url
 from tests.repo_runner import crashy_job, exity_job, noop_job, sleepy_job
 from tests.utils import start_taskiq_worker
 from tests.utils_launcher import poll_for_finished_run, poll_for_step_start
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def instance(tempdir):
     with instance_for_test(
         temp_dir=tempdir,
@@ -43,7 +43,7 @@ def instance(tempdir):
         yield test_instance
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def workspace_process_context(instance) -> Iterator[WorkspaceProcessContext]:
     with WorkspaceProcessContext(
         instance,
@@ -57,14 +57,12 @@ def workspace_process_context(instance) -> Iterator[WorkspaceProcessContext]:
         yield workspace_process_context
 
 
-@pytest.fixture(scope="function")
-def workspace(
-    instance, workspace_process_context: WorkspaceProcessContext
-) -> Iterator[WorkspaceRequestContext]:
-    yield workspace_process_context.create_request_context()
+@pytest.fixture
+def workspace(instance, workspace_process_context: WorkspaceProcessContext) -> Iterator[WorkspaceRequestContext]:
+    return workspace_process_context.create_request_context()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker(queue="custom-queue"):
         yield
@@ -86,11 +84,7 @@ def test_successful_run(
     workspace: WorkspaceRequestContext,
     run_config,
 ):
-    remote_job = (
-        workspace.get_code_location("test")
-        .get_repository("taskiq_test_repository")
-        .get_full_job("noop_job")
-    )
+    remote_job = workspace.get_code_location("test").get_repository("taskiq_test_repository").get_full_job("noop_job")
 
     dagster_run = instance.create_run_for_job(
         job_def=noop_job,
@@ -131,11 +125,7 @@ def test_crashy_run(
 ):
     logger = logging.getLogger()
 
-    remote_job = (
-        workspace.get_code_location("test")
-        .get_repository("taskiq_test_repository")
-        .get_full_job("crashy_job")
-    )
+    remote_job = workspace.get_code_location("test").get_repository("taskiq_test_repository").get_full_job("crashy_job")
 
     run = instance.create_run_for_job(
         job_def=crashy_job,
@@ -177,11 +167,7 @@ def test_exity_run(
     workspace: WorkspaceRequestContext,
     run_config: Mapping[str, Any],
 ):
-    remote_job = (
-        workspace.get_code_location("test")
-        .get_repository("taskiq_test_repository")
-        .get_full_job("exity_job")
-    )
+    remote_job = workspace.get_code_location("test").get_repository("taskiq_test_repository").get_full_job("exity_job")
 
     run = instance.create_run_for_job(
         job_def=exity_job,
@@ -228,11 +214,7 @@ def test_terminated_run(
     workspace: WorkspaceRequestContext,
     run_config: Mapping[str, Any],
 ):
-    remote_job = (
-        workspace.get_code_location("test")
-        .get_repository("taskiq_test_repository")
-        .get_full_job("sleepy_job")
-    )
+    remote_job = workspace.get_code_location("test").get_repository("taskiq_test_repository").get_full_job("sleepy_job")
     run = instance.create_run_for_job(
         job_def=sleepy_job,
         run_config=run_config,
@@ -243,7 +225,8 @@ def test_terminated_run(
     run_id = run.run_id
 
     run = instance.get_run_by_id(run_id)
-    assert run and run.status == DagsterRunStatus.NOT_STARTED
+    assert run
+    assert run.status == DagsterRunStatus.NOT_STARTED
 
     instance.launch_run(run.run_id, workspace)
 
@@ -253,7 +236,8 @@ def test_terminated_run(
     assert launcher.terminate(run_id)
 
     terminated_run = poll_for_finished_run(instance, run_id, timeout=30)
-    assert terminated_run and terminated_run.status == DagsterRunStatus.FAILURE
+    assert terminated_run
+    assert terminated_run.status == DagsterRunStatus.FAILURE
 
     event_records = list(instance.all_logs(run_id))
     assert _message_exists(event_records, "Requested Taskiq task cancellation."), (
@@ -262,8 +246,4 @@ def test_terminated_run(
 
 
 def _message_exists(event_records, message_text):
-    for event_record in event_records:
-        if message_text in event_record.message:
-            return True
-
-    return False
+    return any(message_text in event_record.message for event_record in event_records)

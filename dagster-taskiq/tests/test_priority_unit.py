@@ -3,11 +3,10 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
-import pytest
-from dagster._core.origin import JobPythonOrigin
+from dagster._core.origin import JobPythonOrigin  # noqa: PLC2701
 
 from dagster_taskiq.defaults import task_default_priority
-from dagster_taskiq.executor import _priority_to_delay_seconds
+from dagster_taskiq.executor import _priority_to_delay_seconds  # noqa: PLC2701
 
 
 def test_priority_to_delay_mapping():
@@ -30,12 +29,9 @@ def test_priority_to_delay_mapping():
 
 def test_delay_label_passed_to_broker():
     """Test that delay labels are correctly passed to the taskiq broker."""
-    import asyncio
-    from dagster_taskiq.executor import _submit_task_async
-    from dagster_taskiq.tasks import create_task
+    from dagster_taskiq.executor import _submit_task_async  # noqa: PLC0415, PLC2701
 
     async def run_test():
-
         # Create a mock broker
         mock_broker = MagicMock()
         mock_broker.startup = AsyncMock()
@@ -71,9 +67,9 @@ def test_delay_label_passed_to_broker():
         mock_step.key = "test_step"
 
         # Mock create_task to return our mock task
-        with patch('dagster_taskiq.tasks.create_task', return_value=mock_task):
+        with patch("dagster_taskiq.tasks.create_task", return_value=mock_task):
             # Test with high priority (should have low delay)
-            result = await _submit_task_async(
+            await _submit_task_async(
                 mock_broker,
                 mock_plan_context,
                 mock_step,
@@ -85,14 +81,14 @@ def test_delay_label_passed_to_broker():
             # Verify with_labels was called with delay=0
             mock_kicker_with_labels.with_labels.assert_called_once()
             call_kwargs = mock_kicker_with_labels.with_labels.call_args[1]
-            assert call_kwargs['delay'] == 0, f"Expected delay=0 for priority=10, got delay={call_kwargs.get('delay')}"
+            assert call_kwargs["delay"] == 0, f"Expected delay=0 for priority=10, got delay={call_kwargs.get('delay')}"
 
             # Reset mocks
             mock_kicker_with_labels.with_labels.reset_mock()
             mock_kiq.reset_mock()
 
             # Test with low priority (should have high delay)
-            result = await _submit_task_async(
+            await _submit_task_async(
                 mock_broker,
                 mock_plan_context,
                 mock_step,
@@ -104,6 +100,8 @@ def test_delay_label_passed_to_broker():
             # Verify with_labels was called with delay=80
             mock_kicker_with_labels.with_labels.assert_called_once()
             call_kwargs = mock_kicker_with_labels.with_labels.call_args[1]
-            assert call_kwargs['delay'] == 80, f"Expected delay=80 for priority=-3, got delay={call_kwargs.get('delay')}"
+            assert call_kwargs["delay"] == 80, (
+                f"Expected delay=80 for priority=-3, got delay={call_kwargs.get('delay')}"
+            )
 
     asyncio.run(run_test())

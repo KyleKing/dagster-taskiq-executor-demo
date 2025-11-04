@@ -9,7 +9,7 @@ from dagster import (
     job,
     op,
 )
-from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition
+from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition  # noqa: PLC2701
 from dagster_taskiq import taskiq_executor
 
 example_partition_def = StaticPartitionsDefinition(
@@ -36,17 +36,35 @@ partitioned_job_long = define_asset_job(
 
 @op
 def start() -> int:
-    """This op returns a simple value."""
+    """This op returns a simple value.
+
+    Returns:
+        The integer value 1
+    """
     return 1
+
+
+class ReliabilityError(Exception):
+    """Exception raised when an operation fails reliability check."""
 
 
 @op
 def unreliable(num: int) -> int:
-    """This op is unreliable and will fail 50% of the time."""
+    """This op is unreliable and will fail 50% of the time.
+
+    Args:
+        num: Input number
+
+    Returns:
+        The input number if reliable
+
+    Raises:
+        ReliabilityError: If the operation fails the reliability check
+    """
     failure_rate = 0.5
-    if random.random() < failure_rate:
+    if random.random() < failure_rate:  # noqa: S311
         msg = "Failed to be reliable."
-        raise Exception(msg)
+        raise ReliabilityError(msg)
 
     return num
 

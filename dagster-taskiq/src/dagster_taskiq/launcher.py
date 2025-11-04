@@ -1,7 +1,13 @@
+"""Taskiq run launcher for Dagster.
+
+This module provides TaskiqRunLauncher which launches Dagster runs as Taskiq tasks
+on AWS SQS.
+"""
+
 import asyncio
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Self
 
 from dagster import (
     DagsterInstance,
@@ -10,9 +16,11 @@ from dagster import (
     Noneable,
     Permissive,
     StringSource,
-    _check as check,
 )
-from dagster._core.events import EngineEventData
+from dagster import (
+    _check as check,  # noqa: PLC2701
+)
+from dagster._core.events import EngineEventData  # noqa: PLC2701
 from dagster._core.launcher import (
     CheckRunHealthResult,
     LaunchRunContext,
@@ -20,13 +28,13 @@ from dagster._core.launcher import (
     RunLauncher,
     WorkerStatus,
 )
-from dagster._grpc.types import ExecuteRunArgs, ResumeRunArgs
-from dagster._serdes import ConfigurableClass, ConfigurableClassData, pack_value
+from dagster._grpc.types import ExecuteRunArgs, ResumeRunArgs  # noqa: PLC2701
+from dagster._serdes import ConfigurableClass, ConfigurableClassData, pack_value  # noqa: PLC2701
 from taskiq import AsyncBroker
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dagster_taskiq.config import DEFAULT_CONFIG, TASK_EXECUTE_JOB_NAME, TASK_RESUME_JOB_NAME
-from dagster_taskiq.defaults import task_default_queue, sqs_queue_url, aws_region_name
+from dagster_taskiq.defaults import aws_region_name, sqs_queue_url, task_default_queue
 from dagster_taskiq.make_app import make_app
 from dagster_taskiq.tags import (
     DAGSTER_TASKIQ_QUEUE_TAG,
@@ -37,7 +45,6 @@ from dagster_taskiq.tasks import create_execute_job_task, create_resume_job_task
 
 if TYPE_CHECKING:
     from dagster._config import UserConfigSchema
-    from taskiq.result import TaskiqResult
 
 
 class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
@@ -53,11 +60,11 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
     def __init__(
         self,
         default_queue: str,
-        queue_url: Optional[str] = None,
-        region_name: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
-        config_source: Optional[dict] = None,
-        inst_data: Optional[ConfigurableClassData] = None,
+        queue_url: str | None = None,
+        region_name: str | None = None,
+        endpoint_url: str | None = None,
+        config_source: dict | None = None,
+        inst_data: ConfigurableClassData | None = None,
     ) -> None:
         """Initialize the Taskiq run launcher.
 
@@ -74,9 +81,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         self.queue_url = check.opt_str_param(queue_url, "queue_url", default=sqs_queue_url)
         self.region_name = check.opt_str_param(region_name, "region_name", default=aws_region_name)
         self.endpoint_url = check.opt_str_param(endpoint_url, "endpoint_url")
-        self.config_source = dict(
-            DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source")
-        )
+        self.config_source = dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source"))
         self.default_queue = check.str_param(default_queue, "default_queue")
 
         # Create the Taskiq broker
@@ -258,7 +263,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self.broker.startup())
-            if hasattr(self.broker, 'result_backend') and self.broker.result_backend:
+            if hasattr(self.broker, "result_backend") and self.broker.result_backend:
                 loop.run_until_complete(self.broker.result_backend.startup())
 
             # Use kiq() to submit the task with labels
@@ -274,7 +279,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             )
 
             # Store the task ID for tracking
-            task_id = result.task_id if hasattr(result, 'task_id') else str(id(result))
+            task_id = result.task_id if hasattr(result, "task_id") else str(id(result))
 
             self._instance.add_run_tags(
                 run.run_id,
@@ -284,13 +289,11 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             self._instance.report_engine_event(
                 "Taskiq task has been forwarded to SQS.",
                 run,
-                EngineEventData(
-                    {
-                        "Run ID": run.run_id,
-                        "Taskiq Task ID": task_id,
-                        "Queue": queue,
-                    }
-                ),
+                EngineEventData({
+                    "Run ID": run.run_id,
+                    "Taskiq Task ID": task_id,
+                    "Queue": queue,
+                }),
                 cls=self.__class__,
             )
         finally:
@@ -323,14 +326,11 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         # For now, we return UNKNOWN since we don't have a result backend configured
         # In a production setup, you'd configure a result backend and check it here
         return CheckRunHealthResult(
-            WorkerStatus.UNKNOWN,
-            f"Task {task_id} status cannot be determined without result backend"
+            WorkerStatus.UNKNOWN, f"Task {task_id} status cannot be determined without result backend"
         )
 
     @override
-    def get_run_worker_debug_info(
-        self, run: DagsterRun, include_container_logs: Optional[bool] = True
-    ) -> Optional[str]:
+    def get_run_worker_debug_info(self, run: DagsterRun, include_container_logs: bool | None = True) -> str | None:
         """Get debug information about the worker running this task.
 
         Args:
@@ -345,17 +345,15 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
 
         task_id = run.tags[DAGSTER_TASKIQ_TASK_ID_TAG]
 
-        return str(
-            {
-                "run_id": run.run_id,
-                "taskiq_task_id": task_id,
-                "queue_url": self.queue_url,
-                "region": self.region_name,
-            }
-        )
+        return str({
+            "run_id": run.run_id,
+            "taskiq_task_id": task_id,
+            "queue_url": self.queue_url,
+            "region": self.region_name,
+        })
 
     @property
-    def inst_data(self) -> Optional[ConfigurableClassData]:
+    def inst_data(self) -> ConfigurableClassData | None:
         """Get the instance data.
 
         Returns:
@@ -374,18 +372,12 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             "queue_url": Field(
                 Noneable(StringSource),
                 is_required=False,
-                description=(
-                    "The URL of the SQS queue. Default: environment variable "
-                    "DAGSTER_TASKIQ_SQS_QUEUE_URL."
-                ),
+                description=("The URL of the SQS queue. Default: environment variable DAGSTER_TASKIQ_SQS_QUEUE_URL."),
             ),
             "region_name": Field(
                 Noneable(StringSource),
                 is_required=False,
-                description=(
-                    "AWS region name. Default: environment variable AWS_DEFAULT_REGION "
-                    "or us-east-1."
-                ),
+                description=("AWS region name. Default: environment variable AWS_DEFAULT_REGION or us-east-1."),
             ),
             "endpoint_url": Field(
                 Noneable(StringSource),
@@ -395,10 +387,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             "default_queue": Field(
                 StringSource,
                 is_required=False,
-                description=(
-                    "The default queue to use when a run does not specify "
-                    "Taskiq queue tag."
-                ),
+                description=("The default queue to use when a run does not specify Taskiq queue tag."),
                 default_value=task_default_queue,
             ),
             "config_source": Field(
@@ -409,9 +398,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         }
 
     @classmethod
-    def from_config_value(
-        cls, inst_data: ConfigurableClassData, config_value: Mapping[str, Any]
-    ) -> Self:
+    def from_config_value(cls, inst_data: ConfigurableClassData, config_value: Mapping[str, Any]) -> Self:
         """Create a launcher instance from configuration.
 
         Args:

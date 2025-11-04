@@ -1,5 +1,10 @@
+"""Taskiq executor for Dagster.
+
+This module provides the TaskiqExecutor which uses AWS SQS for distributed task execution.
+"""
+
 import asyncio
-from typing import Optional
+from typing import TYPE_CHECKING, Any
 
 from dagster import (
     Executor,
@@ -7,30 +12,35 @@ from dagster import (
     Noneable,
     Permissive,
     StringSource,
-    _check as check,
     executor,
     multiple_process_executor_requirements,
 )
-from dagster._core.execution.retries import RetryMode, get_retries_config
-from dagster._grpc.types import ExecuteStepArgs
-from dagster._serdes import pack_value
+from dagster import (
+    _check as check,  # noqa: PLC2701
+)
+from dagster._core.execution.retries import RetryMode, get_retries_config  # noqa: PLC2701
+from dagster._grpc.types import ExecuteStepArgs  # noqa: PLC2701
+from dagster._serdes import pack_value  # noqa: PLC2701
 
 from dagster_taskiq.config import DEFAULT_CONFIG, dict_wrapper
 from dagster_taskiq.defaults import (
-    sqs_queue_url,
-    sqs_endpoint_url,
     aws_region_name,
+    sqs_endpoint_url,
+    sqs_queue_url,
     task_default_priority,
 )
+from dagster_taskiq.tasks import create_task
+
+if TYPE_CHECKING:
+    from dagster._core.execution.context.system import PlanOrchestrationContext
+    from dagster._core.execution.plan.plan import ExecutionPlan
+    from taskiq import AsyncBroker
 
 TASKIQ_CONFIG = {
     "queue_url": Field(
         Noneable(StringSource),
         is_required=False,
-        description=(
-            "The URL of the SQS queue. Default: "
-            "environment variable DAGSTER_TASKIQ_SQS_QUEUE_URL."
-        ),
+        description=("The URL of the SQS queue. Default: environment variable DAGSTER_TASKIQ_SQS_QUEUE_URL."),
     ),
     "region_name": Field(
         Noneable(StringSource),
@@ -58,7 +68,7 @@ TASKIQ_CONFIG = {
     config_schema=TASKIQ_CONFIG,
     requirements=multiple_process_executor_requirements(),
 )
-def taskiq_executor(init_context):
+def taskiq_executor(init_context: Any) -> "TaskiqExecutor":
     """Taskiq-based executor.
 
     The Taskiq executor uses AWS SQS for task distribution and supports distributed
@@ -94,6 +104,12 @@ def taskiq_executor(init_context):
     workers on which you hope to run were started. If, for example, you point the executor at a
     different queue than the one your workers are listening to, the workers will never be able to
     pick up tasks for execution.
+
+    Args:
+        init_context: The executor initialization context
+
+    Returns:
+        A configured TaskiqExecutor instance
     """
     return TaskiqExecutor(
         queue_url=init_context.executor_config.get("queue_url"),
@@ -104,27 +120,44 @@ def taskiq_executor(init_context):
     )
 
 
-async def _submit_task_async(broker, plan_context, step, queue, priority, known_state):
+async def _submit_task_async(  # noqa: PLR0917
+    broker: "AsyncBroker",
+    plan_context: "PlanOrchestrationContext",
+    step: Any,
+    queue: str,  # noqa: ARG001
+    priority: int,
+    known_state: Any,
+) -> dict[str, Any]:
     """Submit a task asynchronously using taskiq.
 
     This function is async because taskiq's kiq() method is async.
-    """
-    from dagster_taskiq.tasks import create_task
 
+    Args:
+        broker: The Taskiq broker instance
+        plan_context: The plan orchestration context
+        step: The step to execute
+        queue: The queue name (unused but kept for API compatibility)
+        priority: The priority for the task
+        known_state: The known execution state
+
+    Returns:
+        Dictionary containing 'result' and 'task_id' keys
+    """
     # Ensure broker is started
     await broker.startup()
 
     # Ensure result backend is started if it exists
-    if hasattr(broker, 'result_backend') and broker.result_backend:
+    if hasattr(broker, "result_backend") and broker.result_backend:
         await broker.result_backend.startup()
         plan_context.log.debug(
-            f"Result backend configured: {type(broker.result_backend).__name__} "
-            f"for step '{step.key}'"
+            "Result backend configured: %s for step '%s'",
+            type(broker.result_backend).__name__,
+            step.key,
         )
     else:
         plan_context.log.warning(
-            f"No result backend configured on broker for step '{step.key}'. "
-            f"Results may not be retrievable."
+            "No result backend configured on broker for step '%s'. Results may not be retrievable.",
+            step.key,
         )
 
     execute_step_args = ExecuteStepArgs(
@@ -144,38 +177,54 @@ async def _submit_task_async(broker, plan_context, step, queue, priority, known_
 
     # Debug logging for priority/delay mapping
     plan_context.log.info(
-        f"Task for step '{execute_step_args.step_keys_to_execute[0]}': "
-        f"priority={priority}, calculated_delay={delay_seconds}s"
+        "Task for step '%s': priority=%d, calculated_delay=%ds",
+        execute_step_args.step_keys_to_execute[0],
+        priority,
+        delay_seconds,
     )
 
     # Use kicker with delay label for taskiq-aio-sqs
-    task_result = await task.kicker().with_labels(delay=delay_seconds).kiq(
-        execute_step_args_packed=pack_value(execute_step_args),
-        executable_dict=plan_context.reconstructable_job.to_dict(),
+    task_result = (
+        await task.kicker()
+        .with_labels(delay=delay_seconds)
+        .kiq(
+            execute_step_args_packed=pack_value(execute_step_args),
+            executable_dict=plan_context.reconstructable_job.to_dict(),
+        )
     )
 
     # Verify task result has access to result backend
-    if hasattr(task_result, 'broker') and hasattr(task_result.broker, 'result_backend'):
+    if hasattr(task_result, "broker") and hasattr(task_result.broker, "result_backend"):
+        backend_name = type(task_result.broker.result_backend).__name__ if task_result.broker.result_backend else "None"
         plan_context.log.debug(
-            f"Task result for step '{step.key}' has result backend: "
-            f"{type(task_result.broker.result_backend).__name__ if task_result.broker.result_backend else 'None'}"
+            "Task result for step '%s' has result backend: %s",
+            step.key,
+            backend_name,
         )
 
-    return {'result': task_result, 'task_id': str(task_result.task_id)}
-
-
-
+    return {"result": task_result, "task_id": str(task_result.task_id)}
 
 
 class TaskiqExecutor(Executor):
+    """Executor that uses Taskiq for distributed task execution via AWS SQS."""
+
     def __init__(
         self,
-        retries,
-        queue_url: Optional[str] = None,
-        region_name: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
-        config_source: Optional[dict] = None,
-    ):
+        retries: RetryMode,
+        queue_url: str | None = None,
+        region_name: str | None = None,
+        endpoint_url: str | None = None,
+        config_source: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize the Taskiq executor.
+
+        Args:
+            retries: The retry mode configuration
+            queue_url: SQS queue URL
+            region_name: AWS region name
+            endpoint_url: Custom AWS endpoint URL (for LocalStack)
+            config_source: Additional configuration for the Taskiq broker
+        """
         self.queue_url = check.opt_str_param(queue_url, "queue_url", default=sqs_queue_url)
         self.region_name = check.opt_str_param(region_name, "region_name", default=aws_region_name)
         self.endpoint_url = check.opt_str_param(
@@ -183,28 +232,38 @@ class TaskiqExecutor(Executor):
             "endpoint_url",
             default=sqs_endpoint_url,
         )
-        self.config_source = dict_wrapper(
-            dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source"))
-        )
+        self.config_source = dict_wrapper(dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source")))
         self._retries = check.inst_param(retries, "retries", RetryMode)
 
     @property
-    def retries(self):
+    def retries(self) -> RetryMode:
+        """Get the retry mode configuration.
+
+        Returns:
+            The retry mode
+        """
         return self._retries
 
-    def execute(self, plan_context, execution_plan):
+    def execute(self, plan_context: "PlanOrchestrationContext", execution_plan: "ExecutionPlan") -> Any:
+        """Execute the plan using Taskiq.
+
+        Args:
+            plan_context: The plan orchestration context
+            execution_plan: The execution plan
+
+        Yields:
+            Dagster events from execution
+        """
         from dagster_taskiq.core_execution_loop import core_taskiq_execution_loop
 
         # Run the async generator in a new event loop and yield synchronously
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            async_gen = core_taskiq_execution_loop(
-                plan_context, execution_plan, step_execution_fn=_submit_task_async
-            )
+            async_gen = core_taskiq_execution_loop(plan_context, execution_plan, step_execution_fn=_submit_task_async)
             while True:
                 try:
-                    event = loop.run_until_complete(async_gen.__anext__())
+                    event = loop.run_until_complete(anext(async_gen))
                     yield event
                 except StopAsyncIteration:
                     break
@@ -213,11 +272,22 @@ class TaskiqExecutor(Executor):
 
     @staticmethod
     def for_cli(
-        queue_url: Optional[str] = None,
-        region_name: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
-        config_source: Optional[dict] = None,
-    ):
+        queue_url: str | None = None,
+        region_name: str | None = None,
+        endpoint_url: str | None = None,
+        config_source: dict[str, Any] | None = None,
+    ) -> "TaskiqExecutor":
+        """Create an executor instance for CLI use.
+
+        Args:
+            queue_url: SQS queue URL
+            region_name: AWS region name
+            endpoint_url: Custom AWS endpoint URL
+            config_source: Additional configuration
+
+        Returns:
+            A TaskiqExecutor instance configured for CLI use
+        """
         return TaskiqExecutor(
             retries=RetryMode(RetryMode.DISABLED),
             queue_url=queue_url,
@@ -226,7 +296,12 @@ class TaskiqExecutor(Executor):
             config_source=config_source,
         )
 
-    def app_args(self):
+    def app_args(self) -> dict[str, Any]:
+        """Get application arguments for broker creation.
+
+        Returns:
+            Dictionary of broker configuration arguments
+        """
         return {
             "queue_url": self.queue_url,
             "region_name": self.region_name,
@@ -234,6 +309,8 @@ class TaskiqExecutor(Executor):
             "config_source": self.config_source,
             "retries": self.retries,
         }
+
+
 MAX_SQS_DELAY_SECONDS = 900
 DELAY_SECONDS_STEP = 10
 
@@ -245,6 +322,12 @@ def _priority_to_delay_seconds(priority: int) -> int:
     lower priority numbers introduce a bounded delay. Values higher than the
     default priority map to zero delay, and low priorities are clamped to the
     SQS maximum delay window.
+
+    Args:
+        priority: The Dagster priority value
+
+    Returns:
+        The delay in seconds (0 to MAX_SQS_DELAY_SECONDS)
     """
     priority_delta = task_default_priority - priority
     if priority_delta <= 0:

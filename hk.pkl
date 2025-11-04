@@ -19,8 +19,7 @@ local linters = new Mapping<String, Step> {
   ["trailing-whitespace"] = Builtins.trailing_whitespace
   ["yamllint"] = Builtins.yamllint
   ["toml-sort"] = new Step {
-    // PLANNED: only supports pyproject.toml for now. See mise.toml
-    glob = List("**/pyproject.toml")
+    glob = List("**/*.toml")
     check = "toml-sort --check {{files}}"
     fix = "toml-sort --in-place {{files}}"
   }

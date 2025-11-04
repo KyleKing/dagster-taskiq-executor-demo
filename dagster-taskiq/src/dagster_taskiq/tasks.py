@@ -1,12 +1,19 @@
+"""Task definitions for Taskiq workers.
+
+This module defines the Taskiq tasks that execute Dagster runs and steps
+on worker processes.
+"""
+
 from typing import Any
 
-from dagster import DagsterInstance, _check as check
-from dagster._cli.api import _execute_run_command_body, _resume_run_command_body
-from dagster._core.definitions.reconstruct import ReconstructableJob
-from dagster._core.events import EngineEventData
-from dagster._core.execution.api import create_execution_plan, execute_plan_iterator
-from dagster._grpc.types import ExecuteRunArgs, ExecuteStepArgs, ResumeRunArgs
-from dagster._serdes import serialize_value, unpack_value
+from dagster import DagsterInstance
+from dagster import _check as check  # noqa: PLC2701
+from dagster._cli.api import _execute_run_command_body, _resume_run_command_body  # noqa: PLC2701
+from dagster._core.definitions.reconstruct import ReconstructableJob  # noqa: PLC2701
+from dagster._core.events import EngineEventData  # noqa: PLC2701
+from dagster._core.execution.api import create_execution_plan, execute_plan_iterator  # noqa: PLC2701
+from dagster._grpc.types import ExecuteRunArgs, ExecuteStepArgs, ResumeRunArgs  # noqa: PLC2701
+from dagster._serdes import serialize_value, unpack_value  # noqa: PLC2701
 from dagster_shared.serdes.serdes import JsonSerializableValue
 from taskiq import AsyncBroker
 
@@ -100,15 +107,13 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
         ):
             events.append(step_event)
 
-        serialized_events = [serialize_value(event) for event in events]
-        return serialized_events
+        return [serialize_value(event) for event in events]
 
     return _execute_plan
 
 
 def _send_to_null(_event: Any) -> None:
     """Null event sink."""
-    pass
 
 
 def create_execute_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
@@ -144,9 +149,7 @@ def create_execute_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
                 run_id=args.run_id,
                 write_stream_fn=_send_to_null,
                 set_exit_code_on_failure=(
-                    args.set_exit_code_on_failure
-                    if args.set_exit_code_on_failure is not None
-                    else True
+                    args.set_exit_code_on_failure if args.set_exit_code_on_failure is not None else True
                 ),
             )
 
@@ -186,9 +189,7 @@ def create_resume_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
                 run_id=args.run_id,
                 write_stream_fn=_send_to_null,
                 set_exit_code_on_failure=(
-                    args.set_exit_code_on_failure
-                    if args.set_exit_code_on_failure is not None
-                    else True
+                    args.set_exit_code_on_failure if args.set_exit_code_on_failure is not None else True
                 ),
             )
 

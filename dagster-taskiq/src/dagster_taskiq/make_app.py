@@ -1,28 +1,50 @@
+"""Application factory for creating Taskiq broker instances.
+
+This module provides utilities for creating and configuring Taskiq brokers
+with SQS support for dagster-taskiq.
+"""
+
 import os
 import warnings
-from typing import Any, Optional
+from typing import Any
 
 from taskiq import AsyncBroker
 
+from dagster_taskiq import defaults
 from dagster_taskiq.broker import SqsBrokerConfig
 from dagster_taskiq.cancellable_broker import CancellableSQSBroker
-from dagster_taskiq import defaults
 
 
 def _dict_from_source(config_source: Any) -> dict[str, Any]:
+    """Extract a dictionary from a config source.
+
+    Args:
+        config_source: Configuration source (dict, object with __dict__, or None)
+
+    Returns:
+        Dictionary representation of the config source
+    """
     if isinstance(config_source, dict):
         return config_source
     if config_source is None:
         return {}
-    source_dict = getattr(config_source, '__dict__', {})
+    source_dict = getattr(config_source, "__dict__", {})
     return source_dict if isinstance(source_dict, dict) else {}
 
 
 def _coerce_bool(value: Any) -> bool:
+    """Coerce a value to a boolean.
+
+    Args:
+        value: Value to coerce (bool, str, or other)
+
+    Returns:
+        Boolean representation of the value
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        return value.strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
+        return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
     return bool(value)
 
 
@@ -33,7 +55,19 @@ def _resolve_value(
     default: Any,
     *aliases: str,
 ) -> Any:
-    search_keys = (key,) + aliases
+    """Resolve a configuration value from multiple sources.
+
+    Args:
+        config: Primary configuration dictionary
+        source_overrides: Override configuration dictionary
+        key: Primary key to search for
+        default: Default value if key not found
+        *aliases: Alternative keys to search for
+
+    Returns:
+        Resolved configuration value
+    """
+    search_keys = (key, *aliases)
     for container in (config, source_overrides):
         if not isinstance(container, dict):
             continue
@@ -43,7 +77,7 @@ def _resolve_value(
     return default
 
 
-def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
+def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
     """Create a taskiq broker with SQS backend and S3 result backend.
 
     Args:
@@ -59,47 +93,38 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     queue_url = config.get("queue_url", defaults.sqs_queue_url)
     sqs_endpoint = config.get("endpoint_url", defaults.sqs_endpoint_url)
     region_name = config.get("region_name", defaults.aws_region_name)
-    source_overrides = _dict_from_source(config.get('config_source'))
+    source_overrides = _dict_from_source(config.get("config_source"))
 
     # Get S3 configuration
-    s3_bucket = _resolve_value(config, source_overrides, 's3_bucket_name', defaults.s3_bucket_name)
-    s3_endpoint = _resolve_value(config, source_overrides, 's3_endpoint_url', defaults.s3_endpoint_url)
+    s3_bucket = _resolve_value(config, source_overrides, "s3_bucket_name", defaults.s3_bucket_name)
+    s3_endpoint = _resolve_value(config, source_overrides, "s3_endpoint_url", defaults.s3_endpoint_url)
 
     # Get AWS credentials from environment or config
-    aws_access_key_id = _resolve_value(
-        config, source_overrides, 'aws_access_key_id', os.getenv('AWS_ACCESS_KEY_ID')
-    )
-    aws_secret_access_key = config.get(
-        'aws_secret_access_key', os.getenv('AWS_SECRET_ACCESS_KEY')
-    )
+    aws_access_key_id = _resolve_value(config, source_overrides, "aws_access_key_id", os.getenv("AWS_ACCESS_KEY_ID"))
+    aws_secret_access_key = config.get("aws_secret_access_key", os.getenv("AWS_SECRET_ACCESS_KEY"))
 
     # Get worker configuration
     max_messages_raw = _resolve_value(
-        config, source_overrides, 'max_number_of_messages', defaults.worker_max_messages, 'worker_max_messages'
+        config, source_overrides, "max_number_of_messages", defaults.worker_max_messages, "worker_max_messages"
     )
-    wait_time_raw = _resolve_value(
-        config, source_overrides, 'wait_time_seconds', defaults.wait_time_seconds
-    )
-    delay_seconds_raw = _resolve_value(config, source_overrides, 'delay_seconds', 0)
-    use_task_id_for_dedup = _resolve_value(
-        config, source_overrides, 'use_task_id_for_deduplication', False
-    )
-    extra_options_raw = _resolve_value(
-        config, source_overrides, 'extra_options', {}, 'broker_transport_options'
-    )
-    env_enable_cancellation = os.getenv('DAGSTER_TASKIQ_ENABLE_CANCELLATION')
+    wait_time_raw = _resolve_value(config, source_overrides, "wait_time_seconds", defaults.wait_time_seconds)
+    delay_seconds_raw = _resolve_value(config, source_overrides, "delay_seconds", 0)
+    use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)
+    extra_options_raw = _resolve_value(config, source_overrides, "extra_options", {}, "broker_transport_options")
+    env_enable_cancellation = os.getenv("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
     default_enable_cancellation = env_enable_cancellation
     if default_enable_cancellation is None:
         # Disable cancellation by default until fully implemented (see IMPLEMENTATION_PROGRESS.md Phase 3)
         default_enable_cancellation = False
     enable_cancellation_raw = _resolve_value(
-        config, source_overrides, 'enable_cancellation', default_enable_cancellation
+        config, source_overrides, "enable_cancellation", default_enable_cancellation
     )
     enable_cancellation = _coerce_bool(enable_cancellation_raw)
 
     # Create S3 result backend
     try:
         from taskiq_aio_sqs import S3Backend
+
         result_backend = S3Backend(
             bucket_name=s3_bucket,
             endpoint_url=s3_endpoint,
@@ -110,7 +135,7 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     except ImportError:
         raise ImportError("taskiq-aio-sqs is required for S3 backend support")
 
-    ignored_visibility = _resolve_value(config, source_overrides, 'visibility_timeout', None)
+    ignored_visibility = _resolve_value(config, source_overrides, "visibility_timeout", None)
     if ignored_visibility is not None:
         warnings.warn(
             '"visibility_timeout" is not supported by taskiq-aio-sqs; configure the SQS queue directly.',
@@ -120,7 +145,7 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
 
     # Determine fair-queue configuration. Taskiq fair queues require FIFO URLs.
     queue_is_fifo = str(queue_url or "").lower().endswith(".fifo")
-    requested_fair_queue = _resolve_value(config, source_overrides, 'is_fair_queue', None)
+    requested_fair_queue = _resolve_value(config, source_overrides, "is_fair_queue", None)
 
     if requested_fair_queue is None:
         is_fair_queue = queue_is_fifo
@@ -137,17 +162,20 @@ def make_app(app_args: Optional[dict[str, Any]] = None) -> AsyncBroker:
     try:
         max_messages = int(max_messages_raw)
     except (TypeError, ValueError):
-        raise ValueError(f'invalid max_number_of_messages value: {max_messages_raw!r}')
+        msg = f"invalid max_number_of_messages value: {max_messages_raw!r}"
+        raise ValueError(msg)
 
     try:
         wait_time = int(wait_time_raw)
     except (TypeError, ValueError):
-        raise ValueError(f'invalid wait_time_seconds value: {wait_time_raw!r}')
+        msg = f"invalid wait_time_seconds value: {wait_time_raw!r}"
+        raise ValueError(msg)
 
     try:
         delay_seconds = int(delay_seconds_raw)
     except (TypeError, ValueError):
-        raise ValueError(f'invalid delay_seconds value: {delay_seconds_raw!r}')
+        msg = f"invalid delay_seconds value: {delay_seconds_raw!r}"
+        raise ValueError(msg)
 
     extra_options = dict(extra_options_raw) if isinstance(extra_options_raw, dict) else {}
 

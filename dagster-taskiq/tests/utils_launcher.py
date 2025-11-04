@@ -1,15 +1,18 @@
 import time
 from collections.abc import Mapping
-from typing import Optional
 
 from dagster import DagsterInstance, DagsterRun, DagsterRunStatus, RunsFilter
 
 
+class PollingTimeoutError(Exception):
+    """Exception raised when polling times out."""
+
+
 def poll_for_finished_run(
     instance: DagsterInstance,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
     timeout: float = 20,
-    run_tags: Optional[Mapping[str, str]] = None,
+    run_tags: Mapping[str, str] | None = None,
 ) -> DagsterRun:
     total_time = 0
     interval = 0.01
@@ -28,11 +31,10 @@ def poll_for_finished_run(
         runs = instance.get_runs(filters, limit=1)
         if runs:
             return runs[0]
-        else:
-            time.sleep(interval)
-            total_time += interval
-            if total_time > timeout:
-                raise Exception("Timed out")
+        time.sleep(interval)
+        total_time += interval
+        if total_time > timeout:
+            raise PollingTimeoutError("Timed out")
 
 
 def poll_for_step_start(instance: DagsterInstance, run_id: str, timeout: float = 30):
@@ -43,7 +45,7 @@ def poll_for_event(
     instance: DagsterInstance,
     run_id: str,
     event_type: str,
-    message: Optional[str],
+    message: str | None,
     timeout: float = 30,
 ) -> None:
     total_time = 0
@@ -55,8 +57,7 @@ def poll_for_event(
         matching_events = [
             log_record.get_dagster_event()
             for log_record in logs
-            if log_record.is_dagster_event
-            and log_record.get_dagster_event().event_type_value == event_type
+            if log_record.is_dagster_event and log_record.get_dagster_event().event_type_value == event_type
         ]
         if matching_events:
             if message is None:
@@ -66,6 +67,6 @@ def poll_for_event(
                     return
 
         total_time += backoff
-        backoff = backoff * 2
+        backoff *= 2
         if total_time > timeout:
-            raise Exception("Timed out")
+            raise PollingTimeoutError("Timed out")

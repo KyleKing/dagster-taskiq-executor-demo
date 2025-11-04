@@ -1,3 +1,9 @@
+"""Tag constants for dagster-taskiq.
+
+This module defines tag keys used to configure Taskiq executor behavior
+for Dagster runs and steps.
+"""
+
 # Used to set the priority for a particular step execution
 DAGSTER_TASKIQ_STEP_PRIORITY_TAG = "dagster-taskiq/priority"
 

@@ -1,3 +1,9 @@
+"""Default configuration values for dagster-taskiq.
+
+This module provides default values for SQS queues, regions, and other configuration
+that can be overridden via environment variables.
+"""
+
 import os
 
 # SQS configuration

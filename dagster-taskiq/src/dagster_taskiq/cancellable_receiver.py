@@ -7,9 +7,8 @@ import logging
 from typing import Any
 
 import anyio
-
-from taskiq.receiver import Receiver
 from taskiq.message import TaskiqMessage
+from taskiq.receiver import Receiver
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +26,25 @@ class CancellableReceiver(Receiver):
     QUEUE_DONE = _QUEUE_DONE
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the cancellable receiver.
+
+        Args:
+            *args: Positional arguments passed to parent Receiver
+            **kwargs: Keyword arguments passed to parent Receiver
+        """
         super().__init__(*args, **kwargs)
         self.tasks: set[asyncio.Task[Any]] = set()
 
     def parse_message(self, message: bytes | Any) -> TaskiqMessage | None:
-        """Parse a message into a TaskiqMessage."""
-        message_data = message.data if hasattr(message, 'data') else message
+        """Parse a message into a TaskiqMessage.
+
+        Args:
+            message: Raw message bytes or message object
+
+        Returns:
+            Parsed TaskiqMessage or None if parsing fails
+        """
+        message_data = message.data if hasattr(message, "data") else message
         try:
             taskiq_msg = self.broker.formatter.loads(message=message_data)
             taskiq_msg.parse_labels()
@@ -75,6 +87,7 @@ class CancellableReceiver(Receiver):
 
     async def runner_canceller(self, finish_event: asyncio.Event) -> None:
         """Listen for cancellation messages and cancel tasks."""
+
         def cancel_task(task_id: str) -> None:
             for task in self.tasks:
                 if task.get_name() == task_id:
@@ -100,6 +113,7 @@ class CancellableReceiver(Receiver):
 
     async def runner(self, queue: asyncio.Queue[bytes | Any]) -> None:
         """Run tasks from the queue."""
+
         def task_cb(task: asyncio.Task[Any]) -> None:
             self.tasks.discard(task)
             if self.sem is not None:

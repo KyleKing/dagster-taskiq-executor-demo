@@ -1,17 +1,23 @@
+"""Core execution loop for Taskiq-based distributed execution.
+
+This module provides the main execution loop that coordinates task submission,
+result retrieval, and event handling for Dagster runs executed via Taskiq.
+"""
+
 import asyncio
 import sys
 import uuid
-from typing import Any, AsyncGenerator, Callable, cast
+from collections.abc import AsyncGenerator, Callable
+from typing import Any, cast
 
-import dagster._check as check
-from dagster._core.errors import DagsterSubprocessError
-from dagster._core.events import DagsterEvent, EngineEventData
-from dagster._core.execution.context.system import PlanOrchestrationContext
-from dagster._core.execution.plan.instance_concurrency_context import InstanceConcurrencyContext
-from dagster._core.execution.plan.plan import ExecutionPlan
-
-from dagster._core.storage.tags import PRIORITY_TAG
-from dagster._utils.error import serializable_error_info_from_exc_info
+import dagster._check as check  # noqa: PLC2701
+from dagster._core.errors import DagsterSubprocessError  # noqa: PLC2701
+from dagster._core.events import DagsterEvent, EngineEventData  # noqa: PLC2701
+from dagster._core.execution.context.system import PlanOrchestrationContext  # noqa: PLC2701
+from dagster._core.execution.plan.instance_concurrency_context import InstanceConcurrencyContext  # noqa: PLC2701
+from dagster._core.execution.plan.plan import ExecutionPlan  # noqa: PLC2701
+from dagster._core.storage.tags import PRIORITY_TAG  # noqa: PLC2701
+from dagster._utils.error import serializable_error_info_from_exc_info  # noqa: PLC2701
 from dagster_shared.serdes import deserialize_value
 
 from dagster_taskiq.defaults import task_default_priority, task_default_queue
@@ -55,15 +61,35 @@ async def core_taskiq_execution_loop(
             "similar system that allows files to be available to all nodes), S3, or GCS",
         )
 
-    broker = make_app(cast(TaskiqExecutor, job_context.executor).app_args())
+    broker = make_app(cast("TaskiqExecutor", job_context.executor).app_args())
 
-    priority_for_step = lambda step: (  # type: ignore
-        -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore
-        + -1 * _get_run_priority(job_context)
-    )
-    priority_for_key = lambda step_key: (  # type: ignore
-        priority_for_step(execution_plan.get_step_by_key(step_key))
-    )
+    def priority_for_step(step: Any) -> int:
+        """Calculate priority for a step.
+
+        Args:
+            step: The step to calculate priority for
+
+        Returns:
+            Negative priority value (for sorting)
+        """
+        return (  # type: ignore[return-value]
+            -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore[arg-type]
+            + -1 * _get_run_priority(job_context)
+        )
+
+    def priority_for_key(step_key: str) -> int:
+        """Calculate priority for a step by key.
+
+        Args:
+            step_key: The step key to calculate priority for
+
+        Returns:
+            Negative priority value (for sorting)
+        """
+        return (  # type: ignore[return-value]
+            priority_for_step(execution_plan.get_step_by_key(step_key))
+        )
+
     _warn_on_priority_misuse(job_context, execution_plan)
 
     step_results = {}  # Dict[str, dict] {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
@@ -72,13 +98,13 @@ async def core_taskiq_execution_loop(
 
     async def _request_task_cancellations(reason: str) -> None:
         """Ask the broker to cancel any in-flight TaskIQ tasks."""
-        cancel_callable = getattr(broker, 'cancel_task', None)
+        cancel_callable = getattr(broker, "cancel_task", None)
         if not callable(cancel_callable):
             return
 
         pending = []
         for data in step_results.values():
-            task_id = data.get('task_id')
+            task_id = data.get("task_id")
             if not task_id or task_id in cancelled_task_ids:
                 continue
             try:
@@ -91,20 +117,16 @@ async def core_taskiq_execution_loop(
         if not pending:
             return
 
-        job_context.log.debug(
-            f"Requesting cancellation for {len(pending)} taskiq tasks ({reason})."
-        )
+        job_context.log.debug("Requesting cancellation for %d taskiq tasks (%s).", len(pending), reason)
         results = await asyncio.gather(*pending, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
-                job_context.log.warning(f"Taskiq task cancellation failed: {result}")
+                job_context.log.warning("Taskiq task cancellation failed: %s", result)
 
     async def _cancel_waiters() -> None:
         """Ensure waiter tasks are cancelled/awaited before exiting."""
         waiters = [
-            data.get('waiter')
-            for data in list(step_results.values())
-            if isinstance(data.get('waiter'), asyncio.Task)
+            data.get("waiter") for data in list(step_results.values()) if isinstance(data.get("waiter"), asyncio.Task)
         ]
         if not waiters:
             return
@@ -115,9 +137,7 @@ async def core_taskiq_execution_loop(
 
         await asyncio.gather(*waiters, return_exceptions=True)
 
-    with InstanceConcurrencyContext(
-        job_context.instance, job_context.dagster_run
-    ) as instance_concurrency_context:
+    with InstanceConcurrencyContext(job_context.instance, job_context.dagster_run) as instance_concurrency_context:
         with execution_plan.start(
             retry_mode=job_context.executor.retries,
             sort_key_fn=priority_for_step,
@@ -135,13 +155,14 @@ async def core_taskiq_execution_loop(
                         )
                         stopping = True
                         active_execution.mark_interrupted()
-                        await _request_task_cancellations(reason='termination signal')
+                        await _request_task_cancellations(reason="termination signal")
 
                     results_to_pop = []
                     for step_key, data in sorted(
-                        step_results.items(), key=lambda x: priority_for_key(x[0])  # type: ignore
+                        step_results.items(),
+                        key=lambda x: priority_for_key(x[0]),  # type: ignore[arg-type]
                     ):
-                        waiter = data['waiter']
+                        waiter = data["waiter"]
                         if not waiter.done():
                             continue
 
@@ -150,9 +171,9 @@ async def core_taskiq_execution_loop(
 
                             if task_result is not None:
                                 # Handle TaskiqResult objects that may wrap the actual return value
-                                if hasattr(task_result, 'raise_for_error'):
+                                if hasattr(task_result, "raise_for_error"):
                                     task_result.raise_for_error()
-                                if hasattr(task_result, 'return_value'):
+                                if hasattr(task_result, "return_value"):
                                     step_events = task_result.return_value
                                 else:
                                     step_events = task_result
@@ -160,23 +181,24 @@ async def core_taskiq_execution_loop(
                                 step_events = None
                         except Exception as e:
                             job_context.log.error(
-                                f"Error getting result for step {step_key}: {e}",
+                                "Error getting result for step %s: %s",
+                                step_key,
+                                e,
                                 exc_info=True,
                             )
                             step_events = []
                             step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
-                            await _request_task_cancellations(reason='step failure')
+                            await _request_task_cancellations(reason="step failure")
 
                         # Handle None or non-iterable step_events
                         if step_events is None:
-                            job_context.log.warning(
-                                f"Step {step_key} returned None result. Events may be missing."
-                            )
+                            job_context.log.warning("Step %s returned None result. Events may be missing.", step_key)
                             step_events = []
                         elif not isinstance(step_events, (list, tuple)):
                             job_context.log.warning(
-                                f"Step {step_key} returned non-list result: {type(step_events)}. "
-                                f"Attempting to convert to list."
+                                "Step %s returned non-list result: %s. Attempting to convert to list.",
+                                step_key,
+                                type(step_events),
                             )
                             # If it's not a list/tuple, try to make it iterable
                             step_events = [step_events] if step_events else []
@@ -200,7 +222,7 @@ async def core_taskiq_execution_loop(
                         await asyncio.sleep(TICK_SECONDS)
                         continue
 
-                    for step in active_execution.get_steps_to_execute():  # type: ignore
+                    for step in active_execution.get_steps_to_execute():  # type: ignore[assignment]
                         try:
                             queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
                             yield DagsterEvent.engine_event(
@@ -219,24 +241,30 @@ async def core_taskiq_execution_loop(
                                 priority,
                                 active_execution.get_known_state(),
                             )
-                            result_handle = step_results[step.key]['result']
-                            task_id = step_results[step.key]['task_id']
+                            result_handle = step_results[step.key]["result"]
+                            task_id = step_results[step.key]["task_id"]
 
                             # Create a waiter that tries wait_result() first, then falls back to direct S3 backend access
-                            async def _wait_for_result():
-                                """Wait for task result, using S3 backend if wait_result() fails."""
+                            async def _wait_for_result() -> Any:
+                                """Wait for task result, using S3 backend if wait_result() fails.
+
+                                Returns:
+                                    The task result value
+                                """
                                 try:
                                     # First try the standard wait_result() method
-                                    wait_result_fn = getattr(result_handle, 'wait_result', None)
+                                    wait_result_fn = getattr(result_handle, "wait_result", None)
                                     if wait_result_fn:
                                         result = await wait_result_fn()
                                         if result is not None:
                                             return result
 
                                     # If wait_result() returned None or doesn't exist, use S3 backend directly
-                                    if hasattr(broker, 'result_backend') and broker.result_backend and task_id:
+                                    if hasattr(broker, "result_backend") and broker.result_backend and task_id:
                                         job_context.log.debug(
-                                            f"Using S3 result backend directly for step {step.key}, task {task_id}"
+                                            "Using S3 result backend directly for step %s, task %s",
+                                            step.key,
+                                            task_id,
                                         )
                                         # Poll the S3 backend until result is ready
                                         result_backend = broker.result_backend
@@ -248,34 +276,41 @@ async def core_taskiq_execution_loop(
                                             try:
                                                 if await result_backend.is_result_ready(task_id):
                                                     backend_result = await result_backend.get_result(task_id)
-                                                    if hasattr(backend_result, 'return_value'):
+                                                    if hasattr(backend_result, "return_value"):
                                                         return backend_result.return_value
                                                     return backend_result
                                             except Exception as e:
                                                 # Result not ready yet, continue waiting
                                                 if "ResultIsMissingError" not in str(type(e)):
                                                     job_context.log.debug(
-                                                        f"Error checking result for step {step.key}: {e}"
+                                                        "Error checking result for step %s: %s",
+                                                        step.key,
+                                                        e,
                                                     )
 
                                             await asyncio.sleep(wait_interval)
                                             elapsed += wait_interval
 
-                                        raise TimeoutError(
-                                            f"Result for step {step.key} (task {task_id}) not available after {max_wait_seconds}s"
+                                        msg = "Result for step %s (task %s) not available after %ds" % (
+                                            step.key,
+                                            task_id,
+                                            max_wait_seconds,
                                         )
+                                        raise TimeoutError(msg)
 
                                     # No result backend available
                                     return None
 
                                 except Exception as e:
                                     job_context.log.error(
-                                        f"Error waiting for result for step {step.key}: {e}",
+                                        "Error waiting for result for step %s: %s",
+                                        step.key,
+                                        e,
                                         exc_info=True,
                                     )
                                     raise
 
-                            step_results[step.key]['waiter'] = asyncio.create_task(_wait_for_result())
+                            step_results[step.key]["waiter"] = asyncio.create_task(_wait_for_result())
 
                         except Exception:
                             yield DagsterEvent.engine_event(
@@ -290,31 +325,31 @@ async def core_taskiq_execution_loop(
                     await asyncio.sleep(TICK_SECONDS)
 
                 if step_errors:
+                    error_list = "\n".join([f"[{key}]: {err.to_string()}" for key, err in step_errors.items()])
+                    msg = f"During taskiq execution errors occurred in workers:\n{error_list}"
                     raise DagsterSubprocessError(
-                        "During taskiq execution errors occurred in workers:\n{error_list}".format(
-                            error_list="\n".join(
-                                [f"[{key}]: {err.to_string()}" for key, err in step_errors.items()]
-                            )
-                        ),
+                        msg,
                         subprocess_error_infos=list(step_errors.values()),
                     )
             finally:
                 # Best-effort cancellation of any remaining remote tasks and waiter tasks.
-                await _request_task_cancellations(reason='loop shutdown')
+                await _request_task_cancellations(reason="loop shutdown")
                 await _cancel_waiters()
 
 
-
-
-
 def _get_step_priority(context: PlanOrchestrationContext, step: Any) -> int:
-    """Step priority is (currently) set as the overall run priority plus the individual
-    step priority.
+    """Step priority is (currently) set as the overall run priority plus the individual step priority.
+
+    Args:
+        context: The plan orchestration context
+        step: The step to get priority for
+
+    Returns:
+        The combined priority value (run priority + step priority)
     """
     run_priority = _get_run_priority(context)
-    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
-    priority = run_priority + step_priority
-    return priority
+    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore[arg-type]
+    return run_priority + step_priority
 
 
 def _get_run_priority(context: PlanOrchestrationContext) -> int:
@@ -332,14 +367,15 @@ def _warn_on_priority_misuse(context: PlanOrchestrationContext, execution_plan: 
     for key in execution_plan.step_keys_to_execute:
         step = execution_plan.get_step_by_key(key)
         if (
-            step.tags.get(PRIORITY_TAG) is not None  # type: ignore
-            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore
+            step.tags.get(PRIORITY_TAG) is not None  # type: ignore[arg-type]
+            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore[arg-type]
         ):
             bad_keys.append(key)
 
     if bad_keys:
         context.log.warning(
             'The following steps do not have "dagster-taskiq/priority" set but do '
-            'have "dagster/priority" set which is not applicable for the taskiq engine: [{}]. '
-            "Consider using a function to set both keys.".format(", ".join(bad_keys))
+            'have "dagster/priority" set which is not applicable for the taskiq engine: [%s]. '
+            "Consider using a function to set both keys.",
+            ", ".join(bad_keys),
         )
