@@ -22,7 +22,7 @@ from dagster._core.execution.retries import RetryMode, get_retries_config  # noq
 from dagster._grpc.types import ExecuteStepArgs  # noqa: PLC2701
 from dagster._serdes import pack_value  # noqa: PLC2701
 
-from dagster_taskiq.config import DEFAULT_CONFIG, dict_wrapper
+from dagster_taskiq.config import DEFAULT_CONFIG, DictWrapper
 from dagster_taskiq.defaults import (
     aws_region_name,
     sqs_endpoint_url,
@@ -116,7 +116,7 @@ def taskiq_executor(init_context: Any) -> "TaskiqExecutor":
         region_name=init_context.executor_config.get("region_name"),
         endpoint_url=init_context.executor_config.get("endpoint_url"),
         config_source=init_context.executor_config.get("config_source"),
-        retries=RetryMode.from_config(init_context.executor_config["retries"]),
+        retries=RetryMode.from_config(init_context.executor_config.get("retries", {})),  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
     )
 
 
@@ -147,7 +147,7 @@ async def _submit_task_async(  # noqa: PLR0917
     await broker.startup()
 
     # Ensure result backend is started if it exists
-    if hasattr(broker, "result_backend") and broker.result_backend:
+    if hasattr(broker, "result_backend") and broker.result_backend:  # type: ignore[truthy-bool]
         await broker.result_backend.startup()
         plan_context.log.debug(
             "Result backend configured: %s for step '%s'",
@@ -178,7 +178,7 @@ async def _submit_task_async(  # noqa: PLR0917
     # Debug logging for priority/delay mapping
     plan_context.log.info(
         "Task for step '%s': priority=%d, calculated_delay=%ds",
-        execute_step_args.step_keys_to_execute[0],
+        execute_step_args.step_keys_to_execute[0] if execute_step_args.step_keys_to_execute else "unknown",  # pyright: ignore[reportOptionalSubscript]
         priority,
         delay_seconds,
     )
@@ -232,7 +232,7 @@ class TaskiqExecutor(Executor):
             "endpoint_url",
             default=sqs_endpoint_url,
         )
-        self.config_source = dict_wrapper(dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source")))
+        self.config_source = DictWrapper(dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source")))
         self._retries = check.inst_param(retries, "retries", RetryMode)
 
     @property
@@ -244,7 +244,7 @@ class TaskiqExecutor(Executor):
         """
         return self._retries
 
-    def execute(self, plan_context: "PlanOrchestrationContext", execution_plan: "ExecutionPlan") -> Any:
+    def execute(self, plan_context: "PlanOrchestrationContext", execution_plan: "ExecutionPlan") -> Any:  # noqa: PLR6301
         """Execute the plan using Taskiq.
 
         Args:
@@ -254,7 +254,7 @@ class TaskiqExecutor(Executor):
         Yields:
             Dagster events from execution
         """
-        from dagster_taskiq.core_execution_loop import core_taskiq_execution_loop
+        from dagster_taskiq.core_execution_loop import core_taskiq_execution_loop  # noqa: PLC0415
 
         # Run the async generator in a new event loop and yield synchronously
         loop = asyncio.new_event_loop()

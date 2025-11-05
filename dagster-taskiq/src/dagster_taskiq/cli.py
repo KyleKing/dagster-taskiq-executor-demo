@@ -30,7 +30,7 @@ def _coerce_bool(value: Any) -> bool:
     return bool(value)
 
 
-def create_worker_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+def create_worker_parser(subparsers: argparse._SubParsersAction[Any]) -> argparse.ArgumentParser:  # pyright: ignore[reportPrivateUsage]
     """Create the worker subcommand parser.
 
     Args:
@@ -87,7 +87,7 @@ def create_worker_parser(subparsers: argparse._SubParsersAction) -> argparse.Arg
     dashboard_parser.add_argument(
         "--host",
         type=str,
-        default="0.0.0.0",
+        default="0.0.0.0",  # noqa: S104
         help="Host to bind the dashboard server to.",
     )
     dashboard_parser.add_argument(
@@ -120,7 +120,7 @@ def create_worker_parser(subparsers: argparse._SubParsersAction) -> argparse.Arg
         help="Specify the path to a config YAML file with SQS queue configuration.",
     )
 
-    return worker_parser
+    return worker_parser  # type: ignore[no-any-return]
 
 
 def get_config_value_from_yaml(yaml_path: str | None) -> Mapping[str, Any]:
@@ -135,7 +135,7 @@ def get_config_value_from_yaml(yaml_path: str | None) -> Mapping[str, Any]:
     if yaml_path is None:
         return {}
     parsed_yaml = load_yaml_from_path(yaml_path) or {}
-    assert isinstance(parsed_yaml, dict)
+    assert isinstance(parsed_yaml, dict)  # noqa: S101
     # Extract config from execution block
     return parsed_yaml.get("execution", {}).get("config", {}) or {}
 
@@ -176,7 +176,7 @@ def get_validated_config(config_yaml: str | None = None) -> Any:
             config.errors,
             config_value,
         )
-    return post_process_config(config_type, config_value).value  # type: ignore
+    return post_process_config(config_type or {}, config_value).value  # type: ignore[arg-type]
 
 
 def get_config_module(config_yaml: str | None = None) -> str:
@@ -192,9 +192,9 @@ def get_config_module(config_yaml: str | None = None) -> str:
 
     config_module_name = "dagster_taskiq_config"
 
-    config_dir = os.path.join(instance.root_directory, "dagster_taskiq", "config", str(uuid.uuid4()))
+    config_dir = os.path.join(instance.root_directory, "dagster_taskiq", "config", str(uuid.uuid4()))  # noqa: PTH118
     mkdir_p(config_dir)
-    config_path = os.path.join(config_dir, f"{config_module_name}.py")
+    config_path = os.path.join(config_dir, f"{config_module_name}.py")  # noqa: PTH118
 
     validated_config = get_validated_config(config_yaml)
     with pathlib.Path(config_path).open("w", encoding="utf8") as fd:
@@ -220,10 +220,10 @@ def launch_background_worker(subprocess_args: list[str], env: dict[str, str] | N
     Returns:
         Subprocess handle
     """
-    return subprocess.Popen(subprocess_args, stdout=None, stderr=None, env=env)
+    return subprocess.Popen(subprocess_args, stdout=None, stderr=None, env=env)  # noqa: S603
 
 
-def worker_start_command(args: argparse.Namespace) -> int | None:
+def worker_start_command(args: argparse.Namespace) -> int | None:  # noqa: C901
     """Start a Taskiq worker.
 
     This wraps the taskiq CLI and adds Dagster-specific configuration.
@@ -257,7 +257,7 @@ def worker_start_command(args: argparse.Namespace) -> int | None:
     env = os.environ.copy()
     validated_config: Mapping[str, Any] = get_validated_config(args.config_yaml) if args.config_yaml else {}
 
-    config_source = validated_config.get("config_source") if isinstance(validated_config, Mapping) else None
+    config_source = validated_config.get("config_source")
     enable_cancellation = True
     if isinstance(config_source, Mapping) and "enable_cancellation" in config_source:
         enable_cancellation = _coerce_bool(config_source["enable_cancellation"])
@@ -296,7 +296,7 @@ def worker_start_command(args: argparse.Namespace) -> int | None:
     if args.background:
         launch_background_worker(subprocess_args, env=env)
     else:
-        return subprocess.check_call(subprocess_args, env=env)
+        return subprocess.check_call(subprocess_args, env=env)  # noqa: S603
     return None
 
 
@@ -333,7 +333,7 @@ def worker_list_command(args: argparse.Namespace) -> None:
         args: Parsed command line arguments
     """
     try:
-        import boto3  # noqa: PLC0415
+        import boto3  # noqa: PLC0415  # type: ignore[import-untyped]
     except ImportError:
         return
 
@@ -365,7 +365,7 @@ def worker_list_command(args: argparse.Namespace) -> None:
 
         response.get("Attributes", {})
 
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
 

@@ -19,7 +19,11 @@ AWS_TEST_REGION = "us-east-1"
 
 
 def find_free_port() -> int:
-    """Find an available port for the moto server."""
+    """Find an available port for the moto server.
+
+    Returns:
+        An available port number
+    """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         s.listen(1)

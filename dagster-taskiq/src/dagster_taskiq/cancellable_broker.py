@@ -55,6 +55,7 @@ class CancellableSQSBroker(AsyncBroker):
         self.supports_cancellation = True
 
     async def startup(self) -> None:
+        """Start up the broker and cancel queue client."""
         await self.sqs_broker.startup()
         # Setup SQS client for cancel queue
         if self.cancel_sqs_client:
@@ -69,9 +70,11 @@ class CancellableSQSBroker(AsyncBroker):
             aws_secret_access_key=self._config.aws_secret_access_key,
         )
         self._cancel_client_cm = client_cm
-        self.cancel_sqs_client = await client_cm.__aenter__()
+        # Manually enter context manager to keep client alive for shutdown
+        self.cancel_sqs_client = await client_cm.__aenter__()  # noqa: PLC2801
 
     async def shutdown(self) -> None:
+        """Shut down the broker and cancel queue client."""
         await self.sqs_broker.shutdown()
         if self._cancel_client_cm is not None:
             await self._cancel_client_cm.__aexit__(None, None, None)
@@ -147,7 +150,7 @@ class CancellableSQSBroker(AsyncBroker):
         """
         return getattr(self.sqs_broker, name)
 
-    async def kick(self, task: Any) -> Any:
+    async def kick(self, task: Any) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Kick a task to the broker.
 
         Args:
@@ -158,7 +161,7 @@ class CancellableSQSBroker(AsyncBroker):
         """
         return await self.sqs_broker.kick(task)
 
-    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:
+    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:  # pyright: ignore[reportIncompatibleMethodOverride]  # type: ignore[override]
         """Listen for messages from the broker.
 
         Yields:

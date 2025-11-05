@@ -39,7 +39,7 @@ def main() -> None:
         except s3.exceptions.NoSuchBucket:
             s3.create_bucket(Bucket=bucket_name)
 
-    from dagster_taskiq.cli import main as dagster_taskiq_main  # noqa: PLC0415
+    from dagster_taskiq.cli import main as dagster_taskiq_main
 
     dagster_taskiq_main()
 

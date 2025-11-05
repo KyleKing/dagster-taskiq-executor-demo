@@ -4,7 +4,7 @@ dev = [
   "pyright>=1.1.407",
   "pytest>=8.0.0",
   "pytest-mock>=3.14.0",
-  "ruff>=0.14.3",
+  "ruff>=0.14.3"
 ]
 
 [project]
@@ -14,7 +14,7 @@ description = "Pulumi infrastructure for Dagster TaskIQ LocalStack demo"
 requires-python = ">=3.13"
 dependencies = [
   "pulumi>=3.100.0",
-  "pulumi-aws>=6.0.0",
+  "pulumi-aws>=6.0.0"
 ]
 
 [tool.mypy]
@@ -70,7 +70,7 @@ ignore = [
   "TD001", # Invalid TODO tag: `FIXME`
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
-  "TRY003", # Avoid specifying long messages outside the exception class
+  "TRY003" # Avoid specifying long messages outside the exception class
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -91,7 +91,7 @@ unfixable = ["ERA001"] # Commented-out code
   "S108", # Probable insecure usage of temporary file or directory
   "SLF001", # Private member accessed
   "ARG001", # Unused function argument
-  "ARG002", # Unused method argument
+  "ARG002" # Unused method argument
 ]
 
 [tool.ruff.lint.pydocstyle]

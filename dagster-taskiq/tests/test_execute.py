@@ -3,12 +3,12 @@ from threading import Thread
 from unittest import mock
 
 import pytest
-from dagster._core.definitions.reconstruct import ReconstructableJob  # noqa: PLC2701
-from dagster._core.errors import DagsterSubprocessError  # noqa: PLC2701
-from dagster._core.events import DagsterEventType  # noqa: PLC2701
-from dagster._core.execution.api import execute_job, execute_run_iterator  # noqa: PLC2701
+from dagster._core.definitions.reconstruct import ReconstructableJob
+from dagster._core.errors import DagsterSubprocessError
+from dagster._core.events import DagsterEventType
+from dagster._core.execution.api import execute_job, execute_run_iterator
 from dagster._core.instance import DagsterInstance
-from dagster._utils import send_interrupt  # noqa: PLC2701
+from dagster._utils import send_interrupt
 
 from tests.utils import (
     REPO_FILE,

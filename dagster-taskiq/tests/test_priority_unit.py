@@ -3,10 +3,10 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
-from dagster._core.origin import JobPythonOrigin  # noqa: PLC2701
+from dagster._core.origin import JobPythonOrigin
 
 from dagster_taskiq.defaults import task_default_priority
-from dagster_taskiq.executor import _priority_to_delay_seconds  # noqa: PLC2701
+from dagster_taskiq.executor import _priority_to_delay_seconds
 
 
 def test_priority_to_delay_mapping():
@@ -29,7 +29,7 @@ def test_priority_to_delay_mapping():
 
 def test_delay_label_passed_to_broker():
     """Test that delay labels are correctly passed to the taskiq broker."""
-    from dagster_taskiq.executor import _submit_task_async  # noqa: PLC0415, PLC2701
+    from dagster_taskiq.executor import _submit_task_async
 
     async def run_test():
         # Create a mock broker

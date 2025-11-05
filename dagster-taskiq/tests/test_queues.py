@@ -4,7 +4,7 @@ import threading
 import time
 
 import pytest
-from dagster._core.test_utils import instance_for_test  # noqa: PLC2701
+from dagster._core.test_utils import instance_for_test
 from taskiq.result import TaskiqResult
 from taskiq_aio_sqs import S3Backend
 

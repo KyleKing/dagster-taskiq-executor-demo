@@ -9,7 +9,7 @@ from typing import Any
 try:  # pragma: no cover - exercised in integration tests
     from taskiq_aio_sqs import SQSBroker as TaskiqSQSBroker
 except ImportError:  # pragma: no cover - best effort without dependency
-    TaskiqSQSBroker = None  # type: ignore[assignment]
+    TaskiqSQSBroker = None  # type: ignore[assignment,misc]
 
 
 def _queue_name_from_url(queue_url: str) -> str:

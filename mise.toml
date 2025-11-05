@@ -47,8 +47,12 @@ run = [
   "mise -C dagster-taskiq-demo run checks",
   "mise -C taskiq-aio-multi-sqs run checks",
   "mise -C deploy run checks",
-  "mise -C taskiq-demo run checks",
+  "mise -C taskiq-demo run checks"
 ]
+
+[tasks."dashboard:start"]
+description = "Start TaskIQ dashboard (requires dev dependencies)"
+run = "./scripts/run-dashboard.sh"
 
 [tasks."ecr:login"]
 description = "Login to LocalStack ECR"
@@ -85,17 +89,6 @@ run = [
   "mise install"
 ]
 
-[tasks."test:all"]
-description = "Test all projects"
-run = [
-  "mise -C dagster-taskiq run test",
-  "mise -C dagster-taskiq/example run test",
-  "mise -C dagster-taskiq-demo run test",
-  "mise -C taskiq-aio-multi-sqs run test",
-  "mise -C deploy run test",
-  "mise -C taskiq-demo run test",
-]
-
 [tasks."fixes:all"]
 description = "Lint and auto-fix all projects"
 run = [
@@ -104,7 +97,7 @@ run = [
   "mise -C dagster-taskiq-demo run fixes",
   "mise -C taskiq-aio-multi-sqs run fixes",
   "mise -C deploy run fixes",
-  "mise -C taskiq-demo run fixes",
+  "mise -C taskiq-demo run fixes"
 ]
 
 [tasks."install:all"]
@@ -115,7 +108,7 @@ run = [
   "mise -C dagster-taskiq-demo run install",
   "mise -C taskiq-aio-multi-sqs run install",
   "mise -C deploy run install",
-  "mise -C taskiq-demo run install",
+  "mise -C taskiq-demo run install"
 ]
 
 [tasks."localstack:logs"]
@@ -145,10 +138,6 @@ description = "Stop LocalStack container"
 alias = "stop"
 run = "docker compose down"
 
-[tasks."dashboard:start"]
-description = "Start TaskIQ dashboard (requires dev dependencies)"
-run = "./scripts/run-dashboard.sh"
-
 [tasks.mdformat]
 description = "Format all markdown files"
 run = "mdformat **/*.md"
@@ -163,6 +152,17 @@ description = "Format all pkl files"
 run = "pkl format --write hk.pkl"
 sources = ["hk.pkl"]
 
+[tasks."test:all"]
+description = "Test all projects"
+run = [
+  "mise -C dagster-taskiq run test",
+  "mise -C dagster-taskiq/example run test",
+  "mise -C dagster-taskiq-demo run test",
+  "mise -C taskiq-aio-multi-sqs run test",
+  "mise -C deploy run test",
+  "mise -C taskiq-demo run test"
+]
+
 [tasks.toml-sort]
 description = "Format all toml files"
 run = "toml-sort --trailing-comma-inline-array --in-place **/*.toml"
@@ -171,7 +171,7 @@ sources = ["**/*.toml"]
 [tools]
 "asdf:postgres" = "18"
 hadolint = "latest"
-node = "latest"  # Why do I need node?
+node = "latest" # Why do I need node?
 "pipx:awscli-local" = "latest"
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"

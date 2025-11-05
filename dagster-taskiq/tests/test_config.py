@@ -17,12 +17,12 @@ def test_basic_environment_config():
         }),
     ):
         # Reload module to pick up environment variables
-        import importlib  # noqa: PLC0415
+        import importlib
 
-        import dagster_taskiq.defaults  # noqa: PLC0415
+        import dagster_taskiq.defaults
 
         importlib.reload(dagster_taskiq.defaults)
-        from dagster_taskiq.defaults import aws_region_name, sqs_queue_url  # noqa: PLC0415
+        from dagster_taskiq.defaults import aws_region_name, sqs_queue_url
 
         assert sqs_queue_url == "https://sqs.us-east-1.amazonaws.com/123/test"
         assert aws_region_name == "us-east-1"
@@ -37,12 +37,12 @@ def test_endpoint_url_config():
         }),
     ):
         # Reload module to pick up new environment variables
-        import importlib  # noqa: PLC0415
+        import importlib
 
-        import dagster_taskiq.defaults  # noqa: PLC0415
+        import dagster_taskiq.defaults
 
         importlib.reload(dagster_taskiq.defaults)
-        from dagster_taskiq.defaults import sqs_endpoint_url  # noqa: PLC0415
+        from dagster_taskiq.defaults import sqs_endpoint_url
 
         assert sqs_endpoint_url == "http://localhost:4566"
 

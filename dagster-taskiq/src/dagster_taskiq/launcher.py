@@ -22,11 +22,11 @@ from dagster import (
 )
 from dagster._core.events import EngineEventData  # noqa: PLC2701
 from dagster._core.launcher import (
-    CheckRunHealthResult,
+    CheckRunHealthResult,  # noqa: PLC2701
     LaunchRunContext,
     ResumeRunContext,
-    RunLauncher,
-    WorkerStatus,
+    RunLauncher,  # noqa: PLC2701
+    WorkerStatus,  # noqa: PLC2701
 )
 from dagster._grpc.types import ExecuteRunArgs, ResumeRunArgs  # noqa: PLC2701
 from dagster._serdes import ConfigurableClass, ConfigurableClassData, pack_value  # noqa: PLC2701
@@ -57,13 +57,13 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
     _instance: DagsterInstance  # pyright: ignore[reportIncompatibleMethodOverride]
     broker: AsyncBroker
 
-    def __init__(
+    def __init__(  # noqa: PLR0917
         self,
         default_queue: str,
         queue_url: str | None = None,
         region_name: str | None = None,
         endpoint_url: str | None = None,
-        config_source: dict | None = None,
+        config_source: dict[str, Any] | None = None,
         inst_data: ConfigurableClassData | None = None,
     ) -> None:
         """Initialize the Taskiq run launcher.
@@ -90,7 +90,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
 
         super().__init__()
 
-    def app_args(self) -> dict:
+    def app_args(self) -> dict[str, Any]:
         """Get arguments for broker creation.
 
         Returns:
@@ -128,7 +128,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             routing_key=TASK_EXECUTE_JOB_NAME,
         )
 
-    def terminate(self, run_id: str) -> bool:
+    def terminate(self, run_id: str) -> bool:  # noqa: PLR0911
         """Terminate a running task.
 
         Args:
@@ -181,7 +181,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self.broker.startup())
-            loop.run_until_complete(cancel_callable(task_uuid))
+            loop.run_until_complete(cancel_callable(task_uuid))  # pyright: ignore[reportArgumentType]
         except Exception as exc:
             self._instance.report_engine_event(
                 f"Failed to submit Taskiq cancellation request: {exc}",
@@ -195,7 +195,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         self._instance.report_engine_event(
             "Requested Taskiq task cancellation.",
             run,
-            EngineEventData(interrupted=[task_id]),
+            EngineEventData.interrupted([task_id]),
             cls=self.__class__,
         )
         return True
@@ -238,7 +238,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         self,
         run: DagsterRun,
         task: Any,
-        task_args: dict,
+        task_args: dict[str, Any],
         routing_key: str,
     ) -> None:
         """Launch a Taskiq task for the run.
@@ -263,7 +263,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self.broker.startup())
-            if hasattr(self.broker, "result_backend") and self.broker.result_backend:
+            if hasattr(self.broker, "result_backend") and self.broker.result_backend:  # type: ignore[truthy-bool]
                 loop.run_until_complete(self.broker.result_backend.startup())
 
             # Use kiq() to submit the task with labels
@@ -308,7 +308,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         """
         return True
 
-    def check_run_worker_health(self, run: DagsterRun) -> CheckRunHealthResult:
+    def check_run_worker_health(self, run: DagsterRun) -> CheckRunHealthResult:  # noqa: PLR6301
         """Check the health status of a running task.
 
         Args:

@@ -33,7 +33,7 @@ TICK_SECONDS = 1
 DELEGATE_MARKER = "taskiq_queue_wait"
 
 
-async def core_taskiq_execution_loop(
+async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
     job_context: PlanOrchestrationContext,
     execution_plan: ExecutionPlan,
     step_execution_fn: Callable[..., Any],
@@ -72,8 +72,8 @@ async def core_taskiq_execution_loop(
         Returns:
             Negative priority value (for sorting)
         """
-        return (  # type: ignore[return-value]
-            -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore[arg-type]
+        return (
+            -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
             + -1 * _get_run_priority(job_context)
         )
 
@@ -86,13 +86,11 @@ async def core_taskiq_execution_loop(
         Returns:
             Negative priority value (for sorting)
         """
-        return (  # type: ignore[return-value]
-            priority_for_step(execution_plan.get_step_by_key(step_key))
-        )
+        return priority_for_step(execution_plan.get_step_by_key(step_key))
 
     _warn_on_priority_misuse(job_context, execution_plan)
 
-    step_results = {}  # Dict[str, dict] {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
+    step_results: dict[str, dict[str, Any]] = {}  # {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
     cancelled_task_ids: set[str] = set()
 
@@ -132,12 +130,13 @@ async def core_taskiq_execution_loop(
             return
 
         for waiter in waiters:
-            if not waiter.done():
+            if waiter is not None and not waiter.done():
                 waiter.cancel()
 
-        await asyncio.gather(*waiters, return_exceptions=True)
+        filtered_waiters = [w for w in waiters if w is not None]
+        await asyncio.gather(*filtered_waiters, return_exceptions=True)
 
-    with InstanceConcurrencyContext(job_context.instance, job_context.dagster_run) as instance_concurrency_context:
+    with InstanceConcurrencyContext(job_context.instance, job_context.dagster_run) as instance_concurrency_context:  # noqa: PLR1702, SIM117
         with execution_plan.start(
             retry_mode=job_context.executor.retries,
             sort_key_fn=priority_for_step,
@@ -160,7 +159,7 @@ async def core_taskiq_execution_loop(
                     results_to_pop = []
                     for step_key, data in sorted(
                         step_results.items(),
-                        key=lambda x: priority_for_key(x[0]),  # type: ignore[arg-type]
+                        key=lambda x: priority_for_key(x[0]),
                     ):
                         waiter = data["waiter"]
                         if not waiter.done():
@@ -179,12 +178,10 @@ async def core_taskiq_execution_loop(
                                     step_events = task_result
                             else:
                                 step_events = None
-                        except Exception as e:
-                            job_context.log.error(
-                                "Error getting result for step %s: %s",
+                        except Exception:
+                            job_context.log.exception(
+                                "Error getting result for step %s",
                                 step_key,
-                                e,
-                                exc_info=True,
                             )
                             step_events = []
                             step_errors[step_key] = serializable_error_info_from_exc_info(sys.exc_info())
@@ -222,7 +219,7 @@ async def core_taskiq_execution_loop(
                         await asyncio.sleep(TICK_SECONDS)
                         continue
 
-                    for step in active_execution.get_steps_to_execute():  # type: ignore[assignment]
+                    for step in active_execution.get_steps_to_execute():
                         try:
                             queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
                             yield DagsterEvent.engine_event(
@@ -243,28 +240,35 @@ async def core_taskiq_execution_loop(
                             )
                             result_handle = step_results[step.key]["result"]
                             task_id = step_results[step.key]["task_id"]
+                            step_key_for_wait = step.key
 
-                            # Create a waiter that tries wait_result() first, then falls back to direct S3 backend access
+                            # Create a waiter that tries wait_result() first, then falls back to
+                            # direct S3 backend access
                             async def _wait_for_result() -> Any:
                                 """Wait for task result, using S3 backend if wait_result() fails.
 
                                 Returns:
                                     The task result value
                                 """
+                                # Capture loop variables to avoid B023
+                                captured_result_handle = result_handle  # noqa: B023
+                                captured_task_id = task_id  # noqa: B023
+                                captured_step_key = step_key_for_wait  # noqa: B023
+
                                 try:
                                     # First try the standard wait_result() method
-                                    wait_result_fn = getattr(result_handle, "wait_result", None)
+                                    wait_result_fn = getattr(captured_result_handle, "wait_result", None)
                                     if wait_result_fn:
                                         result = await wait_result_fn()
                                         if result is not None:
                                             return result
 
                                     # If wait_result() returned None or doesn't exist, use S3 backend directly
-                                    if hasattr(broker, "result_backend") and broker.result_backend and task_id:
+                                    if hasattr(broker, "result_backend") and broker.result_backend and captured_task_id:  # type: ignore[truthy-bool]
                                         job_context.log.debug(
                                             "Using S3 result backend directly for step %s, task %s",
-                                            step.key,
-                                            task_id,
+                                            captured_step_key,
+                                            captured_task_id,
                                         )
                                         # Poll the S3 backend until result is ready
                                         result_backend = broker.result_backend
@@ -274,8 +278,8 @@ async def core_taskiq_execution_loop(
 
                                         while elapsed < max_wait_seconds:
                                             try:
-                                                if await result_backend.is_result_ready(task_id):
-                                                    backend_result = await result_backend.get_result(task_id)
+                                                if await result_backend.is_result_ready(captured_task_id):
+                                                    backend_result = await result_backend.get_result(captured_task_id)
                                                     if hasattr(backend_result, "return_value"):
                                                         return backend_result.return_value
                                                     return backend_result
@@ -284,29 +288,26 @@ async def core_taskiq_execution_loop(
                                                 if "ResultIsMissingError" not in str(type(e)):
                                                     job_context.log.debug(
                                                         "Error checking result for step %s: %s",
-                                                        step.key,
+                                                        captured_step_key,
                                                         e,
                                                     )
 
                                             await asyncio.sleep(wait_interval)
-                                            elapsed += wait_interval
+                                            elapsed = int(elapsed + wait_interval)
 
-                                        msg = "Result for step %s (task %s) not available after %ds" % (
-                                            step.key,
-                                            task_id,
-                                            max_wait_seconds,
+                                        msg = (
+                                            f"Result for step {captured_step_key} (task {captured_task_id}) "
+                                            f"not available after {max_wait_seconds}s"
                                         )
-                                        raise TimeoutError(msg)
+                                        raise TimeoutError(msg)  # noqa: TRY301
 
                                     # No result backend available
-                                    return None
+                                    return None  # noqa: TRY300
 
-                                except Exception as e:
-                                    job_context.log.error(
-                                        "Error waiting for result for step %s: %s",
-                                        step.key,
-                                        e,
-                                        exc_info=True,
+                                except Exception:
+                                    job_context.log.exception(
+                                        "Error waiting for result for step %s",
+                                        captured_step_key,
                                     )
                                     raise
 
@@ -348,7 +349,7 @@ def _get_step_priority(context: PlanOrchestrationContext, step: Any) -> int:
         The combined priority value (run priority + step priority)
     """
     run_priority = _get_run_priority(context)
-    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))  # type: ignore[arg-type]
+    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
     return run_priority + step_priority
 
 
@@ -367,8 +368,8 @@ def _warn_on_priority_misuse(context: PlanOrchestrationContext, execution_plan: 
     for key in execution_plan.step_keys_to_execute:
         step = execution_plan.get_step_by_key(key)
         if (
-            step.tags.get(PRIORITY_TAG) is not None  # type: ignore[arg-type]
-            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore[arg-type]
+            step.tags.get(PRIORITY_TAG) is not None  # type: ignore[union-attr]
+            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore[union-attr]
         ):
             bad_keys.append(key)
 

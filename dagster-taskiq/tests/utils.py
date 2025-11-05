@@ -9,13 +9,13 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any
 
-from dagster._core.definitions.reconstruct import ReconstructableJob  # noqa: PLC2701
+from dagster._core.definitions.reconstruct import ReconstructableJob
 from dagster._core.events import DagsterEvent
-from dagster._core.execution.api import execute_job  # noqa: PLC2701
+from dagster._core.execution.api import execute_job
 from dagster._core.execution.execution_result import ExecutionResult
-from dagster._core.instance import DagsterInstance  # noqa: PLC2701
+from dagster._core.instance import DagsterInstance
 from dagster._core.instance.ref import InstanceRef
-from dagster._core.test_utils import instance_for_test  # noqa: PLC2701
+from dagster._core.test_utils import instance_for_test
 
 BUILDKITE = os.getenv("BUILDKITE")
 
@@ -130,14 +130,14 @@ def start_taskiq_worker(queue: str | None = None) -> Iterator[None]:
         pathlib.Path(__file__).parent.resolve(),
     ]
     existing_pythonpath = env.get("PYTHONPATH")
-    python_path = os.pathsep.join(roots)
+    python_path = os.pathsep.join(str(p) for p in roots)
     env["PYTHONPATH"] = f"{python_path}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else python_path
 
     # Command is static, not user input, so subprocess is safe
     process = subprocess.Popen(cmd, env=env)  # noqa: S603
 
     # Give the worker a moment to start
-    import time  # noqa: PLC0415
+    import time
 
     time.sleep(2)
 

@@ -8,7 +8,10 @@ from typing import Any
 
 from dagster import DagsterInstance
 from dagster import _check as check  # noqa: PLC2701
-from dagster._cli.api import _execute_run_command_body, _resume_run_command_body  # noqa: PLC2701
+from dagster._cli.api import (  # pyright: ignore[reportPrivateUsage]
+    _execute_run_command_body,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _resume_run_command_body,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+)
 from dagster._core.definitions.reconstruct import ReconstructableJob  # noqa: PLC2701
 from dagster._core.events import EngineEventData  # noqa: PLC2701
 from dagster._core.execution.api import create_execution_plan, execute_plan_iterator  # noqa: PLC2701
@@ -39,9 +42,9 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
 
     @broker.task(task_name=TASK_EXECUTE_PLAN_NAME, **task_kwargs)
     def _execute_plan(
-        execute_step_args_packed: dict,
-        executable_dict: dict,
-    ) -> list:
+        execute_step_args_packed: dict[str, Any],
+        executable_dict: dict[str, Any],
+    ) -> list[Any]:
         """Execute a plan step in a taskiq worker.
 
         Args:
@@ -61,7 +64,7 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
 
         check.dict_param(executable_dict, "executable_dict")
 
-        instance = DagsterInstance.from_ref(execute_step_args.instance_ref)  # pyright: ignore[reportArgumentType]
+        instance = DagsterInstance.from_ref(execute_step_args.instance_ref)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
 
         recon_job = ReconstructableJob.from_dict(executable_dict)
         retry_mode = execute_step_args.retry_mode
@@ -69,11 +72,11 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
         dagster_run = instance.get_run_by_id(execute_step_args.run_id)
         check.invariant(dagster_run, f"Could not load run {execute_step_args.run_id}")
 
-        step_keys_str = ", ".join(execute_step_args.step_keys_to_execute)  # pyright: ignore[reportCallIssue,reportArgumentType]
+        step_keys_str = ", ".join(execute_step_args.step_keys_to_execute or [])
 
         execution_plan = create_execution_plan(
             recon_job,
-            dagster_run.run_config,  # pyright: ignore[reportOptionalMemberAccess]
+            dagster_run.run_config,  # type: ignore[union-attr]  # pyright: ignore[reportOptionalMemberAccess]
             step_keys_to_execute=execute_step_args.step_keys_to_execute,
             known_state=execute_step_args.known_state,
         )
@@ -82,6 +85,7 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
         # Taskiq doesn't provide the same context as Celery, so we'll use a placeholder
         worker_name = "taskiq-worker"
 
+        step_handle = execution_plan.step_handle_for_single_step_plans()
         engine_event = instance.report_engine_event(
             f"Executing steps {step_keys_str} in taskiq worker",
             dagster_run,
@@ -93,19 +97,19 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
                 marker_end=DELEGATE_MARKER,
             ),
             TaskiqExecutor,
-            step_key=execution_plan.step_handle_for_single_step_plans().to_key(),  # pyright: ignore[reportOptionalMemberAccess]
+            step_key=step_handle.to_key() if step_handle else None,  # pyright: ignore[reportOptionalMemberAccess]
         )
 
         events = [engine_event]
         for step_event in execute_plan_iterator(
             execution_plan=execution_plan,
             job=recon_job,
-            dagster_run=dagster_run,  # pyright: ignore[reportArgumentType]
+            dagster_run=dagster_run,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
             instance=instance,
             retry_mode=retry_mode,
-            run_config=dagster_run.run_config,  # pyright: ignore[reportOptionalMemberAccess]
+            run_config=dagster_run.run_config if dagster_run else {},  # pyright: ignore[reportOptionalMemberAccess]
         ):
-            events.append(step_event)
+            events.append(step_event)  # noqa: PERF402
 
         return [serialize_value(event) for event in events]
 
@@ -116,9 +120,8 @@ def _send_to_null(_event: Any) -> None:
     """Null event sink."""
 
 
-def create_execute_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
-    """Create a Taskiq task that executes a run and registers status updates with the
-    Dagster instance.
+def create_execute_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
+    """Create a Taskiq task that executes a run and registers status updates with the Dagster instance.
 
     Args:
         broker: The taskiq broker
@@ -156,9 +159,8 @@ def create_execute_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
     return _execute_job
 
 
-def create_resume_job_task(broker: AsyncBroker, **task_kwargs: dict) -> Any:
-    """Create a Taskiq task that resumes a run and registers status updates with the
-    Dagster instance.
+def create_resume_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
+    """Create a Taskiq task that resumes a run and registers status updates with the Dagster instance.
 
     Args:
         broker: The taskiq broker

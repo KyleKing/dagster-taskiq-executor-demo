@@ -69,7 +69,7 @@ def _resolve_value(
     """
     search_keys = (key, *aliases)
     for container in (config, source_overrides):
-        if not isinstance(container, dict):
+        if not isinstance(container, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
             continue
         for candidate in search_keys:
             if candidate in container and container[candidate] is not None:
@@ -77,7 +77,7 @@ def _resolve_value(
     return default
 
 
-def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
+def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PLR0915, PLR0914
     """Create a taskiq broker with SQS backend and S3 result backend.
 
     Args:
@@ -109,10 +109,10 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
     )
     wait_time_raw = _resolve_value(config, source_overrides, "wait_time_seconds", defaults.wait_time_seconds)
     delay_seconds_raw = _resolve_value(config, source_overrides, "delay_seconds", 0)
-    use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)
+    use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)  # noqa: FBT003
     extra_options_raw = _resolve_value(config, source_overrides, "extra_options", {}, "broker_transport_options")
     env_enable_cancellation = os.getenv("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
-    default_enable_cancellation = env_enable_cancellation
+    default_enable_cancellation: str | bool | None = env_enable_cancellation
     if default_enable_cancellation is None:
         # Disable cancellation by default until fully implemented (see IMPLEMENTATION_PROGRESS.md Phase 3)
         default_enable_cancellation = False
@@ -123,9 +123,9 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
 
     # Create S3 result backend
     try:
-        from taskiq_aio_sqs import S3Backend
+        from taskiq_aio_sqs import S3Backend  # noqa: PLC0415
 
-        result_backend = S3Backend(
+        result_backend: Any = S3Backend(
             bucket_name=s3_bucket,
             endpoint_url=s3_endpoint,
             region_name=region_name,
@@ -133,7 +133,7 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
             aws_secret_access_key=aws_secret_access_key,
         )
     except ImportError:
-        raise ImportError("taskiq-aio-sqs is required for S3 backend support")
+        raise ImportError("taskiq-aio-sqs is required for S3 backend support") from None
 
     ignored_visibility = _resolve_value(config, source_overrides, "visibility_timeout", None)
     if ignored_visibility is not None:
@@ -163,19 +163,19 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
         max_messages = int(max_messages_raw)
     except (TypeError, ValueError):
         msg = f"invalid max_number_of_messages value: {max_messages_raw!r}"
-        raise ValueError(msg)
+        raise ValueError(msg) from None
 
     try:
         wait_time = int(wait_time_raw)
     except (TypeError, ValueError):
         msg = f"invalid wait_time_seconds value: {wait_time_raw!r}"
-        raise ValueError(msg)
+        raise ValueError(msg) from None
 
     try:
         delay_seconds = int(delay_seconds_raw)
     except (TypeError, ValueError):
         msg = f"invalid delay_seconds value: {delay_seconds_raw!r}"
-        raise ValueError(msg)
+        raise ValueError(msg) from None
 
     extra_options = dict(extra_options_raw) if isinstance(extra_options_raw, dict) else {}
 
@@ -197,4 +197,4 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:
     if enable_cancellation:
         return CancellableSQSBroker(broker_config, result_backend=result_backend)
 
-    return broker_config.create_broker(result_backend=result_backend)
+    return broker_config.create_broker(result_backend=result_backend)  # type: ignore[no-any-return]

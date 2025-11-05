@@ -20,7 +20,7 @@ loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 try:
     loop.run_until_complete(broker.startup())
-    if hasattr(broker, "result_backend") and broker.result_backend:
+    if hasattr(broker, "result_backend") and broker.result_backend:  # type: ignore[truthy-bool]
         loop.run_until_complete(broker.result_backend.startup())
 finally:
     loop.close()

@@ -32,7 +32,7 @@ description = "Reset LocalStack and Pulumi state"
 confirm = "This will delete all LocalStack and Pulumi data. Continue?"
 run = [
   "rm -rf volume/*",
-  "mise run localstack:start --detach",
+  "mise run localstack:start --detach"
 ]
 wait_for = ["localstack:stop"]
 depends_post = ["pulumi:refresh"]

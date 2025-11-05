@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 from dagster import DagsterInstance, DagsterRunStatus, file_relative_path, instance_for_test
-from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext  # noqa: PLC2701
-from dagster._core.workspace.load_target import PythonFileTarget  # noqa: PLC2701
-from dagster._daemon import execute_run_monitoring_iteration  # noqa: PLC2701
+from dagster._core.workspace.context import WorkspaceProcessContext, WorkspaceRequestContext
+from dagster._core.workspace.load_target import PythonFileTarget
+from dagster._daemon import execute_run_monitoring_iteration
 from dagster_shared import seven
 
 from dagster_taskiq.defaults import sqs_queue_url

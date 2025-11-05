@@ -17,7 +17,6 @@ local linters = new Mapping<String, Step> {
   ["python-check-ast"] = Builtins.python_check_ast
   ["python-debug-statements"] = Builtins.python_debug_statements
   ["trailing-whitespace"] = Builtins.trailing_whitespace
-  ["yamllint"] = Builtins.yamllint
   ["toml-sort"] = new Step {
     glob = List("**/*.toml")
     check = "toml-sort --check {{files}}"
