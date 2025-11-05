@@ -1,10 +1,10 @@
-# Root mise.toml - Monorepo Orchestration
-# This file coordinates tasks across the entire repository
+experimental_monorepo_root = true
 
 [env]
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
-PROJECT_NAME = "dagster-taskiq-demo"
+MISE_EXPERIMENTAL = "1"
+PROJECT_NAME = "dag-tiq"
 PULUMI_CONFIG_PASSPHRASE = "See README!"
 _.file = {path = ".env"}
 
@@ -39,17 +39,6 @@ description = "Build TaskIQ demo image with docker bake"
 run = "docker buildx bake taskiq-demo"
 sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
 
-[tasks."checks:all"]
-description = "Check all projects"
-run = [
-  "mise -C dagster-taskiq run checks",
-  "mise -C dagster-taskiq/example run checks",
-  "mise -C dagster-taskiq-demo run checks",
-  "mise -C taskiq-aio-multi-sqs run checks",
-  "mise -C deploy run checks",
-  "mise -C taskiq-demo run checks"
-]
-
 [tasks."dashboard:start"]
 description = "Start TaskIQ dashboard (requires dev dependencies)"
 run = "./scripts/run-dashboard.sh"
@@ -68,7 +57,7 @@ if [ -n "$REPO_URI" ]; then
   awslocal ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
     docker login --username AWS --password-stdin "${REPO_URI%%/*}"
 else
-  echo "ECR repository not found. Run 'mise --cd deploy run pulumi:up' first."
+  echo "ECR repository not found. Run `mise run //deploy:pulumi:up` first."
   exit 1
 fi
 '''
@@ -87,28 +76,6 @@ description = "Initial project setup (check env, install deps)"
 run = [
   "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
   "mise install"
-]
-
-[tasks."fixes:all"]
-description = "Lint and auto-fix all projects"
-run = [
-  "mise -C dagster-taskiq run fixes",
-  "mise -C dagster-taskiq/example run fixes",
-  "mise -C dagster-taskiq-demo run fixes",
-  "mise -C taskiq-aio-multi-sqs run fixes",
-  "mise -C deploy run fixes",
-  "mise -C taskiq-demo run fixes"
-]
-
-[tasks."install:all"]
-description = "Install all project dependencies"
-run = [
-  "mise -C dagster-taskiq run install",
-  "mise -C dagster-taskiq/example run install",
-  "mise -C dagster-taskiq-demo run install",
-  "mise -C taskiq-aio-multi-sqs run install",
-  "mise -C deploy run install",
-  "mise -C taskiq-demo run install"
 ]
 
 [tasks."localstack:logs"]
@@ -151,17 +118,6 @@ run = "mise up --bump"
 description = "Format all pkl files"
 run = "pkl format --write hk.pkl"
 sources = ["hk.pkl"]
-
-[tasks."test:all"]
-description = "Test all projects"
-run = [
-  "mise -C dagster-taskiq run test",
-  "mise -C dagster-taskiq/example run test",
-  "mise -C dagster-taskiq-demo run test",
-  "mise -C taskiq-aio-multi-sqs run test",
-  "mise -C deploy run test",
-  "mise -C taskiq-demo run test"
-]
 
 [tasks.toml-sort]
 description = "Format all toml files"
