@@ -109,6 +109,68 @@ pulumi cancel  # Release stuck locks
 pulumi refresh # Sync state with cloud
 ```
 
+## Observability
+
+### Log Viewing Commands
+
+From project root, use mise tasks to tail CloudWatch logs:
+
+```bash
+# Dagster daemon logs
+mise run logs:dagster-daemon
+
+# Dagster webserver logs
+mise run logs:dagster-webserver
+
+# TaskIQ worker logs
+mise run logs:taskiq-worker
+
+# Auto-scaler logs
+mise run logs:auto-scaler
+```
+
+### ECS Service Status
+
+```bash
+# List all services
+mise run aws:services
+
+# Check specific service
+mise run ecs:status SERVICE_NAME=dagster-daemon
+mise run ecs:status SERVICE_NAME=taskiq-worker
+
+# List running tasks
+mise run aws:tasks
+```
+
+### Queue Monitoring
+
+```bash
+# Check queue depth
+mise run queue:depth
+
+# Get queue URL from stack
+uv run pulumi stack output queueUrl --stack local
+```
+
+### Stack Outputs
+
+Get infrastructure URLs and identifiers:
+
+```bash
+# Queue URL
+uv run pulumi stack output queueUrl --stack local
+
+# Database endpoint
+uv run pulumi stack output databaseEndpoint --stack local
+
+# ECS cluster name
+uv run pulumi stack output clusterName --stack local
+
+# All outputs
+uv run pulumi stack output --stack local
+```
+
 ## Additional Resources
 
 - [Pulumi IDP Best Practices](https://www.pulumi.com/docs/idp/best-practices/)

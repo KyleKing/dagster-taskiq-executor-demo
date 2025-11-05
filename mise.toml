@@ -71,6 +71,23 @@ run = "./scripts/build-and-push.sh"
 description = "Build and push TaskIQ demo image to LocalStack ECR"
 run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
+[tasks."ecs:status"]
+description = "Check ECS service status (requires SERVICE_NAME env var)"
+run = '''
+CLUSTER="${ECS_CLUSTER_NAME:-dagster-taskiq-demo-${ENVIRONMENT}}"
+SERVICE_NAME="${SERVICE_NAME}"
+if [ -z "$SERVICE_NAME" ]; then
+  echo "Error: SERVICE_NAME not set. Example: mise run ecs:status SERVICE_NAME=dagster-daemon"
+  exit 1
+fi
+awslocal ecs describe-services \
+  --cluster "$CLUSTER" \
+  --services "$SERVICE_NAME" \
+  --region ${AWS_DEFAULT_REGION} \
+  --query 'services[0].{Status:status,DesiredCount:desiredCount,RunningCount:runningCount,PendingCount:pendingCount}' \
+  --output table
+'''
+
 [tasks.env-setup]
 description = "Initial project setup (check env, install deps)"
 run = [
@@ -105,6 +122,22 @@ description = "Stop LocalStack container"
 alias = "stop"
 run = "docker compose down"
 
+[tasks."logs:auto-scaler"]
+description = "Tail auto-scaler logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/auto-scaler-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:dagster-daemon"]
+description = "Tail Dagster daemon logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/dagster-daemon-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:dagster-webserver"]
+description = "Tail Dagster webserver logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/dagster-webserver-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:taskiq-worker"]
+description = "Tail TaskIQ worker logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/taskiq-worker-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
 [tasks.mdformat]
 description = "Format all markdown files"
 run = "mdformat **/*.md"
@@ -118,6 +151,20 @@ run = "mise up --bump"
 description = "Format all pkl files"
 run = "pkl format --write hk.pkl"
 sources = ["hk.pkl"]
+
+[tasks."queue:depth"]
+description = "Check SQS queue depth (requires QUEUE_URL env var or deploy stack output)"
+run = '''
+QUEUE_URL="${QUEUE_URL:-$(cd deploy && uv run pulumi stack output queueUrl --stack ${ENVIRONMENT} 2>/dev/null || echo "")}"
+if [ -z "$QUEUE_URL" ]; then
+  echo "Error: QUEUE_URL not set. Get it from: cd deploy && uv run pulumi stack output queueUrl --stack ${ENVIRONMENT}"
+  exit 1
+fi
+awslocal sqs get-queue-attributes \
+  --queue-url "$QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
+  --region ${AWS_DEFAULT_REGION}
+'''
 
 [tasks.toml-sort]
 description = "Format all toml files"

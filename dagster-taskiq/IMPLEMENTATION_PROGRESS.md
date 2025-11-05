@@ -102,54 +102,17 @@
 
 See original Phase 3 plan below - blocked until Phases 1-2 complete and LocalStack issues resolved.
 
-## Next Phases
+## Remaining Work
 
-### Phase 1 – Stabilise Existing Behaviour
+**Note**: For current status and consolidated remaining work, see `../TODO.md`.
 
-1. **Fix delay/priority mapping**
-   - Revisit Dagster priority semantics (higher number = higher priority).
-   - Map priority to `DelaySeconds` so higher priority executes sooner (e.g. inverse clamped scale).
-   - Add regression tests using fake broker to confirm zero default delay.
-1. **Guard fair queue usage**
-   - Detect `.fifo` queues before enabling `is_fair_queue`.
-   - Document required queue configuration (standard vs FIFO) and expose toggle via config.
-1. **Smoke-test S3 extended payload support**
-   - Run against LocalStack to confirm large message flow.
-   - Capture findings in test instructions.
-
-### Phase 2 – Complete TaskIQ API Adoption
-
-1. **Result handling simplification**
-   - Replace manual `is_ready()`/`get_result()` loop with TaskIQ async helpers or callbacks.
-   - Ensure exceptions propagate with serialised Dagster error info.
-1. **Broker configuration cleanup**
-   - Consume `taskiq_aio_sqs.SQSBroker` directly from executor/app factory.
-   - Prune unused kwargs, centralise defaults in one location.
-   - Revalidate environment-based overrides.
-1. **Config ergonomics**
-   - Align `config_source` schema with TaskIQ broker parameters (e.g. allow `is_fair_queue` toggle).
-   - Update docs and Dagster config examples accordingly.
-
-### Phase 3 – Implement Cancellation / Revoke
-
-1. **Executor integration**
-   - Wire `CancellableSQSBroker` into `make_app()` when cancellation enabled.
-   - Start cancel listener in `core_execution_loop`; cancel pending results when messages arrive.
-1. **Dagster-facing API**
-   - Add method on `TaskiqExecutor`/instance to submit cancel requests (wrap `cancel_task`).
-   - Ensure run launcher or daemon surfaces cancellation path.
-1. **Worker handling**
-   - Extend `tasks.create_task` workers to check cancellation signal before executing steps.
-   - Decide on cooperative interruption strategy for long-running steps.
-1. **Testing**
-   - Add integration test using LocalStack cancelling an in-flight step.
-   - Verify idempotency storage still ensures exactly-once semantics after cancellation.
+The sections below are historical. Completed work has been moved to "Fixed Issues" in `../TODO.md`.
 
 ## Validation Plan
 
 - Run `mise run test` after each phase; add targeted Dagster `execute_in_process` scenarios where feasible.
 - Add LocalStack integration workflow to CI for SQS/S3 exercises.
-- Document manual verification steps in `TESTING.md`.
+- ✅ Manual verification steps documented in `../TESTING.md`.
 
 ## Success Criteria
 
