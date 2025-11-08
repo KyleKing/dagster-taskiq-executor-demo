@@ -87,7 +87,9 @@ execution:
 
 When enabled, the system uses a separate SQS queue (named `{queue-name}-cancels`) for cancellation messages. Workers automatically listen for cancellation requests and cancel running tasks when requested.
 
-**Note**: Cancellation requires both the executor and workers to have cancellation enabled. The cancel queue is automatically created with the naming convention `{main-queue-name}-cancels`.
+**Note**: Cancellation requires both the executor and workers to have cancellation enabled. The cancel queue must be created manually (see `CANCELLATION.md` for details).
+
+For comprehensive cancellation documentation, troubleshooting, and examples, see [`CANCELLATION.md`](CANCELLATION.md).
 
 ### Advanced Configuration
 
@@ -163,8 +165,8 @@ export AWS_SECRET_ACCESS_KEY=test
 - **Multi-queue routing**: Not supported (simplified to single queue)
 - **Priority-based delays**: Not supported (removed in simplification)
 - **Worker cancellation**: ✅ Fully implemented - Workers check cancellation queue and cancel tasks
-- **Worker health checks**: Returns `UNKNOWN` (result backend status not checked)
-- **LocalStack**: Some SQS features may not work identically to AWS (e.g., `DelaySeconds`)
+- **Worker health checks**: ✅ Implemented - Uses result backend to check task status
+- **LocalStack**: Some SQS features may not work identically to AWS (e.g., `DelaySeconds`). See [`LOCALSTACK.md`](LOCALSTACK.md) for details and workarounds.
 
 ## Migration from Dagster-Celery
 
