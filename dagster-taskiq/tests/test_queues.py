@@ -1,32 +1,11 @@
 import asyncio
 import os
-import threading
-import time
 
 import pytest
-from dagster._core.test_utils import instance_for_test
 from taskiq.result import TaskiqResult
 from taskiq_aio_sqs import S3Backend
 
 from dagster_taskiq.make_app import make_app
-from tests.utils import execute_on_thread, start_taskiq_worker
-
-
-def test_multiqueue(localstack):
-    with instance_for_test() as instance:
-        done = threading.Event()
-        with start_taskiq_worker():
-            execute_thread = threading.Thread(
-                target=execute_on_thread,
-                args=("multiqueue_job", done, instance.get_ref()),
-                daemon=True,
-            )
-            execute_thread.start()
-            time.sleep(1)
-            assert not done.is_set()
-            with start_taskiq_worker(queue="fooqueue"):
-                execute_thread.join()
-                assert done.is_set()
 
 
 @pytest.mark.parametrize(

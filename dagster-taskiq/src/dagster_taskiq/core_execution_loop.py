@@ -16,18 +16,10 @@ from dagster._core.events import DagsterEvent, EngineEventData  # noqa: PLC2701
 from dagster._core.execution.context.system import PlanOrchestrationContext  # noqa: PLC2701
 from dagster._core.execution.plan.instance_concurrency_context import InstanceConcurrencyContext  # noqa: PLC2701
 from dagster._core.execution.plan.plan import ExecutionPlan  # noqa: PLC2701
-from dagster._core.storage.tags import PRIORITY_TAG  # noqa: PLC2701
 from dagster._utils.error import serializable_error_info_from_exc_info  # noqa: PLC2701
 from dagster_shared.serdes import deserialize_value
 
-from dagster_taskiq.defaults import task_default_priority, task_default_queue
-from dagster_taskiq.executor import TaskiqExecutor
 from dagster_taskiq.make_app import make_app
-from dagster_taskiq.tags import (
-    DAGSTER_TASKIQ_QUEUE_TAG,
-    DAGSTER_TASKIQ_RUN_PRIORITY_TAG,
-    DAGSTER_TASKIQ_STEP_PRIORITY_TAG,
-)
 
 TICK_SECONDS = 1
 DELEGATE_MARKER = "taskiq_queue_wait"
@@ -61,34 +53,10 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
             "similar system that allows files to be available to all nodes), S3, or GCS",
         )
 
-    broker = make_app(cast("TaskiqExecutor", job_context.executor).app_args())
+    # Lazy import to avoid circular dependency
+    from dagster_taskiq.executor import TaskiqExecutor  # noqa: PLC0415
 
-    def priority_for_step(step: Any) -> int:
-        """Calculate priority for a step.
-
-        Args:
-            step: The step to calculate priority for
-
-        Returns:
-            Negative priority value (for sorting)
-        """
-        return (
-            -1 * int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
-            + -1 * _get_run_priority(job_context)
-        )
-
-    def priority_for_key(step_key: str) -> int:
-        """Calculate priority for a step by key.
-
-        Args:
-            step_key: The step key to calculate priority for
-
-        Returns:
-            Negative priority value (for sorting)
-        """
-        return priority_for_step(execution_plan.get_step_by_key(step_key))
-
-    _warn_on_priority_misuse(job_context, execution_plan)
+    broker = make_app(cast(TaskiqExecutor, job_context.executor).app_args())
 
     step_results: dict[str, dict[str, Any]] = {}  # {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
@@ -139,7 +107,7 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
     with InstanceConcurrencyContext(job_context.instance, job_context.dagster_run) as instance_concurrency_context:  # noqa: PLR1702, SIM117
         with execution_plan.start(
             retry_mode=job_context.executor.retries,
-            sort_key_fn=priority_for_step,
+            sort_key_fn=None,
             instance_concurrency_context=instance_concurrency_context,
         ) as active_execution:
             stopping = False
@@ -157,10 +125,7 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                         await _request_task_cancellations(reason="termination signal")
 
                     results_to_pop = []
-                    for step_key, data in sorted(
-                        step_results.items(),
-                        key=lambda x: priority_for_key(x[0]),
-                    ):
+                    for step_key, data in step_results.items():
                         waiter = data["waiter"]
                         if not waiter.done():
                             continue
@@ -221,21 +186,16 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
 
                     for step in active_execution.get_steps_to_execute():
                         try:
-                            queue = step.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, task_default_queue)
                             yield DagsterEvent.engine_event(
                                 job_context.for_step(step),
-                                f'Submitting taskiq task for step "{step.key}" to queue "{queue}".',
+                                f'Submitting taskiq task for step "{step.key}".',
                                 EngineEventData(marker_start=DELEGATE_MARKER),
                             )
-
-                            priority = _get_step_priority(job_context, step)
 
                             step_results[step.key] = await step_execution_fn(
                                 broker,
                                 job_context,
                                 step,
-                                queue,
-                                priority,
                                 active_execution.get_known_state(),
                             )
                             result_handle = step_results[step.key]["result"]
@@ -336,47 +296,3 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                 # Best-effort cancellation of any remaining remote tasks and waiter tasks.
                 await _request_task_cancellations(reason="loop shutdown")
                 await _cancel_waiters()
-
-
-def _get_step_priority(context: PlanOrchestrationContext, step: Any) -> int:
-    """Step priority is (currently) set as the overall run priority plus the individual step priority.
-
-    Args:
-        context: The plan orchestration context
-        step: The step to get priority for
-
-    Returns:
-        The combined priority value (run priority + step priority)
-    """
-    run_priority = _get_run_priority(context)
-    step_priority = int(step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG, task_default_priority))
-    return run_priority + step_priority
-
-
-def _get_run_priority(context: PlanOrchestrationContext) -> int:
-    tag_value = context.get_tag(DAGSTER_TASKIQ_RUN_PRIORITY_TAG)
-    if tag_value is None:
-        return 0
-    try:
-        return int(tag_value)
-    except ValueError:
-        return 0
-
-
-def _warn_on_priority_misuse(context: PlanOrchestrationContext, execution_plan: ExecutionPlan) -> None:
-    bad_keys = []
-    for key in execution_plan.step_keys_to_execute:
-        step = execution_plan.get_step_by_key(key)
-        if (
-            step.tags.get(PRIORITY_TAG) is not None  # type: ignore[union-attr]
-            and step.tags.get(DAGSTER_TASKIQ_STEP_PRIORITY_TAG) is None  # type: ignore[union-attr]
-        ):
-            bad_keys.append(key)
-
-    if bad_keys:
-        context.log.warning(
-            'The following steps do not have "dagster-taskiq/priority" set but do '
-            'have "dagster/priority" set which is not applicable for the taskiq engine: [%s]. '
-            "Consider using a function to set both keys.",
-            ", ".join(bad_keys),
-        )

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import pulumi
 from pulumi_aws import Provider, ec2, ecs, iam, sqs
@@ -55,9 +55,9 @@ def create_taskiq_demo_infrastructure(
     api_desired_count: int,
     worker_desired_count: int,
     assign_public_ip: bool = True,
+    api_target_group_arn: pulumi.Input[str] | None = None,
 ) -> TaskiqDemoResources:
     """Provision SQS queue plus API/worker ECS services for the TaskIQ demo."""
-
     queue = sqs.Queue(
         f"{resource_name}-queue",
         name=queue_name,
@@ -252,20 +252,41 @@ def create_taskiq_demo_infrastructure(
 
     security_groups = security_group.id.apply(lambda sg: [sg])
 
+    api_service_args = ecs.ServiceArgs(
+        name=f"{project_name}-taskiq-demo-api-{environment}",
+        cluster=cluster_arn,
+        task_definition=api_task_definition.arn,
+        desired_count=api_desired_count,
+        launch_type="FARGATE",
+        network_configuration=ecs.ServiceNetworkConfigurationArgs(
+            subnets=subnet_ids,
+            security_groups=security_groups,
+            assign_public_ip=assign_public_ip,
+        ),
+        deployment_circuit_breaker=ecs.ServiceDeploymentCircuitBreakerArgs(
+            enable=True,
+            rollback=True,
+        ),
+        deployment_controller=ecs.ServiceDeploymentControllerArgs(
+            type="ECS",
+        ),
+        health_check_grace_period_seconds=60,
+        force_new_deployment=True,
+    )
+
+    # Add load balancer configuration if target group is provided
+    if api_target_group_arn is not None:
+        api_service_args.load_balancers = [
+            ecs.ServiceLoadBalancerArgs(
+                target_group_arn=api_target_group_arn,
+                container_name="taskiq-demo-api",
+                container_port=8000,
+            )
+        ]
+
     api_service = ecs.Service(
         f"{resource_name}-api-service",
-        ecs.ServiceArgs(
-            name=f"{project_name}-taskiq-demo-api-{environment}",
-            cluster=cluster_arn,
-            task_definition=api_task_definition.arn,
-            desired_count=api_desired_count,
-            launch_type="FARGATE",
-            network_configuration=ecs.ServiceNetworkConfigurationArgs(
-                subnets=subnet_ids,
-                security_groups=security_groups,
-                assign_public_ip=assign_public_ip,
-            ),
-        ),
+        api_service_args,
         opts=pulumi.ResourceOptions(provider=provider),
     )
 
@@ -282,6 +303,15 @@ def create_taskiq_demo_infrastructure(
                 security_groups=security_groups,
                 assign_public_ip=assign_public_ip,
             ),
+            deployment_circuit_breaker=ecs.ServiceDeploymentCircuitBreakerArgs(
+                enable=True,
+                rollback=True,
+            ),
+            deployment_controller=ecs.ServiceDeploymentControllerArgs(
+                type="ECS",
+            ),
+            health_check_grace_period_seconds=60,
+            force_new_deployment=True,
         ),
         opts=pulumi.ResourceOptions(provider=provider),
     )

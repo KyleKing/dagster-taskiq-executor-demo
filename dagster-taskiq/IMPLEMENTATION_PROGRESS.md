@@ -10,14 +10,11 @@
 
 ### Phase 1 - Stabilise Existing Behaviour ✅
 
-1. **Delay/priority mapping** (`src/dagster_taskiq/executor.py:210-224`)
+1. **Priority/queue simplification**
 
-   - ✅ Implemented `_priority_to_delay_seconds()` function
-   - ✅ Maps Dagster priority to SQS DelaySeconds: higher priority = lower delay
-   - ✅ Default priority (5) = 0 delay, decreasing priority adds 10s per level
-   - ✅ Clamped to SQS max (900 seconds)
-   - ✅ Unit tests passing (`tests/test_priority.py::test_priority_delay_translation`)
-   - ⚠️ Integration test failing due to LocalStack DelaySeconds limitations
+   - ✅ Removed priority-to-delay mapping functionality
+   - ✅ Removed multi-queue support
+   - ✅ Simplified to single queue implementation
 
 1. **Fair queue guards** (`src/dagster_taskiq/make_app.py:129-143`)
 
@@ -58,9 +55,8 @@
 ### Documentation & Cleanup
 
 - ✅ Created this progress log
-- ✅ Debug logging added to priority/delay mapping (`executor.py:132-135`)
+- ✅ Removed priority and queue routing functionality
 - ✅ Documented LocalStack limitations
-- ✅ Fixed test assertion logic for priority ordering
 
 ## Remaining Work
 
@@ -74,8 +70,7 @@
 
 1. **LocalStack Test Stability** - Medium Priority
 
-   - `test_run_priority_job` fails due to DelaySeconds not being honored
-   - Options: upgrade LocalStack, mock SQS delays, or skip test in LocalStack
+   - Priority tests removed as part of simplification
    - Document LocalStack limitations for contributors
 
 1. **Documentation** - Medium Priority
@@ -118,11 +113,10 @@ The sections below are historical. Completed work has been moved to "Fixed Issue
 
 ### Phase 1 & 2 (Current) ✅ Mostly Met
 
-- ✅ Delay/priority logic respects Dagster priority contract (unit tests pass)
+- ✅ Simplified to single queue without priority logic
 - ✅ Broker factories use TaskIQ APIs directly (`SqsBrokerConfig.create_broker()`)
 - ✅ Configuration errors surface clearly (warnings for unsupported options)
 - ✅ All existing Dagster jobs run without configuration changes
-- ⚠️ Integration test flaky in LocalStack (DelaySeconds limitation)
 
 ### Phase 3 (Future) - Not Yet Started
 
@@ -134,16 +128,15 @@ The sections below are historical. Completed work has been moved to "Fixed Issue
 
 ### Files Modified
 
-- `src/dagster_taskiq/executor.py` - Priority-to-delay mapping, debug logging
+- `src/dagster_taskiq/executor.py` - Removed priority-to-delay mapping
 - `src/dagster_taskiq/make_app.py` - Fair queue guards, cancellation toggle
 - `src/dagster_taskiq/broker.py` - SqsBrokerConfig dataclass
-- `src/dagster_taskiq/core_execution_loop.py` - Waiter task cleanup
+- `src/dagster_taskiq/core_execution_loop.py` - Removed priority/queue logic, waiter task cleanup
 - `tests/conftest.py` - Independent LocalStack fixtures
-- `tests/test_priority.py` - Fixed assertion logic
+- `tests/test_priority.py` - Removed (priority tests deleted)
 - `pyproject.toml` - Added `[cancellation]` extra for aioboto3
 
 ### Test Status
 
-- ✅ Config tests passing (6/6)
-- ✅ Unit tests passing (priority delay calculation)
-- ⚠️ Integration tests flaky (LocalStack SQS delays)
+- ✅ Config tests passing
+- ✅ Single queue tests passing

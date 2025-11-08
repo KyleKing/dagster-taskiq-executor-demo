@@ -43,4 +43,4 @@ USER nonroot
 
 EXPOSE 3030
 
-CMD ["dagster", "api", "grpc", "--host", "0.0.0.0", "--port", "3030", "--python-file", "./src/dagster_celery_example/definitions.py"]
+CMD ["dagster", "api", "grpc", "--host", "0.0.0.0", "--port", "3030", "--python-file", "./src/dagster_taskiq_example/definitions.py"]

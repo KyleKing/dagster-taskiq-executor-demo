@@ -430,4 +430,6 @@ def test_target_group_configuration(mock_aws_provider: MagicMock) -> pulumi.Outp
         assert health_check["timeout"] == 5
         assert health_check["unhealthy_threshold"] == 2
 
-    return pulumi.Output.all(result.dagster_target_group.urn, result.dagster_target_group.__dict__).apply(check_target_group_properties)
+    return pulumi.Output.all(result.dagster_target_group.urn, result.dagster_target_group.__dict__).apply(
+        check_target_group_properties
+    )

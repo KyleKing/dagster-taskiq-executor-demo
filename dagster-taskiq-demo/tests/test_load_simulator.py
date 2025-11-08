@@ -1,6 +1,6 @@
 """Tests for the load simulator."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -24,7 +24,8 @@ class TestLoadSimulator:
         assert simulator.repository_name is None
 
     @patch("dagster_taskiq_demo.load_simulator.simulator.DagsterGraphQLClient")
-    def test_submit_run_success(self, mock_client_class: Mock, simulator: LoadSimulator) -> None:
+    @pytest.mark.asyncio
+    async def test_submit_run_success(self, mock_client_class: Mock, simulator: LoadSimulator) -> None:
         """Test successful run submission."""
         mock_client = Mock()
         mock_client.submit_job_execution.return_value = "test-run-id"
@@ -33,17 +34,18 @@ class TestLoadSimulator:
         # Re-initialize simulator with mocked client
         simulator.client = mock_client
 
-        result = simulator.submit_run("test_job")
+        result = await simulator.submit_run("test_job")
 
         assert result == "test-run-id"
         mock_client.submit_job_execution.assert_called_once_with(
             job_name="test_job",
             run_config={},
-            tags={"load_simulator": "true", "submitted_at": pytest.any},
+            tags={"load_simulator": "true", "submitted_at": ANY},
         )
 
     @patch("dagster_taskiq_demo.load_simulator.simulator.DagsterGraphQLClient")
-    def test_submit_run_with_repo_params(self, mock_client_class: Mock) -> None:
+    @pytest.mark.asyncio
+    async def test_submit_run_with_repo_params(self, mock_client_class: Mock) -> None:
         """Test run submission with repository parameters."""
         mock_client = Mock()
         mock_client.submit_job_execution.return_value = "test-run-id"
@@ -57,7 +59,7 @@ class TestLoadSimulator:
         )
         simulator.client = mock_client
 
-        result = simulator.submit_run("test_job")
+        result = await simulator.submit_run("test_job")
 
         assert result == "test-run-id"
         mock_client.submit_job_execution.assert_called_once_with(
@@ -65,13 +67,14 @@ class TestLoadSimulator:
             repository_location_name="test_location",
             repository_name="test_repo",
             run_config={},
-            tags={"load_simulator": "true", "submitted_at": pytest.any},
+            tags={"load_simulator": "true", "submitted_at": ANY},
         )
 
     @patch("dagster_taskiq_demo.load_simulator.simulator.DagsterGraphQLClient")
-    def test_submit_run_failure(self, mock_client_class: Mock, simulator: LoadSimulator) -> None:
+    @pytest.mark.asyncio
+    async def test_submit_run_failure(self, mock_client_class: Mock, simulator: LoadSimulator) -> None:
         """Test run submission failure."""
-        from dagster_graphql import DagsterGraphQLClientError
+        from dagster_graphql import DagsterGraphQLClientError  # noqa: PLC0415
 
         mock_client = Mock()
         mock_client.submit_job_execution.side_effect = DagsterGraphQLClientError("Test error")
@@ -79,7 +82,7 @@ class TestLoadSimulator:
 
         simulator.client = mock_client
 
-        result = simulator.submit_run("test_job")
+        result = await simulator.submit_run("test_job")
 
         assert result is None
 

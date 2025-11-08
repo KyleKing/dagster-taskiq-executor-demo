@@ -26,7 +26,6 @@ from dagster_taskiq.config import (
     TASK_RESUME_JOB_NAME,
 )
 from dagster_taskiq.core_execution_loop import DELEGATE_MARKER
-from dagster_taskiq.executor import TaskiqExecutor
 
 
 def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
@@ -86,6 +85,9 @@ def create_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
         worker_name = "taskiq-worker"
 
         step_handle = execution_plan.step_handle_for_single_step_plans()
+        # Lazy import to avoid circular dependency
+        from dagster_taskiq.executor import TaskiqExecutor  # noqa: PLC0415
+
         engine_event = instance.report_engine_event(
             f"Executing steps {step_keys_str} in taskiq worker",
             dagster_run,

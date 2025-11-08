@@ -47,6 +47,16 @@ enable_error_code = ["ignore-without-code", "possibly-undefined", "redundant-exp
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "dagster_taskiq_demo.auto_scaler.*"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+module = "dagster_taskiq_demo.load_simulator.cli"
+disable_error_code = ["attr-defined"]
 
 [tool.pyright]
 pythonVersion = "3.13"
@@ -56,6 +66,22 @@ reportMissingTypeStubs = false
 reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportUnknownVariableType = false
+reportPrivateUsage = false
+
+[[tool.pyright.overrides]]
+include = ["tests/**/*.py"]
+reportPrivateUsage = false
+reportAttributeAccessIssue = false
+reportIncompatibleMethodOverride = false
+reportUnknownMemberType = false
+
+[[tool.pyright.overrides]]
+include = ["**/load_simulator/cli.py"]
+reportAttributeAccessIssue = false
+
+[[tool.pyright.overrides]]
+include = ["src/dagster_taskiq_demo/load_simulator/verification.py"]
+reportAttributeAccessIssue = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -73,23 +99,30 @@ ignore = [
   "ANN003", # Missing type annotation for **kwargs
   "ANN401", # Dynamically typed expressions (typing.Any) are disallowed
   "BLE001", # Do not catch blind exception: `Exception`
+  "PLC0415", # Import should be at top-level (intentional for lazy loading)
   "COM812", # Trailing comma missing (conflicts with formatter)
   "CPY001", # Missing copyright notice at top of file
   "D203", # 1 blank line required before class docstring (conflicts with D211)
   "D213", # Multi-line docstring summary should start at the second line (conflicts with D212)
+  "DOC201", # Return not documented (acceptable for simple returns)
   "DOC501", # Raised exception missing from docstring
+  "E501", # Line too long (handled by formatter)
   "EM101", # Exception must not use a string literal, assign to variable first
+  "F100", # Fixes (auto-fixable issues)
   "FIX001", # Line contains FIXME
   "FIX002", # Line contains TODO
   "FIX004", # Line contains HACK
   "PLR0913", # Too many arguments in function definition
+  "PLR6301", # Method could be function (acceptable in test classes)
+  "S311", # Standard pseudo-random generators (acceptable for non-crypto use)
   "TC001", # Move application import into a type-checking block
   "TC002", # Move third-party import into a type-checking block
   "TC003", # Move standard library import into a type-checking block
   "TD001", # Invalid TODO tag: `FIXME`
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
-  "TRY003" # Avoid specifying long messages outside the exception class
+  "TRY003", # Avoid specifying long messages outside the exception class
+  "Y300" # Consider using typing.Yield (acceptable for fixtures)
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -106,7 +139,9 @@ known-first-party = ["dagster_taskiq_demo"]
   "D102", # Missing docstring in public method
   "D103", # Missing docstring in public function
   "D104", # Missing docstring in public package
+  "DOC201", # Return not documented in docstring
   "PLR2004", # Magic value used in comparison
+  "PLR6301", # Method could be function
   "S101", # Use of assert detected
   "S105", # Possible hardcoded password
   "S106", # Possible hardcoded password

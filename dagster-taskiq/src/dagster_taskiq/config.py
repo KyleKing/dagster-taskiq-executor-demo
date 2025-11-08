@@ -7,15 +7,11 @@ configuring Taskiq executors and workers.
 from typing import Any
 
 from dagster_taskiq.defaults import (
-    task_default_priority,
-    task_default_queue,
     wait_time_seconds,
     worker_max_messages,
 )
 
 DEFAULT_CONFIG = {
-    "task_default_priority": task_default_priority,
-    "task_default_queue": task_default_queue,
     "wait_time_seconds": wait_time_seconds,
     "max_number_of_messages": worker_max_messages,
     "worker_max_messages": worker_max_messages,

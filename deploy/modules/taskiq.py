@@ -208,9 +208,9 @@ def create_taskiq_infrastructure(
     queue_name = f"{project_name}-taskiq-{environment}.fifo"
     dlq_name = f"{project_name}-taskiq-dlq-{environment}.fifo"
 
-    container_defs_json = pulumi.Output.all(
-        database_endpoint, queue_name, dlq_name, container_image
-    ).apply(lambda args: _serialize_worker_containers(cast("tuple[str, str, str, str]", tuple(args))))
+    container_defs_json = pulumi.Output.all(database_endpoint, queue_name, dlq_name, container_image).apply(
+        lambda args: _serialize_worker_containers(cast("tuple[str, str, str, str]", tuple(args)))
+    )
 
     worker_task_definition = create_fargate_task_definition(
         f"{resource_name}-worker-task",

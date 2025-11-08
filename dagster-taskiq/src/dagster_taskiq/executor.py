@@ -27,7 +27,6 @@ from dagster_taskiq.defaults import (
     aws_region_name,
     sqs_endpoint_url,
     sqs_queue_url,
-    task_default_priority,
 )
 from dagster_taskiq.tasks import create_task
 
@@ -124,8 +123,6 @@ async def _submit_task_async(  # noqa: PLR0917
     broker: "AsyncBroker",
     plan_context: "PlanOrchestrationContext",
     step: Any,
-    queue: str,  # noqa: ARG001
-    priority: int,
     known_state: Any,
 ) -> dict[str, Any]:
     """Submit a task asynchronously using taskiq.
@@ -136,8 +133,6 @@ async def _submit_task_async(  # noqa: PLR0917
         broker: The Taskiq broker instance
         plan_context: The plan orchestration context
         step: The step to execute
-        queue: The queue name (unused but kept for API compatibility)
-        priority: The priority for the task
         known_state: The known execution state
 
     Returns:
@@ -172,25 +167,10 @@ async def _submit_task_async(  # noqa: PLR0917
 
     task = create_task(broker)
 
-    # Translate Dagster priority into SQS delay (higher Dagster priority = lower delay)
-    delay_seconds = _priority_to_delay_seconds(priority)
-
-    # Debug logging for priority/delay mapping
-    plan_context.log.info(
-        "Task for step '%s': priority=%d, calculated_delay=%ds",
-        execute_step_args.step_keys_to_execute[0] if execute_step_args.step_keys_to_execute else "unknown",  # pyright: ignore[reportOptionalSubscript]
-        priority,
-        delay_seconds,
-    )
-
-    # Use kicker with delay label for taskiq-aio-sqs
-    task_result = (
-        await task.kicker()
-        .with_labels(delay=delay_seconds)
-        .kiq(
-            execute_step_args_packed=pack_value(execute_step_args),
-            executable_dict=plan_context.reconstructable_job.to_dict(),
-        )
+    # Submit task to queue
+    task_result = await task.kiq(
+        execute_step_args_packed=pack_value(execute_step_args),
+        executable_dict=plan_context.reconstructable_job.to_dict(),
     )
 
     # Verify task result has access to result backend
@@ -309,29 +289,3 @@ class TaskiqExecutor(Executor):
             "config_source": self.config_source,
             "retries": self.retries,
         }
-
-
-MAX_SQS_DELAY_SECONDS = 900
-DELAY_SECONDS_STEP = 10
-
-
-def _priority_to_delay_seconds(priority: int) -> int:
-    """Translate Dagster priority into an SQS delay.
-
-    Higher priority (larger numeric value) should reduce delay to zero, while
-    lower priority numbers introduce a bounded delay. Values higher than the
-    default priority map to zero delay, and low priorities are clamped to the
-    SQS maximum delay window.
-
-    Args:
-        priority: The Dagster priority value
-
-    Returns:
-        The delay in seconds (0 to MAX_SQS_DELAY_SECONDS)
-    """
-    priority_delta = task_default_priority - priority
-    if priority_delta <= 0:
-        return 0
-
-    delay = priority_delta * DELAY_SECONDS_STEP
-    return max(0, min(MAX_SQS_DELAY_SECONDS, delay))

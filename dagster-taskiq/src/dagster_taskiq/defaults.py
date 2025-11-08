@@ -20,11 +20,6 @@ aws_region_name = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 s3_bucket_name = os.getenv("DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results")
 s3_endpoint_url = os.getenv("DAGSTER_TASKIQ_S3_ENDPOINT_URL")  # For LocalStack
 
-# Task configuration
-task_default_priority = 5
-
-task_default_queue = "dagster"
-
 # Worker configuration
 worker_max_messages = 1
 

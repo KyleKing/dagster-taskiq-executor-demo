@@ -53,13 +53,13 @@ class ExactlyOnceVerifier:
             "verification mechanism."
         )
 
-    def export_report(self, result: VerificationResult, output_path: Any, format: str = "json") -> None:
+    def export_report(self, result: VerificationResult, output_path: Any, output_format: str = "json") -> None:
         """Export verification results to file.
 
         Args:
             result: Verification results
             output_path: Path to output file
-            format: Output format ('json' or 'csv')
+            output_format: Output format ('json' or 'csv')
 
         Raises:
             NotImplementedError: This verification is not compatible with the current executor

@@ -34,13 +34,9 @@ from taskiq import AsyncBroker
 from typing_extensions import override
 
 from dagster_taskiq.config import DEFAULT_CONFIG, TASK_EXECUTE_JOB_NAME, TASK_RESUME_JOB_NAME
-from dagster_taskiq.defaults import aws_region_name, sqs_queue_url, task_default_queue
+from dagster_taskiq.defaults import aws_region_name, sqs_queue_url
 from dagster_taskiq.make_app import make_app
-from dagster_taskiq.tags import (
-    DAGSTER_TASKIQ_QUEUE_TAG,
-    DAGSTER_TASKIQ_RUN_PRIORITY_TAG,
-    DAGSTER_TASKIQ_TASK_ID_TAG,
-)
+from dagster_taskiq.tags import DAGSTER_TASKIQ_TASK_ID_TAG
 from dagster_taskiq.tasks import create_execute_job_task, create_resume_job_task
 
 if TYPE_CHECKING:
@@ -59,7 +55,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
 
     def __init__(  # noqa: PLR0917
         self,
-        default_queue: str,
         queue_url: str | None = None,
         region_name: str | None = None,
         endpoint_url: str | None = None,
@@ -69,7 +64,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         """Initialize the Taskiq run launcher.
 
         Args:
-            default_queue: Default queue name for runs
             queue_url: SQS queue URL
             region_name: AWS region name
             endpoint_url: Custom AWS endpoint (for LocalStack)
@@ -82,7 +76,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         self.region_name = check.opt_str_param(region_name, "region_name", default=aws_region_name)
         self.endpoint_url = check.opt_str_param(endpoint_url, "endpoint_url")
         self.config_source = dict(DEFAULT_CONFIG, **check.opt_dict_param(config_source, "config_source"))
-        self.default_queue = check.str_param(default_queue, "default_queue")
 
         # Create the Taskiq broker
         self.broker = make_app(app_args=self.app_args())
@@ -249,9 +242,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             task_args: Arguments to pass to the task
             routing_key: Task routing identifier
         """
-        run_priority = _get_run_priority(run)
-        queue = run.tags.get(DAGSTER_TASKIQ_QUEUE_TAG, self.default_queue)
-
         self._instance.report_engine_event(
             "Creating Taskiq run worker job task",
             run,
@@ -271,8 +261,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
                 task.kiq(
                     **task_args,
                     labels={
-                        "priority": str(run_priority),
-                        "queue": queue,
                         "routing_key": routing_key,
                     },
                 )
@@ -292,7 +280,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
                 EngineEventData({
                     "Run ID": run.run_id,
                     "Taskiq Task ID": task_id,
-                    "Queue": queue,
                 }),
                 cls=self.__class__,
             )
@@ -384,12 +371,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
                 is_required=False,
                 description="Custom AWS endpoint URL (for LocalStack). Default: None.",
             ),
-            "default_queue": Field(
-                StringSource,
-                is_required=False,
-                description=("The default queue to use when a run does not specify Taskiq queue tag."),
-                default_value=task_default_queue,
-            ),
             "config_source": Field(
                 Noneable(Permissive()),
                 is_required=False,
@@ -409,20 +390,3 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             TaskiqRunLauncher instance
         """
         return cls(inst_data=inst_data, **config_value)
-
-
-def _get_run_priority(run: DagsterRun) -> int:
-    """Get the priority for a run from its tags.
-
-    Args:
-        run: The Dagster run
-
-    Returns:
-        Priority value (0 if not set or invalid)
-    """
-    if DAGSTER_TASKIQ_RUN_PRIORITY_TAG not in run.tags:
-        return 0
-    try:
-        return int(run.tags[DAGSTER_TASKIQ_RUN_PRIORITY_TAG])
-    except ValueError:
-        return 0

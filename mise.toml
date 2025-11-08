@@ -4,8 +4,6 @@ experimental_monorepo_root = true
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
 MISE_EXPERIMENTAL = "1"
-PROJECT_NAME = "dag-tiq"
-PULUMI_CONFIG_PASSPHRASE = "See README!"
 _.file = {path = ".env"}
 
 [tasks."aws:clusters"]
@@ -102,8 +100,8 @@ run = "docker compose logs -f localstack"
 
 [tasks."localstack:restart"]
 description = "Restart LocalStack container"
-run = "mise run localstack:start --detach"
-wait_for = ["localstack:stop"]
+run = "mise run //:localstack:start --detach"
+wait_for = ["//:localstack:stop"]
 
 [tasks."localstack:start"]
 description = "Start LocalStack container (or run in background with `pitchfork start localstack`)"

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-import random
+import random  # noqa: S311
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -11,6 +11,11 @@ from datetime import UTC, datetime
 import aioboto3
 
 from dagster_taskiq_demo.config.settings import Settings
+
+# Constants
+HTTP_REQUEST_MIN_PARTS = 2
+FAILURE_SIMULATION_PROBABILITY = 0.05  # 5% chance per cycle
+MAX_QUEUE_AGE_ALERT_SECONDS = 300  # 5 minutes
 
 
 @dataclass
@@ -77,12 +82,12 @@ class AutoScalerService:
         try:
             self.health_server = await asyncio.start_server(
                 self._handle_health_request,
-                host="0.0.0.0",
+                host="0.0.0.0",  # noqa: S104
                 port=8081,  # Different port from worker
             )
             self.logger.info("Auto-scaler health server started on port 8081")
-        except Exception as e:
-            self.logger.exception("Failed to start health server: %s", e)
+        except Exception:
+            self.logger.exception("Failed to start health server")
             raise
 
     async def _stop_health_server(self) -> None:
@@ -100,7 +105,7 @@ class AutoScalerService:
                 return
 
             parts = request_line.decode().strip().split()
-            if len(parts) >= 2 and parts[0] == "GET" and parts[1] in {"/health", "/health/", "/healthz", "/healthz/"}:
+            if len(parts) >= HTTP_REQUEST_MIN_PARTS and parts[0] == "GET" and parts[1] in {"/health", "/health/", "/healthz", "/healthz/"}:
                 response = json.dumps({"status": "healthy", "service": "auto-scaler"}).encode()
                 writer.write(b"HTTP/1.0 200 OK\r\n")
                 writer.write(b"Content-Type: application/json\r\n")
@@ -112,14 +117,18 @@ class AutoScalerService:
                 writer.write(b"Content-Length: 0\r\n")
                 writer.write(b"\r\n")
 
-        except Exception as e:
-            self.logger.exception("Error handling health request: %s", e)
+        except Exception:
+            self.logger.exception("Error handling health request")
         finally:
             writer.close()
             await writer.wait_closed()
 
     async def get_queue_metrics(self) -> QueueMetrics:
-        """Get current queue metrics from SQS."""
+        """Get current queue metrics from SQS.
+
+        Returns:
+            QueueMetrics object with current queue statistics
+        """
         try:
             response = await self.sqs_client.get_queue_attributes(
                 QueueUrl=self._get_queue_url(),
@@ -137,13 +146,17 @@ class AutoScalerService:
                 oldest_message_age_seconds=int(attributes.get("ApproximateAgeOfOldestMessage", 0)) or None,
                 timestamp=datetime.now(UTC),
             )
-        except Exception as e:
-            self.logger.exception("Failed to get queue metrics: %s", e)
+        except Exception:
+            self.logger.exception("Failed to get queue metrics")
             # Return zero metrics on error
             return QueueMetrics(0, 0, None, datetime.now(UTC))
 
     def calculate_scaling_decision(self, metrics: QueueMetrics) -> ScalingDecision:
-        """Calculate scaling decision based on queue metrics."""
+        """Calculate scaling decision based on queue metrics.
+
+        Returns:
+            ScalingDecision with the recommended action
+        """
         current_time = time.time()
 
         # Check cooldown
@@ -202,8 +215,8 @@ class AutoScalerService:
 
             self.logger.info("Scaling action completed successfully")
 
-        except Exception as e:
-            self.logger.exception("Failed to execute scaling action: %s", e)
+        except Exception:
+            self.logger.exception("Failed to execute scaling action")
 
     async def simulate_worker_crash(self) -> None:
         """Simulate a worker task crash by stopping a random task."""
@@ -221,7 +234,7 @@ class AutoScalerService:
                 return
 
             # Pick a random task to stop
-            task_to_stop = random.choice(tasks)
+            task_to_stop = random.choice(tasks)  # noqa: S311
             self.logger.info("Simulating worker crash: stopping task %s", task_to_stop)
 
             await self.ecs_client.stop_task(
@@ -232,8 +245,8 @@ class AutoScalerService:
 
             self.logger.info("Worker crash simulation completed")
 
-        except Exception as e:
-            self.logger.exception("Failed to simulate worker crash: %s", e)
+        except Exception:
+            self.logger.exception("Failed to simulate worker crash")
 
     async def simulate_drain_and_restart(self) -> None:
         """Simulate draining all workers and restarting."""
@@ -261,8 +274,8 @@ class AutoScalerService:
             self.current_worker_count = self.settings.autoscaler_min_workers
             self.logger.info("Drain and restart simulation completed")
 
-        except Exception as e:
-            self.logger.exception("Failed to simulate drain and restart: %s", e)
+        except Exception:
+            self.logger.exception("Failed to simulate drain and restart")
 
     async def simulate_network_partition(self) -> None:
         """Simulate network partition by temporarily disabling message processing."""
@@ -275,13 +288,13 @@ class AutoScalerService:
 
             self.logger.info("Network partition simulation completed")
 
-        except Exception as e:
-            self.logger.exception("Failed to simulate network partition: %s", e)
+        except Exception:
+            self.logger.exception("Failed to simulate network partition")
 
     async def simulate_failure(self) -> None:
         """Simulate a random failure for testing."""
         failure_types = ["worker_crash", "drain_restart", "network_partition"]
-        failure_type = random.choice(failure_types)
+        failure_type = random.choice(failure_types)  # noqa: S311
 
         self.logger.info("Simulating random failure: %s", failure_type)
 
@@ -318,14 +331,14 @@ class AutoScalerService:
 
                 # Simulate failures periodically (configurable)
                 # TODO: Add settings for failure simulation enable/disable and probability
-                if random.random() < 0.05:  # 5% chance per cycle for testing
+                if random.random() < FAILURE_SIMULATION_PROBABILITY:  # noqa: S311
                     await self.simulate_failure()
 
                 # Wait for next cycle
                 await asyncio.sleep(self.settings.autoscaler_cooldown_seconds)
 
-            except Exception as e:
-                self.logger.exception("Error in control loop: %s", e)
+            except Exception:
+                self.logger.exception("Error in control loop")
                 await asyncio.sleep(10)  # Back off on errors
 
     def _emit_metrics(self, metrics: QueueMetrics) -> None:
@@ -341,13 +354,17 @@ class AutoScalerService:
         )
 
         # Alert if queue is getting too old
-        if metrics.oldest_message_age_seconds and metrics.oldest_message_age_seconds > 300:  # 5 minutes
+        if metrics.oldest_message_age_seconds and metrics.oldest_message_age_seconds > MAX_QUEUE_AGE_ALERT_SECONDS:
             self.logger.warning(
                 "ALERT: Queue oldest message age (%ds) exceeds threshold (300s)", metrics.oldest_message_age_seconds
             )
 
     def _get_queue_url(self) -> str:
-        """Get the SQS queue URL."""
+        """Get the SQS queue URL.
+
+        Returns:
+            The full SQS queue URL
+        """
         return f"{self.settings.aws_endpoint_url}/000000000000/{self.settings.taskiq_queue_name}"
 
     def run_service(self) -> None:

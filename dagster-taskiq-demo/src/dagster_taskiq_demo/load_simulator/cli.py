@@ -200,7 +200,8 @@ def mixed_workload(ctx: click.Context, duration: int) -> None:
 def worker_failure(ctx: click.Context, failure_burst_size: int, recovery_interval: int, duration: int) -> None:
     """Run a worker failure scenario."""
     click.echo(
-        f"Starting worker failure scenario: {failure_burst_size} jobs every {recovery_interval} minutes for {duration} seconds"
+        f"Starting worker failure scenario: {failure_burst_size} jobs "
+        f"every {recovery_interval} minutes for {duration} seconds"
     )
 
     try:
@@ -277,7 +278,7 @@ def network_partition(ctx: click.Context, max_burst_size: int, duration: int) ->
     help="Output format for verification report",
 )
 @click.pass_context
-def verify(ctx: click.Context, scenario_tag: str | None, output: str | None, format: str) -> None:
+def verify(_ctx: click.Context, scenario_tag: str | None, output: str | None, output_format: str) -> None:
     """Verify exactly-once execution semantics."""
     click.echo("Running exactly-once verification...")
 
@@ -295,7 +296,7 @@ def verify(ctx: click.Context, scenario_tag: str | None, output: str | None, for
 
         if output:
             output_path = Path(output)
-            verifier.export_report(result, output_path, format)
+            verifier.export_report(result, output_path, output_format)
             click.echo(f"Report exported to {output_path}")
 
     except Exception as exc:

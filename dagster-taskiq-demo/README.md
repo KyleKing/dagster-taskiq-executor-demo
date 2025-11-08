@@ -201,6 +201,7 @@ awslocal sqs get-queue-attributes \
 ### CloudWatch Log Groups
 
 All logs are stored in these CloudWatch log groups (replace `local` with your environment):
+
 - `/aws/ecs/dagster-daemon-local`
 - `/aws/ecs/dagster-webserver-local`
 - `/aws/ecs/taskiq-worker-local`

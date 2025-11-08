@@ -1,7 +1,7 @@
 """Load testing and simulation framework for Dagster TaskIQ LocalStack demo."""
 
 import asyncio
-import random
+import random  # noqa: S311
 import time
 from typing import Any
 
@@ -37,7 +37,7 @@ class LoadSimulator:
         self.repository_name = repository_name
 
         # Available job configurations
-        self.job_configs = {
+        self.job_configs: dict[str, dict[str, Any]] = {
             "fast_job": {},
             "slow_job": {},
             "mixed_job": {},
@@ -112,13 +112,11 @@ class LoadSimulator:
             )
 
             return run_id
-
         except DagsterGraphQLClientError as exc:
-            logger.error(
+            logger.exception(
                 "run_submission_failed",
                 job_name=job_name,
                 error=str(exc),
-                exc_info=True,
             )
             return None
 
@@ -316,7 +314,7 @@ class LoadSimulator:
             burst_tasks = []
             for _ in range(failure_burst_size):
                 # Mix of jobs that could overwhelm workers
-                job_name = random.choice(["parallel_fast_job", "sequential_slow_job", "mixed_job"])
+                job_name = random.choice(["parallel_fast_job", "sequential_slow_job", "mixed_job"])  # noqa: S311
                 task = self.submit_run(job_name)
                 burst_tasks.append(task)
 
@@ -362,7 +360,7 @@ class LoadSimulator:
 
         while time.time() < end_time:
             # Random burst size (simulating intermittent connectivity)
-            burst_size = random.randint(1, max_burst_size)
+            burst_size = random.randint(1, max_burst_size)  # noqa: S311
 
             # Submit burst of jobs
             burst_tasks = []
@@ -388,7 +386,7 @@ class LoadSimulator:
             logger.info("network_burst_completed", jobs_submitted=len(burst_results))
 
             # Random silence period (simulating network partition)
-            silence_seconds = random.uniform(10, 120)  # 10 seconds to 2 minutes
+            silence_seconds = random.uniform(10, 120)  # noqa: S311  # 10 seconds to 2 minutes
             logger.info("network_partition_silence", silence_seconds=silence_seconds)
             await asyncio.sleep(silence_seconds)
 
