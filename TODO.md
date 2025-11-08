@@ -10,10 +10,9 @@ This file consolidates remaining work and known issues from `dagster-taskiq/IMPL
 - **Status**: Not started
 - **Action**: Implement queue selection parity by mapping Dagster tags to SQS queue selection (per-run and per-step)
 
-### S3 Extended Payloads Untested
-- **Issue**: Configuration implemented but not tested. Large messages (>256KB) may not work correctly.
-- **Status**: Needs smoke test against LocalStack
-- **Action**: Verify large message handling and document results
+### S3 Extended Payloads ✅ Tested
+- **Status**: Smoke test implemented (`dagster-taskiq/tests/test_queues.py:59-87`)
+- **Note**: Configuration verified, large messages (>256KB) handled via S3 extended payloads
 
 ## Medium Priority
 
@@ -29,11 +28,10 @@ This file consolidates remaining work and known issues from `dagster-taskiq/IMPL
 - **Status**: Not started
 - **Action**: Thread `config_source` (and `DEFAULT_CONFIG` values) through to broker creation or clearly remove the option
 
-### Run Termination Unsupported
-- **Issue**: Launcher's `terminate()` method logs "not supported" and returns `False`. Cancellation not fully implemented.
-- **Location**: `dagster_taskiq/launcher.py:124`
-- **Status**: Phase 3 (not started). Draft implementation exists in `cancellable_broker.py` but not wired to executor.
-- **Action**: Implement termination (e.g. by sending cancel messages via `CancellableSQSBroker`) or document the limitation and adjust `supports_resume_run`/`terminate` expectations
+### Run Termination ✅ Complete
+- **Status**: Fully implemented - Launcher `terminate()` method sends cancellation requests, `CancellableReceiver` handles worker-side cancellation
+- **Implementation**: `dagster_taskiq/launcher.py:124-194` (terminate), `dagster_taskiq/cancellable_receiver.py` (worker-side)
+- **Testing**: Integration test verifies cancellation flow (`test_launcher.py:211-245`)
 
 ### Worker Health Check Returns UNKNOWN
 - **Issue**: Launcher advertises `supports_check_run_worker_health = True` but always returns `WorkerStatus.UNKNOWN` because no result backend status is read.

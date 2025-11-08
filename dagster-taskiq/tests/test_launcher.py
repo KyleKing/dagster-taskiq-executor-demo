@@ -30,6 +30,9 @@ def instance(tempdir):
                     "endpoint_url": os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL"),
                     "region_name": "us-east-1",
                     "default_queue": "custom-queue",
+                    "config_source": {
+                        "enable_cancellation": True,
+                    },
                 },
             },
             "run_monitoring": {
