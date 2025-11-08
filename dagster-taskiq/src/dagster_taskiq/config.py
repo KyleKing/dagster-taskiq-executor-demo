@@ -15,7 +15,6 @@ DEFAULT_CONFIG = {
     "wait_time_seconds": wait_time_seconds,
     "max_number_of_messages": worker_max_messages,
     "worker_max_messages": worker_max_messages,
-    "delay_seconds": 0,
     "is_fair_queue": None,
     "use_task_id_for_deduplication": False,
     "extra_options": {},

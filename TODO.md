@@ -16,12 +16,6 @@ This file consolidates remaining work and known issues from `dagster-taskiq/IMPL
 
 ## Medium Priority
 
-### LocalStack SQS DelaySeconds Limitation
-- **Issue**: LocalStack's SQS implementation may not honor `DelaySeconds` reliably, causing integration tests to fail.
-- **Impact**: Priority-based delay mapping may not work correctly in LocalStack (works in production AWS)
-- **Status**: Known limitation, documented in `TESTING.md`
-- **Action**: Consider upgrading LocalStack, mocking SQS delays, or skipping test in LocalStack
-
 ### config_source Dropped
 - **Issue**: Executor/launcher accept `config_source` but `make_app()` ignores it and hard-codes SQS/S3 settings.
 - **Location**: `dagster_taskiq/make_app.py:37`
@@ -77,15 +71,6 @@ Blocked until Phases 1-2 complete and LocalStack issues resolved:
    - Verify idempotency storage still ensures exactly-once semantics after cancellation
 
 ## Fixed Issues
-
-### Priority Inversion via SQS Delay ✅
-- **Status**: Fixed
-- **Implementation**: `_priority_to_delay_seconds()` function in `executor.py:318-337`
-- **Details**: Maps Dagster priority to SQS DelaySeconds correctly - higher priority = lower delay
-
-### Delay/Priority Mapping ✅
-- **Status**: Complete
-- **Implementation**: Default priority (5) = 0 delay, decreasing priority adds 10s per level, clamped to SQS max (900 seconds)
 
 ### Fair Queue Guards ✅
 - **Status**: Complete

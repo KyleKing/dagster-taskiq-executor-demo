@@ -192,33 +192,7 @@ Access via LocalStack UI: https://app.localstack.cloud
 - Submit job and check logs - task will still go to default queue
 - Check SQS queue - all messages appear in the same queue
 
-### 2. LocalStack SQS DelaySeconds Limitation (Medium Priority)
-
-**Issue**: LocalStack's SQS implementation may not honor `DelaySeconds` reliably, causing integration tests to fail.
-
-**Impact**: Priority-based delay mapping may not work correctly in LocalStack environment.
-
-**Workaround**: Priority mapping is implemented correctly (`executor.py:318-337`), but delays may not be honored by LocalStack. This should work correctly in production AWS.
-
-**Verification**:
-- Submit jobs with different priorities
-- Check delay labels in logs: `mise run logs:dagster-daemon`
-- Note: Delays may not be visible in LocalStack
-
-**Reference**: `dagster-taskiq/IMPLEMENTATION_PROGRESS.md` documents this limitation
-
-### 3. Priority Inversion via SQS Delay (Fixed, Needs Verification)
-
-**Status**: Fixed in implementation. Priority mapping now correctly maps higher Dagster priority to lower SQS delay.
-
-**Implementation**: `executor.py:318-337` - `_priority_to_delay_seconds()` function
-
-**Verification**:
-- Submit jobs with different priority tags
-- Check logs for: `priority=X, calculated_delay=Ys`
-- Higher priority should result in lower delay (0s for default priority 5)
-
-### 4. config_source Dropped (Medium Priority)
+### 2. config_source Dropped (Medium Priority)
 
 **Issue**: Executor/launcher accept `config_source` but `make_app()` ignores it and hard-codes SQS/S3 settings.
 

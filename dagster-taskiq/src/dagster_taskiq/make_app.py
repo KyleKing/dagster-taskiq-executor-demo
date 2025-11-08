@@ -108,7 +108,6 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
         config, source_overrides, "max_number_of_messages", defaults.worker_max_messages, "worker_max_messages"
     )
     wait_time_raw = _resolve_value(config, source_overrides, "wait_time_seconds", defaults.wait_time_seconds)
-    delay_seconds_raw = _resolve_value(config, source_overrides, "delay_seconds", 0)
     use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)  # noqa: FBT003
     extra_options_raw = _resolve_value(config, source_overrides, "extra_options", {}, "broker_transport_options")
     env_enable_cancellation = os.getenv("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
@@ -171,12 +170,6 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
         msg = f"invalid wait_time_seconds value: {wait_time_raw!r}"
         raise ValueError(msg) from None
 
-    try:
-        delay_seconds = int(delay_seconds_raw)
-    except (TypeError, ValueError):
-        msg = f"invalid delay_seconds value: {delay_seconds_raw!r}"
-        raise ValueError(msg) from None
-
     extra_options = dict(extra_options_raw) if isinstance(extra_options_raw, dict) else {}
 
     broker_config = SqsBrokerConfig(
@@ -187,7 +180,6 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
         aws_secret_access_key=aws_secret_access_key,
         max_number_of_messages=max_messages,
         wait_time_seconds=wait_time,
-        delay_seconds=delay_seconds,
         is_fair_queue=is_fair_queue,
         use_task_id_for_deduplication=_coerce_bool(use_task_id_for_dedup),
         s3_extended_bucket_name=s3_bucket,

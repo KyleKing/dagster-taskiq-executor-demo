@@ -102,7 +102,6 @@ execution:
     config_source:
       wait_time_seconds: 20
       max_number_of_messages: 1
-      delay_seconds: 0
       use_task_id_for_deduplication: false
       extra_options: {}
 ```
@@ -166,7 +165,7 @@ export AWS_SECRET_ACCESS_KEY=test
 - **Priority-based delays**: Not supported (removed in simplification)
 - **Worker cancellation**: ✅ Fully implemented - Workers check cancellation queue and cancel tasks
 - **Worker health checks**: ✅ Implemented - Uses result backend to check task status
-- **LocalStack**: Some SQS features may not work identically to AWS (e.g., `DelaySeconds`). See [`LOCALSTACK.md`](LOCALSTACK.md) for details and workarounds.
+- **LocalStack**: Some SQS features may not work identically to AWS. See [`LOCALSTACK.md`](LOCALSTACK.md) for details and workarounds.
 
 ## Migration from Dagster-Celery
 

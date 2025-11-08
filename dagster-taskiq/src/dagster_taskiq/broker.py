@@ -38,7 +38,6 @@ class SqsBrokerConfig(BaseModel):
     aws_secret_access_key: str | None = Field(None, description="AWS secret access key")
     wait_time_seconds: int = Field(20, ge=0, le=20, description="SQS long polling wait time (0-20 seconds)")
     max_number_of_messages: int = Field(1, ge=1, le=10, description="Maximum messages to receive per poll (1-10)")
-    delay_seconds: int = Field(0, ge=0, le=900, description="Message delay in seconds (0-900)")
     is_fair_queue: bool = Field(False, description="Enable fair queue (FIFO) mode")
     use_task_id_for_deduplication: bool = Field(False, description="Use task ID for FIFO deduplication")
     s3_extended_bucket_name: str | None = Field(None, description="S3 bucket for extended payloads (>256KB)")
@@ -95,7 +94,6 @@ class SqsBrokerConfig(BaseModel):
             "aws_secret_access_key": self.aws_secret_access_key,
             "wait_time_seconds": self.wait_time_seconds,
             "max_number_of_messages": self.max_number_of_messages,
-            "delay_seconds": self.delay_seconds,
             "is_fair_queue": self.is_fair_queue,
             "use_task_id_for_deduplication": self.use_task_id_for_deduplication,
             "s3_extended_bucket_name": self.s3_extended_bucket_name,

@@ -8,25 +8,6 @@ LocalStack provides local AWS service emulation, which is useful for development
 
 ## Known Limitations
 
-### SQS DelaySeconds
-
-**Issue**: LocalStack's SQS implementation may not honor `DelaySeconds` reliably.
-
-**Impact**:
-- Messages with `DelaySeconds > 0` may be delivered immediately
-- Tests that rely on delayed message delivery may fail
-- Priority-based delay mapping (if implemented) may not work correctly
-
-**Workaround**:
-- Avoid using `DelaySeconds` in LocalStack tests
-- Use time-based assertions with generous timeouts
-- Mock SQS delays in unit tests instead of relying on LocalStack
-
-**Example**:
-```python
-# Instead of relying on DelaySeconds
-# Use time.sleep() in tests or mock the delay
-```
 
 ### SQS FIFO Queue Behavior
 
@@ -175,9 +156,9 @@ If a test is known to be flaky with LocalStack, document it:
 
 ```python
 @pytest.mark.localstack_known_issue(
-    reason="LocalStack SQS DelaySeconds not reliable"
+    reason="LocalStack SQS feature not reliable"
 )
-def test_delayed_message():
+def test_sqs_feature():
     # Test that may fail with LocalStack
     pass
 ```
