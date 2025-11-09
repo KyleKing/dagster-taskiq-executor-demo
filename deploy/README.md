@@ -178,19 +178,21 @@ uv run pulumi stack output --stack local
 **Cause**: Multiple resources with the same logical name in Pulumi code.
 
 **Solution**:
+
 1. Check for duplicate resource definitions in `__main__.py` and modules
-2. Ensure each resource has a unique logical name
-3. Use `pulumi:validate` to detect issues before deploying
-4. If state is corrupted, use `pulumi:reset:hard` to start fresh
+1. Ensure each resource has a unique logical name
+1. Use `pulumi:validate` to detect issues before deploying
+1. If state is corrupted, use `pulumi:reset:hard` to start fresh
 
 #### State Drift (Pulumi state out of sync with LocalStack)
 
 **Symptom**: `pulumi up` fails with resource not found or already exists errors.
 
 **Solution**:
+
 1. **Refresh state**: `mise run pulumi:refresh` (syncs Pulumi state with actual infrastructure)
-2. **Repair state**: `mise run pulumi:state:repair` (attempts automatic state repair)
-3. **Validate**: `mise run pulumi:validate` (preview changes without applying)
+1. **Repair state**: `mise run pulumi:state:repair` (attempts automatic state repair)
+1. **Validate**: `mise run pulumi:validate` (preview changes without applying)
 
 #### LocalStack State Corruption
 
@@ -210,12 +212,13 @@ mise run pulumi:reset:soft
 ```
 
 **What it does**:
+
 1. Destroys all Pulumi-managed resources
-2. Stops LocalStack
-3. Cleans LocalStack volume data
-4. Restarts LocalStack
-5. Initializes stack if needed
-6. Refreshes state
+1. Stops LocalStack
+1. Cleans LocalStack volume data
+1. Restarts LocalStack
+1. Initializes stack if needed
+1. Refreshes state
 
 **Use when**: You want to clean up while preserving stack configuration.
 
@@ -229,13 +232,15 @@ mise run pulumi:reset:hard
 ```
 
 **What it does**:
+
 1. Stops LocalStack
-2. Deletes all LocalStack data
-3. **Deletes Pulumi stack** (removes state file)
-4. Restarts LocalStack
-5. Initializes fresh stack
+1. Deletes all LocalStack data
+1. **Deletes Pulumi stack** (removes state file)
+1. Restarts LocalStack
+1. Initializes fresh stack
 
 **Use when**:
+
 - State is severely corrupted
 - Duplicate URN errors persist
 - You need a completely clean slate
@@ -277,36 +282,39 @@ mise run pulumi:state:init
 ### Recovery Workflow
 
 **For minor issues**:
+
 1. `mise run pulumi:validate` - Check what's wrong
-2. `mise run pulumi:refresh` - Sync state
-3. `mise run pulumi:up` - Try deploying again
+1. `mise run pulumi:refresh` - Sync state
+1. `mise run pulumi:up` - Try deploying again
 
 **For state corruption**:
+
 1. `mise run pulumi:state:repair` - Attempt repair
-2. If that fails: `mise run pulumi:reset:soft` - Soft reset
-3. If still failing: `mise run pulumi:reset:hard` - Hard reset, then `pulumi:up`
+1. If that fails: `mise run pulumi:reset:soft` - Soft reset
+1. If still failing: `mise run pulumi:reset:hard` - Hard reset, then `pulumi:up`
 
 **For duplicate URN errors**:
+
 1. Fix the code (remove duplicate resource definitions)
-2. `mise run pulumi:reset:hard` - Clean slate
-3. `mise run pulumi:up` - Fresh deployment
+1. `mise run pulumi:reset:hard` - Clean slate
+1. `mise run pulumi:up` - Fresh deployment
 
 ### Best Practices for Reliability
 
 1. **Always preview before deploying**: `mise run pulumi:validate`
-2. **Use soft reset for routine cleanup**: Preserves stack config
-3. **Save stack config**: `Pulumi.local.yaml` is version-controlled
-4. **Monitor state drift**: Run `pulumi:refresh` periodically during development
-5. **Don't modify resources outside Pulumi**: Always use Pulumi for changes
+1. **Use soft reset for routine cleanup**: Preserves stack config
+1. **Save stack config**: `Pulumi.local.yaml` is version-controlled
+1. **Monitor state drift**: Run `pulumi:refresh` periodically during development
+1. **Don't modify resources outside Pulumi**: Always use Pulumi for changes
 
 ### Making Pulumi More Reliable
 
 1. **Unique Resource Names**: Ensure all resources have unique logical names
-2. **Idempotent Operations**: Design infrastructure code to be safely re-runnable
-3. **State Validation**: Use `pulumi:validate` before every deployment
-4. **Incremental Changes**: Make small, incremental changes rather than large refactors
-5. **Component Encapsulation**: Use components/modules to group related resources
-6. **Error Handling**: Handle Pulumi errors gracefully in infrastructure code
+1. **Idempotent Operations**: Design infrastructure code to be safely re-runnable
+1. **State Validation**: Use `pulumi:validate` before every deployment
+1. **Incremental Changes**: Make small, incremental changes rather than large refactors
+1. **Component Encapsulation**: Use components/modules to group related resources
+1. **Error Handling**: Handle Pulumi errors gracefully in infrastructure code
 
 ## Additional Resources
 

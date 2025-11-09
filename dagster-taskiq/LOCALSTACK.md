@@ -8,17 +8,18 @@ LocalStack provides local AWS service emulation, which is useful for development
 
 ## Known Limitations
 
-
 ### SQS FIFO Queue Behavior
 
 **Issue**: LocalStack's FIFO queue implementation may have subtle differences from AWS.
 
 **Impact**:
+
 - Message ordering may not be strictly enforced
 - Deduplication may behave differently
 - Content-based deduplication may not work as expected
 
 **Workaround**:
+
 - Use message group IDs explicitly
 - Test FIFO behavior against real AWS for critical paths
 - Use standard queues for LocalStack testing when possible
@@ -28,6 +29,7 @@ LocalStack provides local AWS service emulation, which is useful for development
 **Status**: ✅ Generally works correctly
 
 **Note**: Large messages (>256KB) are automatically stored in S3. This functionality works well with LocalStack, but ensure:
+
 - S3 bucket is created before use
 - Bucket permissions are configured correctly
 - Endpoint URLs point to LocalStack
@@ -37,10 +39,12 @@ LocalStack provides local AWS service emulation, which is useful for development
 **Issue**: LocalStack may handle visibility timeouts differently than AWS.
 
 **Impact**:
+
 - Messages may become visible earlier or later than expected
 - Long-running tasks may cause message redelivery issues
 
 **Workaround**:
+
 - Use shorter visibility timeouts in tests
 - Monitor message redelivery in test assertions
 - Use generous timeouts for test assertions
@@ -50,8 +54,8 @@ LocalStack provides local AWS service emulation, which is useful for development
 ### Common Causes
 
 1. **Timing Issues**: LocalStack may process messages faster or slower than AWS
-2. **Queue State**: Queue state may not be immediately consistent
-3. **Resource Cleanup**: Queues/buckets may not be cleaned up between tests
+1. **Queue State**: Queue state may not be immediately consistent
+1. **Resource Cleanup**: Queues/buckets may not be cleaned up between tests
 
 ### Mitigation Strategies
 
@@ -168,11 +172,13 @@ def test_sqs_feature():
 ### Tests Pass Locally but Fail in CI
 
 **Possible Causes**:
+
 - Different LocalStack versions
 - Network latency differences
 - Resource contention
 
 **Solutions**:
+
 - Pin LocalStack version in CI
 - Increase test timeouts
 - Use test isolation (separate queues per test)
@@ -180,12 +186,14 @@ def test_sqs_feature():
 ### Messages Not Appearing in Queue
 
 **Check**:
+
 1. Queue URL is correct
-2. Endpoint URL points to LocalStack
-3. Queue exists (create if needed)
-4. Permissions allow send/receive
+1. Endpoint URL points to LocalStack
+1. Queue exists (create if needed)
+1. Permissions allow send/receive
 
 **Debug**:
+
 ```python
 import boto3
 sqs = boto3.client('sqs', endpoint_url='http://localhost:4566')
@@ -199,11 +207,13 @@ print(response)
 ### S3 Operations Failing
 
 **Check**:
+
 1. Bucket exists
-2. Endpoint URL is correct
-3. Credentials are set (even if dummy values)
+1. Endpoint URL is correct
+1. Credentials are set (even if dummy values)
 
 **Debug**:
+
 ```python
 import boto3
 s3 = boto3.client('s3', endpoint_url='http://localhost:4566')
@@ -216,6 +226,7 @@ print(buckets)
 ### 1. Use Real AWS for Critical Tests
 
 For tests that must match production behavior exactly:
+
 - Use a dedicated test AWS account
 - Use separate queues/buckets for testing
 - Clean up resources after tests
@@ -223,6 +234,7 @@ For tests that must match production behavior exactly:
 ### 2. Use Moto Instead of LocalStack
 
 Moto provides AWS mocking at a different level:
+
 - Better for unit tests
 - Less overhead than LocalStack
 - May have different limitations
@@ -252,12 +264,11 @@ services:
 ### Handling Flaky Tests
 
 1. **Retry Strategy**: Automatically retry failed tests
-2. **Mark as Flaky**: Don't fail CI on known flaky tests
-3. **Separate Test Suites**: Run flaky tests separately
+1. **Mark as Flaky**: Don't fail CI on known flaky tests
+1. **Separate Test Suites**: Run flaky tests separately
 
 ## See Also
 
 - [LocalStack Documentation](https://docs.localstack.cloud/)
 - `TESTING.md` - General testing procedures
 - `IMPLEMENTATION_PROGRESS.md` - Known limitations
-
