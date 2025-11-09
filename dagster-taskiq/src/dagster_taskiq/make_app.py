@@ -77,7 +77,7 @@ def _resolve_value(
     return default
 
 
-def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PLR0915, PLR0914
+def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PLR0914
     """Create a taskiq broker with SQS backend and S3 result backend.
 
     Args:

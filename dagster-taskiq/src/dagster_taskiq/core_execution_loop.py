@@ -25,7 +25,8 @@ TICK_SECONDS = 1
 DELEGATE_MARKER = "taskiq_queue_wait"
 
 
-async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
+# FIXME: refactor into smaller composable private functions
+async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915
     job_context: PlanOrchestrationContext,
     execution_plan: ExecutionPlan,
     step_execution_fn: Callable[..., Any],
@@ -53,14 +54,40 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
             "similar system that allows files to be available to all nodes), S3, or GCS",
         )
 
-    # Lazy import to avoid circular dependency
+    # FIXME: Lazy import to avoid circular dependency
     from dagster_taskiq.executor import TaskiqExecutor  # noqa: PLC0415
 
-    broker = make_app(cast(TaskiqExecutor, job_context.executor).app_args())
+    broker = make_app(cast("TaskiqExecutor", job_context.executor).app_args())
 
     step_results: dict[str, dict[str, Any]] = {}  # {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
     cancelled_task_ids: set[str] = set()
+
+    async def _check_task_cancelled(task_id: str) -> bool:
+        """Check if a task has been cancelled.
+
+        Args:
+            task_id: The task ID to check
+
+        Returns:
+            True if the task has been cancelled, False otherwise
+        """
+        # Check if cancellation was requested locally
+        if task_id in cancelled_task_ids:
+            return True
+
+        # Check if cancellation was requested externally (via launcher terminate())
+        # by checking the Dagster run status. If the run is being cancelled,
+        # all tasks for that run should be considered cancelled.
+        try:
+            run = job_context.instance.get_run_by_id(job_context.dagster_run.run_id)
+            if run and run.status.value in ("CANCELING", "CANCELED"):  # type: ignore[union-attr]
+                return True
+        except Exception:
+            # If we can't check run status, continue waiting
+            job_context.log.debug("Could not check run status for cancellation: %s", task_id)
+
+        return False
 
     async def _request_task_cancellations(reason: str) -> None:
         """Ask the broker to cancel any in-flight TaskIQ tasks."""
@@ -143,6 +170,22 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                                     step_events = task_result
                             else:
                                 step_events = None
+                        except asyncio.CancelledError:
+                            # Task was cancelled - handle gracefully
+                            job_context.log.info(
+                                "Step %s was cancelled while waiting for result",
+                                step_key,
+                            )
+                            yield DagsterEvent.engine_event(
+                                job_context,
+                                f'Step "{step_key}" was cancelled',
+                                EngineEventData.interrupted([step_key]),
+                            )
+                            step_events = []
+                            # Mark as cancelled in the set
+                            task_id = data.get("task_id")
+                            if task_id:
+                                cancelled_task_ids.add(task_id)
                         except Exception:
                             job_context.log.exception(
                                 "Error getting result for step %s",
@@ -207,8 +250,13 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                             async def _wait_for_result() -> Any:
                                 """Wait for task result, using S3 backend if wait_result() fails.
 
+                                Periodically checks for cancellation while waiting.
+
                                 Returns:
                                     The task result value
+
+                                Raises:
+                                    asyncio.CancelledError: If the task has been cancelled
                                 """
                                 # Capture loop variables to avoid B023
                                 captured_result_handle = result_handle  # noqa: B023
@@ -219,6 +267,12 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                                     # First try the standard wait_result() method
                                     wait_result_fn = getattr(captured_result_handle, "wait_result", None)
                                     if wait_result_fn:
+                                        # Check for cancellation before waiting
+                                        if await _check_task_cancelled(captured_task_id):
+                                            raise asyncio.CancelledError(
+                                                f"Task {captured_task_id} for step {captured_step_key} was cancelled"
+                                            )
+
                                         result = await wait_result_fn()
                                         if result is not None:
                                             return result
@@ -237,6 +291,17 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                                         elapsed = 0
 
                                         while elapsed < max_wait_seconds:
+                                            # Check for cancellation periodically
+                                            if await _check_task_cancelled(captured_task_id):
+                                                job_context.log.info(
+                                                    "Task %s for step %s was cancelled while waiting for result",
+                                                    captured_task_id,
+                                                    captured_step_key,
+                                                )
+                                                raise asyncio.CancelledError(
+                                                    f"Task {captured_task_id} for step {captured_step_key} was cancelled"
+                                                )
+
                                             try:
                                                 if await result_backend.is_result_ready(captured_task_id):
                                                     backend_result = await result_backend.get_result(captured_task_id)
@@ -264,6 +329,9 @@ async def core_taskiq_execution_loop(  # noqa: C901, PLR0912, PLR0915, PLR0914
                                     # No result backend available
                                     return None  # noqa: TRY300
 
+                                except asyncio.CancelledError:
+                                    # Re-raise cancellation errors
+                                    raise
                                 except Exception:
                                     job_context.log.exception(
                                         "Error waiting for result for step %s",

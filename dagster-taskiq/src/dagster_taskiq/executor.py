@@ -119,7 +119,7 @@ def taskiq_executor(init_context: Any) -> "TaskiqExecutor":
     )
 
 
-async def _submit_task_async(  # noqa: PLR0917
+async def _submit_task_async(
     broker: "AsyncBroker",
     plan_context: "PlanOrchestrationContext",
     step: Any,

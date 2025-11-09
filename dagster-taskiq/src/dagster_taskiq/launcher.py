@@ -53,7 +53,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
     _instance: DagsterInstance  # pyright: ignore[reportIncompatibleMethodOverride]
     broker: AsyncBroker
 
-    def __init__(  # noqa: PLR0917
+    def __init__(
         self,
         queue_url: str | None = None,
         region_name: str | None = None,
@@ -295,7 +295,42 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         """
         return True
 
-    def check_run_worker_health(self, run: DagsterRun) -> CheckRunHealthResult:  # noqa: PLR6301
+    def _check_result_backend_health(self, task_id: str) -> CheckRunHealthResult:
+        """Check task health using the result backend.
+
+        Args:
+            task_id: The task ID to check
+
+        Returns:
+            Health check result with worker status
+        """
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.broker.startup())
+            if hasattr(self.broker.result_backend, "startup"):  # type: ignore[attr-defined]
+                loop.run_until_complete(self.broker.result_backend.startup())  # type: ignore[attr-defined]
+
+            # Check if result is ready
+            result_backend = self.broker.result_backend  # type: ignore[assignment]
+            is_ready = loop.run_until_complete(result_backend.is_result_ready(task_id))  # type: ignore[attr-defined]
+
+            if not is_ready:
+                return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} is running")
+
+            # Result is ready, check if it's an error
+            try:
+                result = loop.run_until_complete(result_backend.get_result(task_id))  # type: ignore[attr-defined]
+                if hasattr(result, "is_err") and result.is_err:  # type: ignore[attr-defined]
+                    return CheckRunHealthResult(WorkerStatus.FAILED, f"Task {task_id} failed")
+                return CheckRunHealthResult(WorkerStatus.SUCCESS, f"Task {task_id} completed")
+            except Exception:
+                # Result exists but couldn't be retrieved - assume it's processing
+                return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} result available")
+        finally:
+            loop.close()
+
+    def check_run_worker_health(self, run: DagsterRun) -> CheckRunHealthResult:
         """Check the health status of a running task using the result backend.
 
         Args:
@@ -310,44 +345,18 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         task_id = run.tags[DAGSTER_TASKIQ_TASK_ID_TAG]
 
         # Check result backend if available
-        if hasattr(self.broker, "result_backend") and self.broker.result_backend:  # type: ignore[truthy-bool]
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(self.broker.startup())
-                    if hasattr(self.broker.result_backend, "startup"):  # type: ignore[attr-defined]
-                        loop.run_until_complete(self.broker.result_backend.startup())  # type: ignore[attr-defined]
+        if not (hasattr(self.broker, "result_backend") and self.broker.result_backend):  # type: ignore[truthy-bool]
+            return CheckRunHealthResult(
+                WorkerStatus.UNKNOWN, f"Task {task_id} status cannot be determined without result backend"
+            )
 
-                    # Check if result is ready
-                    result_backend = self.broker.result_backend  # type: ignore[assignment]
-                    is_ready = loop.run_until_complete(result_backend.is_result_ready(task_id))  # type: ignore[attr-defined]
-
-                    if is_ready:
-                        # Result is ready, check if it's an error
-                        try:
-                            result = loop.run_until_complete(result_backend.get_result(task_id))  # type: ignore[attr-defined]
-                            if hasattr(result, "is_err") and result.is_err:  # type: ignore[attr-defined]
-                                return CheckRunHealthResult(WorkerStatus.FAILED, f"Task {task_id} failed")
-                            return CheckRunHealthResult(WorkerStatus.SUCCESS, f"Task {task_id} completed")
-                        except Exception:
-                            # Result exists but couldn't be retrieved - assume it's processing
-                            return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} result available")
-                    else:
-                        # Result not ready yet - task is still running
-                        return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} is running")
-                finally:
-                    loop.close()
-            except Exception as e:
-                # If we can't check the backend, return UNKNOWN
-                return CheckRunHealthResult(
-                    WorkerStatus.UNKNOWN, f"Could not check result backend for task {task_id}: {e}"
-                )
-
-        # No result backend configured
-        return CheckRunHealthResult(
-            WorkerStatus.UNKNOWN, f"Task {task_id} status cannot be determined without result backend"
-        )
+        try:
+            return self._check_result_backend_health(task_id)
+        except Exception as e:
+            # If we can't check the backend, return UNKNOWN
+            return CheckRunHealthResult(
+                WorkerStatus.UNKNOWN, f"Could not check result backend for task {task_id}: {e}"
+            )
 
     @override
     def get_run_worker_debug_info(self, run: DagsterRun, include_container_logs: bool | None = True) -> str | None:

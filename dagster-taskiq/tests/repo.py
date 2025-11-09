@@ -1,6 +1,6 @@
 import time
 
-from dagster import Int, OpExecutionContext, Output, RetryRequested, job
+from dagster import Int, Output, RetryRequested, job
 from dagster._core.definitions.decorators import op
 from dagster._core.definitions.output import Out
 from dagster._core.test_utils import nesting_graph

@@ -14,28 +14,27 @@ Task cancellation allows you to terminate running Dagster tasks via the Dagster 
    - Extends the base SQS broker with cancellation support
    - Manages a separate cancellation queue
    - Sends cancellation messages when `cancel_task()` is called
-
-2. **CancellableReceiver** (`src/dagster_taskiq/cancellable_receiver.py`)
+1. **CancellableReceiver** (`src/dagster_taskiq/cancellable_receiver.py`)
    - Worker-side receiver that polls both the main task queue and cancellation queue
    - Matches cancellation messages to running tasks by task ID
    - Cancels asyncio tasks when cancellation is requested
-
-3. **Launcher Integration** (`src/dagster_taskiq/launcher.py`)
+1. **Launcher Integration** (`src/dagster_taskiq/launcher.py`)
    - `terminate()` method sends cancellation requests
    - Stores task IDs in run tags for tracking
-
-4. **Core Execution Loop** (`src/dagster_taskiq/core_execution_loop.py`)
+1. **Core Execution Loop** (`src/dagster_taskiq/core_execution_loop.py`)
    - Requests cancellation on shutdown/interrupt
    - Handles graceful cleanup of cancelled tasks
 
 ### Queue Naming Convention
 
 The cancellation queue is automatically created with the naming convention:
+
 ```
 {main-queue-name}-cancels
 ```
 
 For example:
+
 - Main queue: `dagster-tasks` → Cancel queue: `dagster-tasks-cancels`
 - Main queue: `dagster-tasks.fifo` → Cancel queue: `dagster-tasks-cancels.fifo`
 
@@ -92,9 +91,9 @@ The receiver is configured automatically when `enable_cancellation` is set in th
 #### Via Dagster UI
 
 1. Navigate to the run in the Dagster UI
-2. Click the "Terminate" button
-3. The launcher will send a cancellation message to the cancel queue
-4. The worker will receive the cancellation and cancel the running task
+1. Click the "Terminate" button
+1. The launcher will send a cancellation message to the cancel queue
+1. The worker will receive the cancellation and cancel the running task
 
 #### Via Python API
 
@@ -115,17 +114,20 @@ else:
 ### How It Works
 
 1. **Cancellation Request**: When `terminate()` is called, the launcher:
+
    - Retrieves the task ID from run tags
    - Calls `broker.cancel_task(task_id)` on the `CancellableSQSBroker`
    - Sends a cancellation message to the cancel queue
 
-2. **Worker Processing**: The `CancellableReceiver`:
+1. **Worker Processing**: The `CancellableReceiver`:
+
    - Polls the cancel queue alongside the main task queue
    - Parses cancellation messages to extract task IDs
    - Matches task IDs to running asyncio tasks
    - Cancels matching tasks using `task.cancel()`
 
-3. **Task Cleanup**: When a task is cancelled:
+1. **Task Cleanup**: When a task is cancelled:
+
    - The asyncio task is cancelled, raising `CancelledError`
    - The task execution stops gracefully
    - Any cleanup code in `finally` blocks runs
@@ -140,38 +142,45 @@ else:
 **Possible Causes**:
 
 1. **Cancellation not enabled**
+
    - Check that `enable_cancellation` is set to `true` in config
    - Verify `DAGSTER_TASKIQ_ENABLE_CANCELLATION=1` environment variable
 
-2. **Cancel queue not created**
+1. **Cancel queue not created**
+
    - Ensure the cancel queue exists: `{main-queue-name}-cancels`
    - Check queue permissions allow send/receive
 
-3. **Worker not using CancellableReceiver**
+1. **Worker not using CancellableReceiver**
+
    - Verify worker was started with cancellation enabled
    - Check worker logs for receiver initialization
 
-4. **Task ID mismatch**
+1. **Task ID mismatch**
+
    - Ensure task IDs are stored in run tags
    - Verify task ID format matches between launcher and receiver
 
 ### Debugging Steps
 
 1. **Check Launcher Logs**
+
    ```python
    # Look for cancellation request messages
    instance.all_logs(run_id)
    # Should contain: "Requested Taskiq task cancellation."
    ```
 
-2. **Check Worker Logs**
+1. **Check Worker Logs**
+
    ```bash
    # Look for cancellation messages
    dagster-taskiq worker start --log-level DEBUG
    # Should show: "Cancelling task {task_id}"
    ```
 
-3. **Verify Queue Messages**
+1. **Verify Queue Messages**
+
    ```python
    import boto3
    sqs = boto3.client('sqs')
@@ -182,7 +191,8 @@ else:
    # Check if cancellation messages are in the queue
    ```
 
-4. **Check Task ID Storage**
+1. **Check Task ID Storage**
+
    ```python
    run = instance.get_run_by_id(run_id)
    task_id = run.tags.get('dagster-taskiq/task_id')
@@ -202,6 +212,7 @@ else:
 **Error**: Queue does not exist errors when sending cancellation
 
 **Solution**: Create the cancel queue manually or via infrastructure:
+
 ```bash
 aws sqs create-queue --queue-name dagster-tasks-cancels
 ```
@@ -211,11 +222,13 @@ aws sqs create-queue --queue-name dagster-tasks-cancels
 **Symptoms**: Cancellation messages sent but tasks not cancelled
 
 **Possible Causes**:
+
 - Worker not using `CancellableReceiver`
 - Task ID format mismatch
 - Worker polling interval too long
 
 **Solution**:
+
 - Verify receiver is configured: check worker startup logs
 - Ensure task IDs match exactly (string format)
 - Reduce `wait_time_seconds` for faster polling
@@ -223,17 +236,17 @@ aws sqs create-queue --queue-name dagster-tasks-cancels
 ## Best Practices
 
 1. **Always Create Cancel Queue**: Ensure the cancel queue exists before starting workers
-2. **Monitor Queue Depth**: Watch for stuck cancellation messages
-3. **Use FIFO Queues**: For better ordering guarantees, use FIFO queues for both main and cancel queues
-4. **Test Cancellation**: Verify cancellation works in your environment before relying on it
-5. **Handle Cancellation Gracefully**: Ensure your tasks handle `CancelledError` appropriately
+1. **Monitor Queue Depth**: Watch for stuck cancellation messages
+1. **Use FIFO Queues**: For better ordering guarantees, use FIFO queues for both main and cancel queues
+1. **Test Cancellation**: Verify cancellation works in your environment before relying on it
+1. **Handle Cancellation Gracefully**: Ensure your tasks handle `CancelledError` appropriately
 
 ## Limitations
 
 1. **Cooperative Cancellation**: Tasks must check for cancellation periodically; long-running operations may not cancel immediately
-2. **Result Availability**: Cancelled tasks may or may not have results in the result backend
-3. **Idempotency**: Ensure your tasks are idempotent, as cancellation doesn't guarantee the task won't be retried
-4. **Queue Ordering**: Standard queues don't guarantee order; FIFO queues provide better ordering
+1. **Result Availability**: Cancelled tasks may or may not have results in the result backend
+1. **Idempotency**: Ensure your tasks are idempotent, as cancellation doesn't guarantee the task won't be retried
+1. **Queue Ordering**: Standard queues don't guarantee order; FIFO queues provide better ordering
 
 ## Examples
 
@@ -280,4 +293,3 @@ for run in runs:
 - `IMPLEMENTATION_PROGRESS.md` - Implementation details
 - `README.md` - General usage and configuration
 - `TESTING.md` - Testing procedures
-

@@ -16,7 +16,7 @@ dev = [
 
 [project]
 name = "dagster-taskiq"
-version = "0.0.0"
+version = "0.0.0" # FYI: on-changes, update __version__
 description = "Package for using Taskiq as Dagster's execution engine."
 requires-python = ">=3.11.11"
 license = "Apache-2.0"

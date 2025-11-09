@@ -1,18 +1,10 @@
 """Helpers for constructing Taskiq SQS brokers."""
 
-from __future__ import annotations
-
+import warnings
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
-
-# Import will be available after dependency installation.
-try:  # pragma: no cover - exercised in integration tests
-    from taskiq_aio_sqs import SQSBroker as TaskiqSQSBroker
-except ImportError:  # pragma: no cover - best effort without dependency
-    TaskiqSQSBroker = None  # type: ignore[assignment,misc]
-
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from taskiq_aio_sqs import SQSBroker as TaskiqSQSBroker
 
 
 def _queue_name_from_url(queue_url: str) -> str:
@@ -38,8 +30,8 @@ class SqsBrokerConfig(BaseModel):
     aws_secret_access_key: str | None = Field(None, description="AWS secret access key")
     wait_time_seconds: int = Field(20, ge=0, le=20, description="SQS long polling wait time (0-20 seconds)")
     max_number_of_messages: int = Field(1, ge=1, le=10, description="Maximum messages to receive per poll (1-10)")
-    is_fair_queue: bool = Field(False, description="Enable fair queue (FIFO) mode")
-    use_task_id_for_deduplication: bool = Field(False, description="Use task ID for FIFO deduplication")
+    is_fair_queue: bool = Field(default=False, description="Enable fair queue (FIFO) mode")
+    use_task_id_for_deduplication: bool = Field(default=False, description="Use task ID for FIFO deduplication")
     s3_extended_bucket_name: str | None = Field(None, description="S3 bucket for extended payloads (>256KB)")
     extra_options: dict[str, Any] = Field(default_factory=dict, description="Additional broker options")
 
@@ -48,7 +40,11 @@ class SqsBrokerConfig(BaseModel):
     @field_validator("queue_url")
     @classmethod
     def validate_queue_url(cls, v: str) -> str:
-        """Validate queue URL format."""
+        """Validate queue URL format.
+
+        Returns:
+            The validated and stripped queue URL
+        """
         if not v or not v.strip():
             msg = "queue_url cannot be empty"
             raise ValueError(msg)
@@ -58,14 +54,15 @@ class SqsBrokerConfig(BaseModel):
         return v.strip()
 
     @model_validator(mode="after")
-    def validate_fair_queue_config(self) -> "SqsBrokerConfig":
-        """Warn if fair queue is enabled but queue URL is not FIFO."""
-        if self.is_fair_queue and not self.queue_url.lower().endswith(".fifo"):
-            import warnings
+    def validate_fair_queue_config(self) -> SqsBrokerConfig:
+        """Warn if fair queue is enabled but queue URL is not FIFO.
 
+        Returns:
+            The validated SqsBrokerConfig instance
+        """
+        if self.is_fair_queue and not self.queue_url.lower().endswith(".fifo"):
             warnings.warn(
-                'is_fair_queue=True but queue URL does not end with ".fifo". '
-                "Fair queue mode requires a FIFO queue.",
+                'is_fair_queue=True but queue URL does not end with ".fifo". Fair queue mode requires a FIFO queue.',
                 UserWarning,
                 stacklevel=2,
             )
@@ -107,17 +104,8 @@ class SqsBrokerConfig(BaseModel):
 
         Returns:
             Configured TaskiqSQSBroker instance
-
-        Raises:
-            ImportError: If taskiq-aio-sqs is not installed
         """
-        if TaskiqSQSBroker is None:  # pragma: no cover - import checked above
-            raise ImportError("taskiq-aio-sqs is required for SQS broker support")
-
         broker = TaskiqSQSBroker(**self.as_kwargs())
         if result_backend is not None:
             broker = broker.with_result_backend(result_backend)
         return broker
-
-
-__all__ = ["SqsBrokerConfig", "_queue_name_from_url"]

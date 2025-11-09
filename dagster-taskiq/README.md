@@ -172,9 +172,9 @@ export AWS_SECRET_ACCESS_KEY=test
 Key differences from Dagster-Celery:
 
 1. **Single queue**: No multi-queue routing or priority-based delays
-2. **TaskIQ APIs**: Uses TaskIQ's native broker APIs instead of custom implementations
-3. **S3 results**: Results stored in S3 (not Redis)
-4. **Cancellation**: Uses SQS-based cancellation (not Redis-based)
+1. **TaskIQ APIs**: Uses TaskIQ's native broker APIs instead of custom implementations
+1. **S3 results**: Results stored in S3 (not Redis)
+1. **Cancellation**: Uses SQS-based cancellation (not Redis-based)
 
 ## License
 

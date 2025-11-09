@@ -14,8 +14,7 @@ ARCHITECTURE:
 2. Cancel queue: dagster-cancels (for cancellation signals)
 3. Workers listen to both queues simultaneously
 4. Cancellation is cooperative - workers check cancel queue periodically
-
-TODO: Implement worker-side cancellation checking in core_execution_loop.py
+5. Orchestrator checks for cancellation while waiting for task results
 """
 
 import uuid
@@ -31,6 +30,8 @@ from .broker import SqsBrokerConfig
 
 class CancellableSQSBroker(AsyncBroker):
     """SQS broker with SQS-based cancellation support."""
+
+    supports_cancellation = True
 
     def __init__(
         self,
@@ -52,7 +53,6 @@ class CancellableSQSBroker(AsyncBroker):
         self.cancel_queue_url = cancel_queue_url or _derive_cancel_queue_url(broker_config.queue_url)
         self.cancel_sqs_client = None
         self._cancel_client_cm = None
-        self.supports_cancellation = True
 
     async def startup(self) -> None:
         """Start up the broker and cancel queue client."""
