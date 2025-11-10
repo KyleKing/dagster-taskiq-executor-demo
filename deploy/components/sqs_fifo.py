@@ -1,7 +1,5 @@
 """SQS FIFO queue component with an attached dead-letter queue."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass

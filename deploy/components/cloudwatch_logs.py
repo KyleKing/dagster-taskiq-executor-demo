@@ -1,7 +1,5 @@
 """CloudWatch Logs utilities for ECS services."""
 
-from __future__ import annotations
-
 import pulumi
 from pulumi_aws import Provider
 from pulumi_aws.cloudwatch import LogGroup

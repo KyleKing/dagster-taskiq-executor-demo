@@ -1,7 +1,5 @@
 """TaskIQ module - bundles all TaskIQ-related infrastructure."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from typing import cast

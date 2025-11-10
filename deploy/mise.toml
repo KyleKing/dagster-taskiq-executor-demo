@@ -5,6 +5,11 @@ PULUMI_CONFIG_PASSPHRASE = "See README!"
 [task_config]
 includes = ["../tasks.toml"]
 
+[tasks."build:images"]
+description = "Build and push all required Docker images to ECR"
+run = "../deploy/scripts/ensure-images.sh"
+depends = ["//:localstack:start"]
+
 [tasks."pulumi:config"]
 description = "Show Pulumi configuration"
 run = "uv run pulumi config --stack local"
@@ -33,7 +38,7 @@ env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:reset"]
 description = "Reset LocalStack and Pulumi state (alias for soft reset)"
-run = "pulumi:reset:soft"
+run = "mise run :pulumi:reset:soft"
 
 [tasks."pulumi:reset:hard"]
 description = "Hard reset: delete stack, clean LocalStack, recreate everything"
@@ -44,20 +49,20 @@ run = [
   "uv run pulumi stack rm --yes --stack local || true",
   "pitchfork start localstack",
   "sleep 5",
-  "pulumi:state:init"
+  "mise run :pulumi:state:init",
 ]
 
 [tasks."pulumi:reset:soft"]
 description = "Soft reset: destroy resources, refresh state, then redeploy"
 confirm = "This will destroy all Pulumi-managed resources and refresh state. Continue?"
 run = [
-  "pulumi:down",
+  "mise run :pulumi:down",
   "pitchfork stop localstack",
   "rm -rf volume/*",
   "pitchfork start localstack",
   "sleep 5",
-  "pulumi:state:init",
-  "pulumi:refresh"
+  "mise run :pulumi:state:init",
+  "mise run :pulumi:refresh",
 ]
 
 [tasks."pulumi:state:delete"]
@@ -82,11 +87,22 @@ run = "uv run pulumi state repair --yes --stack local"
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:up"]
-description = "Deploy infrastructure with Pulumi (update)"
-run = "uv run pulumi up --yes --stack local"
+description = "Deploy infrastructure with Pulumi (update) - builds images first"
+run = [
+  "mise run build:images",
+  "uv run pulumi up --yes --stack local",
+]
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:validate"]
 description = "Validate Pulumi state and detect issues (preview without applying)"
 run = "uv run pulumi preview --stack local --diff"
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."rebuild:images"]
+description = "Rebuild images and update Pulumi stack (for code changes)"
+run = [
+  "mise run build:images",
+  "mise run pulumi:up",
+]
+depends = ["//:localstack:start"]

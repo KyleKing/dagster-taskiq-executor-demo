@@ -261,8 +261,8 @@ mise run //deploy:pulumi:destroy
 
 ```bash
 # Build images
-mise run build:dagster-taskiq-demo
-mise run build:taskiq-demo
+mise run //:build:dagster-taskiq-demo
+mise run //:build:taskiq-demo
 
 # Build and push to LocalStack ECR
 ./scripts/build-and-push.sh

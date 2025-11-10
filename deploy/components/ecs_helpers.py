@@ -1,7 +1,5 @@
 """Helper utilities for ECS task definitions and common patterns."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 

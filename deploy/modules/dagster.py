@@ -1,7 +1,5 @@
 """Dagster module - bundles all Dagster-related infrastructure."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass

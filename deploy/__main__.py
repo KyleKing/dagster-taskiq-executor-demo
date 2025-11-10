@@ -1,7 +1,5 @@
 """Pulumi program that provisions the Dagster + TaskIQ LocalStack infrastructure."""
 
-from __future__ import annotations
-
 import json
 
 import pulumi
@@ -63,7 +61,7 @@ def main() -> None:
     )
 
     # Create ECR repository
-    # Note: Images must be built and pushed separately using scripts/build-and-push.sh
+    # Note: Images are built and pushed automatically before Pulumi deployment
     ecr_repo = create_ecr_repository(
         "dagster-taskiq",
         provider=provider,
@@ -125,6 +123,11 @@ def main() -> None:
         lambda args: f"{args[0]}:{args[1]}"
     )
 
+    # Define image URIs for the built images
+    # Images are pre-built by the ensure-images.sh script before Pulumi deployment
+    dagster_image_uri = ecr_repo.repository_uri.apply(lambda uri: f"{uri}:latest")
+    taskiq_demo_image_uri = ecr_repo.repository_uri.apply(lambda uri: f"{uri}:taskiq-demo")
+
     # Create TaskIQ infrastructure module
     taskiq = create_taskiq_infrastructure(
         "taskiq",
@@ -132,7 +135,7 @@ def main() -> None:
         project_name=settings.project.name,
         environment=settings.project.environment,
         region=settings.aws.region,
-        container_image=ecr_repo.repository_uri,
+        container_image=dagster_image_uri,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database_endpoint_with_port,
         execution_role_arn=execution_role.arn,
@@ -150,7 +153,7 @@ def main() -> None:
         project_name=settings.project.name,
         environment=settings.project.environment,
         region=settings.aws.region,
-        container_image=ecr_repo.repository_uri,
+        container_image=dagster_image_uri,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database_endpoint_with_port,
         queue_url=taskiq.queues.queue.id,
@@ -168,7 +171,7 @@ def main() -> None:
         region=settings.aws.region,
         vpc_id=network.vpc.id,
         subnet_ids=network.subnets.ids,
-        container_image=ecr_repo.repository_uri,
+        container_image=dagster_image_uri,
         aws_endpoint_url=settings.aws.endpoint,
         database_endpoint=database_endpoint_with_port,
         queue_url=taskiq.queues.queue.id,
@@ -178,9 +181,6 @@ def main() -> None:
 
     taskiq_demo_resources = None
     if settings.taskiq_demo.enabled:
-        taskiq_demo_image = ecr_repo.repository.repository_url.apply(
-            lambda url: f"{url}:{settings.taskiq_demo.image_tag}",
-        )
         taskiq_demo_resources = create_taskiq_demo_infrastructure(
             "taskiq-demo",
             provider=provider,
@@ -190,7 +190,129 @@ def main() -> None:
             cluster_arn=cluster.cluster.arn,
             vpc_id=network.vpc.id,
             subnet_ids=network.subnets.ids,
-            container_image=taskiq_demo_image,
+            container_image=taskiq_demo_image_uri,
+            aws_endpoint_url=settings.aws.endpoint,
+            aws_access_key=settings.aws.access_key,
+            aws_secret_key=settings.aws.secret_key,
+            queue_name=settings.taskiq_demo.queue_name,
+            message_retention_seconds=settings.taskiq_demo.message_retention_seconds,
+            visibility_timeout=settings.taskiq_demo.visibility_timeout,
+            execution_role_arn=execution_role.arn,
+            api_desired_count=settings.taskiq_demo.api_desired_count,
+            worker_desired_count=settings.taskiq_demo.worker_desired_count,
+            assign_public_ip=settings.taskiq_demo.assign_public_ip,
+            api_target_group_arn=dagster.taskiq_target_group.arn,
+        )
+
+    # Create PostgreSQL database first (with placeholder security group)
+    # We'll create the security group separately
+    # Create security group for database access
+    db_security_group = ec2.SecurityGroup(
+        "dagster-db-sg",
+        name=f"{settings.project.name}-db-{settings.project.environment}",
+        description="Security group for PostgreSQL database",
+        vpc_id=network.vpc.id,
+        opts=pulumi.ResourceOptions(provider=provider),
+    )
+
+    ec2.SecurityGroupRule(
+        "db-postgres-ingress",
+        type="ingress",
+        security_group_id=db_security_group.id,
+        from_port=5432,
+        to_port=5432,
+        protocol="tcp",
+        cidr_blocks=["10.0.0.0/8"],
+        description="PostgreSQL access from LocalStack network",
+        opts=pulumi.ResourceOptions(provider=provider, parent=db_security_group),
+    )
+
+    database = create_postgres_database(
+        "dagster-db",
+        provider=provider,
+        subnet_ids=network.subnets.ids,
+        security_group_ids=[db_security_group.id],
+        db_name=settings.database.db_name,
+        username=settings.database.username,
+        password=settings.database.password,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        engine_version=settings.database.engine_version,
+        min_capacity=settings.database.min_capacity,
+        max_capacity=settings.database.max_capacity,
+        publicly_accessible=settings.database.publicly_accessible,
+        deletion_protection=settings.database.deletion_protection,
+        backup_retention_period=settings.database.backup_retention_period,
+    )
+
+    # Combine database endpoint with port for both modules
+    database_endpoint_with_port = pulumi.Output.all(database.cluster.endpoint, database.cluster.port).apply(
+        lambda args: f"{args[0]}:{args[1]}"
+    )
+
+    # Create TaskIQ infrastructure module
+    taskiq = create_taskiq_infrastructure(
+        "taskiq",
+        provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        region=settings.aws.region,
+        container_image=dagster_image_uri,
+        aws_endpoint_url=settings.aws.endpoint,
+        database_endpoint=database_endpoint_with_port,
+        execution_role_arn=execution_role.arn,
+        message_retention_seconds=settings.queue.message_retention_seconds,
+        queue_visibility_timeout=settings.queue.visibility_timeout,
+        dlq_visibility_timeout=settings.queue.dlq_visibility_timeout,
+        redrive_max_receive_count=settings.queue.redrive_max_receive_count,
+    )
+
+    # Create auto-scaler infrastructure module
+    worker_service_name = f"{settings.project.name}-workers-{settings.project.environment}"
+    auto_scaler = create_auto_scaler_infrastructure(
+        "auto-scaler",
+        provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        region=settings.aws.region,
+        container_image=dagster_image_uri,
+        aws_endpoint_url=settings.aws.endpoint,
+        database_endpoint=database_endpoint_with_port,
+        queue_url=taskiq.queues.queue.id,
+        cluster_name=cluster.cluster.name,
+        worker_service_name=worker_service_name,
+        execution_role_arn=execution_role.arn,
+    )
+
+    # Create Dagster infrastructure module
+    dagster = create_dagster_infrastructure(
+        "dagster",
+        provider=provider,
+        project_name=settings.project.name,
+        environment=settings.project.environment,
+        region=settings.aws.region,
+        vpc_id=network.vpc.id,
+        subnet_ids=network.subnets.ids,
+        container_image=dagster_image_uri,
+        aws_endpoint_url=settings.aws.endpoint,
+        database_endpoint=database_endpoint_with_port,
+        queue_url=taskiq.queues.queue.id,
+        cluster_name=cluster.cluster.name,
+        execution_role_arn=execution_role.arn,
+    )
+
+    taskiq_demo_resources = None
+    if settings.taskiq_demo.enabled:
+        taskiq_demo_resources = create_taskiq_demo_infrastructure(
+            "taskiq-demo",
+            provider=provider,
+            project_name=settings.project.name,
+            environment=settings.project.environment,
+            region=settings.aws.region,
+            cluster_arn=cluster.cluster.arn,
+            vpc_id=network.vpc.id,
+            subnet_ids=network.subnets.ids,
+            container_image=taskiq_demo_image_uri,
             aws_endpoint_url=settings.aws.endpoint,
             aws_access_key=settings.aws.access_key,
             aws_secret_key=settings.aws.secret_key,

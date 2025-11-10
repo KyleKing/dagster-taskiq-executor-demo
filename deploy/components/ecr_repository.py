@@ -1,7 +1,5 @@
 """ECR repository component - creates repository without building images."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import pulumi
