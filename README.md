@@ -1,6 +1,25 @@
 # Dagster TaskIQ Executor Demo
 
-Based on dagster-celery, this project demonstrates a potentially new executor based on taskiq for better performance. Locally are projects demonstrating taskiq standalone with FastAPI and separately as an executor for Dagster. LocalStack and Pulumi are used to locally evaluate the new executor.
+Based on dagster-celery, this project demonstrates a custom async executor using SQS and TaskIQ terminology for better performance. The demo includes a standalone TaskIQ project with FastAPI and a full Dagster integration with custom async workers. LocalStack and Pulumi are used to locally evaluate the executor.
+
+**Note**: While named "taskiq", the `dagster-taskiq-demo` uses custom async workers with aioboto3 for SQS (not the TaskIQ framework) to better integrate with Dagster's execution model. See [`dagster-taskiq-demo/README.md`](./dagster-taskiq-demo/README.md) for architecture details.
+
+## Python Version Requirements
+
+- **dagster-taskiq**: Python 3.11+
+- **dagster-taskiq-demo**: Python 3.13+ (strict requirement)
+- **taskiq-demo**: Python 3.11+
+- **taskiq-aio-multi-sqs**: Python 3.11+
+- **deploy**: Python 3.11+
+
+For local development, **Python 3.13** is recommended to support all subprojects.
+
+## Project Status
+
+This is an experimental migration from dagster-celery with known limitations. See:
+- [`CLEANUP_REPORT.md`](./CLEANUP_REPORT.md) - Comprehensive review and cleanup plan
+- [`dagster-taskiq/IMPLEMENTATION_PROGRESS.md`](./dagster-taskiq/IMPLEMENTATION_PROGRESS.md) - Implementation roadmap
+- [`dagster-taskiq/PARITY_REVIEW.md`](./dagster-taskiq/PARITY_REVIEW.md) - Feature parity analysis
 
 ## Quick Start
 
@@ -43,8 +62,8 @@ Based on dagster-celery, this project demonstrates a potentially new executor ba
 1. **Access UIs**:
 
    - LocalStack: https://app.localstack.cloud
-   - Dagster: http://localhost:3000 (TODO: this is from ECS in LocalStack!)
-   - (Optioanl) TaskIQ Dashboard: http://localhost:8080 (`./scripts/run-dashboard.sh`)
+   - Dagster: http://localhost:3000 (access via port-forwarding from ECS task in LocalStack)
+   - (Optional) TaskIQ Dashboard: http://localhost:8080 (`./scripts/run-dashboard.sh`)
 
 ## Development Tasks
 
