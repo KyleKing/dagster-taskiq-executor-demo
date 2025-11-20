@@ -103,14 +103,222 @@ mise run up
 
 **Troubleshooting**:
 
+See [Troubleshooting & Recovery](#troubleshooting--recovery) section below for detailed guidance.
+
+## Observability
+
+### Log Viewing Commands
+
+From project root, use mise tasks to tail CloudWatch logs:
+
+```bash
+# Dagster daemon logs
+mise run logs:dagster-daemon
+
+# Dagster webserver logs
+mise run logs:dagster-webserver
+
+# TaskIQ worker logs
+mise run logs:taskiq-worker
+
+# Auto-scaler logs
+mise run logs:auto-scaler
+```
+
+### ECS Service Status
+
+```bash
+# List all services
+mise run aws:services
+
+# Check specific service
+mise run ecs:status SERVICE_NAME=dagster-daemon
+mise run ecs:status SERVICE_NAME=taskiq-worker
+
+# List running tasks
+mise run aws:tasks
+```
+
+### Queue Monitoring
+
+```bash
+# Check queue depth
+mise run queue:depth
+
+# Get queue URL from stack
+uv run pulumi stack output queueUrl --stack local
+```
+
+### Stack Outputs
+
+Get infrastructure URLs and identifiers:
+
+```bash
+# Queue URL
+uv run pulumi stack output queueUrl --stack local
+
+# Database endpoint
+uv run pulumi stack output databaseEndpoint --stack local
+
+# ECS cluster name
+uv run pulumi stack output clusterName --stack local
+
+# All outputs
+uv run pulumi stack output --stack local
+```
+
+## Troubleshooting & Recovery
+
+### Common Issues
+
+#### Duplicate Resource URN Errors
+
+**Symptom**: `error: Duplicate resource URN 'urn:pulumi:local::localstack-ecs-sqs::aws:ecs/service:Service::taskiq-demo-worker-service'`
+
+**Cause**: Multiple resources with the same logical name in Pulumi code.
+
+**Solution**:
+
+1. Check for duplicate resource definitions in `__main__.py` and modules
+1. Ensure each resource has a unique logical name
+1. Use `pulumi:validate` to detect issues before deploying
+1. If state is corrupted, use `pulumi:reset:hard` to start fresh
+
+#### State Drift (Pulumi state out of sync with LocalStack)
+
+**Symptom**: `pulumi up` fails with resource not found or already exists errors.
+
+**Solution**:
+
+1. **Refresh state**: `mise run pulumi:refresh` (syncs Pulumi state with actual infrastructure)
+1. **Repair state**: `mise run pulumi:state:repair` (attempts automatic state repair)
+1. **Validate**: `mise run pulumi:validate` (preview changes without applying)
+
+#### LocalStack State Corruption
+
+**Symptom**: LocalStack errors or unexpected behavior after failures.
+
+**Solution**: Use reset strategies below.
+
+### Reset Strategies
+
+#### Soft Reset (Recommended for most cases)
+
+Gracefully destroys resources, cleans LocalStack, and refreshes state:
+
 ```bash
 cd deploy
-pulumi cancel  # Release stuck locks
-pulumi refresh # Sync state with cloud
+mise run pulumi:reset:soft
 ```
+
+**What it does**:
+
+1. Destroys all Pulumi-managed resources
+1. Stops LocalStack
+1. Cleans LocalStack volume data
+1. Restarts LocalStack
+1. Initializes stack if needed
+1. Refreshes state
+
+**Use when**: You want to clean up while preserving stack configuration.
+
+#### Hard Reset (Nuclear option for major failures)
+
+Completely removes Pulumi stack and LocalStack state:
+
+```bash
+cd deploy
+mise run pulumi:reset:hard
+```
+
+**What it does**:
+
+1. Stops LocalStack
+1. Deletes all LocalStack data
+1. **Deletes Pulumi stack** (removes state file)
+1. Restarts LocalStack
+1. Initializes fresh stack
+
+**Use when**:
+
+- State is severely corrupted
+- Duplicate URN errors persist
+- You need a completely clean slate
+- After hard reset, you'll need to run `pulumi:up` to recreate everything
+
+#### Quick Reset (Original behavior)
+
+Alias for soft reset - maintains backward compatibility:
+
+```bash
+cd deploy
+mise run pulumi:reset
+```
+
+### State Management Commands
+
+```bash
+cd deploy
+
+# List all resources in state
+mise run pulumi:state:list
+
+# Validate state without applying changes
+mise run pulumi:validate
+
+# Refresh state to sync with LocalStack
+mise run pulumi:refresh
+
+# Repair corrupted state
+mise run pulumi:state:repair
+
+# Delete stack (doesn't destroy resources)
+mise run pulumi:state:delete
+
+# Initialize stack if missing
+mise run pulumi:state:init
+```
+
+### Recovery Workflow
+
+**For minor issues**:
+
+1. `mise run pulumi:validate` - Check what's wrong
+1. `mise run pulumi:refresh` - Sync state
+1. `mise run pulumi:up` - Try deploying again
+
+**For state corruption**:
+
+1. `mise run pulumi:state:repair` - Attempt repair
+1. If that fails: `mise run pulumi:reset:soft` - Soft reset
+1. If still failing: `mise run pulumi:reset:hard` - Hard reset, then `pulumi:up`
+
+**For duplicate URN errors**:
+
+1. Fix the code (remove duplicate resource definitions)
+1. `mise run pulumi:reset:hard` - Clean slate
+1. `mise run pulumi:up` - Fresh deployment
+
+### Best Practices for Reliability
+
+1. **Always preview before deploying**: `mise run pulumi:validate`
+1. **Use soft reset for routine cleanup**: Preserves stack config
+1. **Save stack config**: `Pulumi.local.yaml` is version-controlled
+1. **Monitor state drift**: Run `pulumi:refresh` periodically during development
+1. **Don't modify resources outside Pulumi**: Always use Pulumi for changes
+
+### Making Pulumi More Reliable
+
+1. **Unique Resource Names**: Ensure all resources have unique logical names
+1. **Idempotent Operations**: Design infrastructure code to be safely re-runnable
+1. **State Validation**: Use `pulumi:validate` before every deployment
+1. **Incremental Changes**: Make small, incremental changes rather than large refactors
+1. **Component Encapsulation**: Use components/modules to group related resources
+1. **Error Handling**: Handle Pulumi errors gracefully in infrastructure code
 
 ## Additional Resources
 
 - [Pulumi IDP Best Practices](https://www.pulumi.com/docs/idp/best-practices/)
 - [Four Factors Framework](https://www.pulumi.com/docs/idp/best-practices/four-factors)
 - [Pulumi Configuration](https://www.pulumi.com/docs/iac/concepts/config/)
+- [Pulumi State Management](https://www.pulumi.com/docs/iac/concepts/state/)

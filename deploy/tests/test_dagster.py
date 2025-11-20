@@ -182,7 +182,8 @@ def test_create_dagster_infrastructure(
     assert result.daemon_service_discovery is not None
     assert result.webserver_service_discovery is not None
     assert result.load_balancer is not None
-    assert result.target_group is not None
+    assert result.dagster_target_group is not None
+    assert result.taskiq_target_group is not None
     assert result.listener is not None
 
 
@@ -412,7 +413,7 @@ def test_target_group_configuration(mock_aws_provider: MagicMock) -> pulumi.Outp
 
     def check_target_group_properties(args: list[Any]) -> None:
         _urn, tg_inputs = args
-        assert tg_inputs["name"] == "dagster-taskiq-demo-tg-test"
+        assert tg_inputs["name"] == "dagster-taskiq-demo-dtg-test"
         assert tg_inputs["port"] == 3000
         assert tg_inputs["protocol"] == "HTTP"
         assert tg_inputs["vpc_id"] == "vpc-12345678"
@@ -429,4 +430,6 @@ def test_target_group_configuration(mock_aws_provider: MagicMock) -> pulumi.Outp
         assert health_check["timeout"] == 5
         assert health_check["unhealthy_threshold"] == 2
 
-    return pulumi.Output.all(result.target_group.urn, result.target_group.__dict__).apply(check_target_group_properties)
+    return pulumi.Output.all(result.dagster_target_group.urn, result.dagster_target_group.__dict__).apply(
+        check_target_group_properties
+    )

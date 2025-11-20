@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from threading import Thread
 from unittest import mock
 
@@ -104,7 +104,7 @@ def test_terminate_job_on_taskiq(dagster_taskiq_worker, instance: DagsterInstanc
         results.append(event)
         result_types.append(event.event_type)
 
-    interrupt_thread.join()  # type: ignore
+    interrupt_thread.join()  # type: ignore[union-attr]
 
     # At least one step succeeded (the one that was running when the interrupt fired)
     assert DagsterEventType.STEP_SUCCESS in result_types
@@ -146,8 +146,8 @@ def test_execute_eagerly_on_taskiq(instance: DagsterInstance):
 
         seen = set()
         assert set(start_markers.keys()) == set(end_markers.keys())
-        for key in end_markers:
-            assert end_markers[key] - start_markers[key] > 0
+        for key, end_time in end_markers.items():
+            assert end_time - start_markers[key] > 0
             seen.add(key)
 
 
@@ -220,18 +220,20 @@ def test_execute_eagerly_retries_job_on_taskiq():
 
 
 def test_engine_error(instance: DagsterInstance, tempdir: str):
-    with mock.patch(
-        "dagster._core.execution.context.system.PlanData.raise_on_error",
-        return_value=True,
+    storage = str(Path(tempdir) / "flakey_storage")
+    with (
+        mock.patch(
+            "dagster._core.execution.context.system.PlanData.raise_on_error",
+            return_value=True,
+        ),
+        pytest.raises(DagsterSubprocessError),
     ):
-        with pytest.raises(DagsterSubprocessError):
-            storage = os.path.join(tempdir, "flakey_storage")
-            execute_job(
-                ReconstructableJob.for_file(REPO_FILE, "engine_error"),
-                run_config={
-                    "resources": {"io_manager": {"config": {"base_dir": storage}}},
-                    "execution": {"config": {"config_source": {"task_always_eager": True}}},
-                    "ops": {"destroy": {"config": storage}},
-                },
-                instance=instance,
-            )
+        execute_job(
+            ReconstructableJob.for_file(REPO_FILE, "engine_error"),
+            run_config={
+                "resources": {"io_manager": {"config": {"base_dir": storage}}},
+                "execution": {"config": {"config_source": {"task_always_eager": True}}},
+                "ops": {"destroy": {"config": storage}},
+            },
+            instance=instance,
+        )

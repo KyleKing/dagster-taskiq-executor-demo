@@ -1,7 +1,6 @@
 # Modifications copyright (c) 2024 dagster-taskiq contributors
 
-"""
-Cancellable SQS broker implementation with SQS-based task cancellation.
+"""Cancellable SQS broker implementation with SQS-based task cancellation.
 
 DESIGN NOTES:
 - Uses separate SQS queue for cancellation messages to avoid Redis dependency
@@ -15,15 +14,14 @@ ARCHITECTURE:
 2. Cancel queue: dagster-cancels (for cancellation signals)
 3. Workers listen to both queues simultaneously
 4. Cancellation is cooperative - workers check cancel queue periodically
-
-TODO: Implement worker-side cancellation checking in core_execution_loop.py
+5. Orchestrator checks for cancellation while waiting for task results
 """
 
 import uuid
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import aioboto3
-
 from taskiq import AsyncBroker
 from taskiq.message import TaskiqMessage
 
@@ -33,22 +31,31 @@ from .broker import SqsBrokerConfig
 class CancellableSQSBroker(AsyncBroker):
     """SQS broker with SQS-based cancellation support."""
 
+    supports_cancellation = True
+
     def __init__(
         self,
         broker_config: SqsBrokerConfig,
         *,
-        result_backend: Optional[object] = None,
+        result_backend: object | None = None,
         cancel_queue_url: str | None = None,
-    ):
+    ) -> None:
+        """Initialize the cancellable SQS broker.
+
+        Args:
+            broker_config: SQS broker configuration
+            result_backend: Optional result backend for task results
+            cancel_queue_url: Optional custom cancel queue URL
+        """
         super().__init__()
         self._config = broker_config
         self.sqs_broker = broker_config.create_broker(result_backend=result_backend)
         self.cancel_queue_url = cancel_queue_url or _derive_cancel_queue_url(broker_config.queue_url)
         self.cancel_sqs_client = None
         self._cancel_client_cm = None
-        self.supports_cancellation = True
 
-    async def startup(self):
+    async def startup(self) -> None:
+        """Start up the broker and cancel queue client."""
         await self.sqs_broker.startup()
         # Setup SQS client for cancel queue
         if self.cancel_sqs_client:
@@ -63,9 +70,11 @@ class CancellableSQSBroker(AsyncBroker):
             aws_secret_access_key=self._config.aws_secret_access_key,
         )
         self._cancel_client_cm = client_cm
-        self.cancel_sqs_client = await client_cm.__aenter__()
+        # Manually enter context manager to keep client alive for shutdown
+        self.cancel_sqs_client = await client_cm.__aenter__()  # noqa: PLC2801
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
+        """Shut down the broker and cancel queue client."""
         await self.sqs_broker.shutdown()
         if self._cancel_client_cm is not None:
             await self._cancel_client_cm.__aexit__(None, None, None)
@@ -91,14 +100,18 @@ class CancellableSQSBroker(AsyncBroker):
         # Ensure MessageBody is a string, not bytes
         message_body = broker_message.message
         if isinstance(message_body, bytes):
-            message_body = message_body.decode('utf-8')
+            message_body = message_body.decode("utf-8")
         await self.cancel_sqs_client.send_message(
             QueueUrl=self.cancel_queue_url,
             MessageBody=message_body,
         )
 
     async def listen_canceller(self) -> AsyncGenerator[bytes, None]:
-        """Poll for cancellation messages from the cancel queue."""
+        """Poll for cancellation messages from the cancel queue.
+
+        Yields:
+            Message bodies from the cancel queue
+        """
         if not self.cancel_sqs_client:
             await self.startup()
         if not self.cancel_sqs_client:
@@ -126,21 +139,42 @@ class CancellableSQSBroker(AsyncBroker):
                 continue
 
     # Delegate other methods to sqs_broker
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
+        """Get attribute from underlying SQS broker.
+
+        Args:
+            name: Attribute name to get
+
+        Returns:
+            The attribute value from the underlying broker
+        """
         return getattr(self.sqs_broker, name)
 
-    async def kick(self, task):
+    async def kick(self, task: Any) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Kick a task to the broker.
+
+        Args:
+            task: The task to kick
+
+        Returns:
+            Result from the underlying broker
+        """
         return await self.sqs_broker.kick(task)
 
-    async def listen(self):
+    async def listen(self) -> AsyncGenerator[TaskiqMessage, None]:  # pyright: ignore[reportIncompatibleMethodOverride]  # type: ignore[override]
+        """Listen for messages from the broker.
+
+        Yields:
+            TaskiqMessage objects from the broker
+        """
         async for message in self.sqs_broker.listen():
             yield message
 
 
 def _derive_cancel_queue_url(queue_url: str) -> str:
     if not queue_url:
-        raise ValueError('Cannot derive cancel queue URL without a base queue URL')
-    queue_url = queue_url.rstrip('/')
-    prefix, _, queue_name = queue_url.rpartition('/')
-    cancel_suffix = f'{queue_name}-cancels' if queue_name else 'dagster-cancels'
-    return f'{prefix}/{cancel_suffix}' if prefix else cancel_suffix
+        raise ValueError("Cannot derive cancel queue URL without a base queue URL")
+    queue_url = queue_url.rstrip("/")
+    prefix, _, queue_name = queue_url.rpartition("/")
+    cancel_suffix = f"{queue_name}-cancels" if queue_name else "dagster-cancels"
+    return f"{prefix}/{cancel_suffix}" if prefix else cancel_suffix

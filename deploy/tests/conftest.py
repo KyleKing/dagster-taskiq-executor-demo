@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pulumi
@@ -29,8 +29,8 @@ def mock_pulumi_config() -> MagicMock:
     """
     config = MagicMock(spec=pulumi.Config)
 
-    def mock_get_object(key: str) -> Mapping[str, str] | None:
-        config_map = {
+    def mock_get_object(key: str) -> dict[str, Any] | None:
+        config_map: dict[str, dict[str, Any]] = {
             "project": {
                 "name": "dagster-taskiq-demo",
                 "environment": "test",

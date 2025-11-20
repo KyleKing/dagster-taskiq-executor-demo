@@ -1,9 +1,10 @@
 import time
 
-from dagster import Int, OpExecutionContext, Output, RetryRequested, job
+from dagster import Int, Output, RetryRequested, job
 from dagster._core.definitions.decorators import op
 from dagster._core.definitions.output import Out
 from dagster._core.test_utils import nesting_graph
+
 from dagster_taskiq import taskiq_executor
 
 # test_execute jobs
@@ -84,14 +85,18 @@ def test_optional_outputs():
     bar.alias("third_consumer")(input_arg=foo_res.out_3)
 
 
+class TestFailureError(Exception):
+    """Custom exception for test failures."""
+
+
 @op
 def fails():
-    raise Exception("argjhgjh")
+    raise TestFailureError("argjhgjh")
 
 
 @op
 def should_never_execute(foo):
-    assert False  # should never execute
+    raise AssertionError  # should never execute
 
 
 @job(executor_def=taskiq_executor)
@@ -101,7 +106,7 @@ def test_fails():
 
 @op
 def retry_request():
-    raise RetryRequested()
+    raise RetryRequested
 
 
 @job(executor_def=taskiq_executor)
@@ -111,7 +116,7 @@ def test_retries():
 
 @op(config_schema=str)
 def destroy(context, x):
-    raise ValueError()
+    raise ValueError
 
 
 @job(executor_def=taskiq_executor)
@@ -139,128 +144,6 @@ def test_resources_limit():
     resource_req_op()
 
 
-# test_priority jobs
-
-
-@op(tags={"dagster-taskiq/priority": 0})
-def zero(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "0"
-    context.log.info("Executing with priority 0")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 1})
-def one(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "1"
-    context.log.info("Executing with priority 1")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 2})
-def two(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "2"
-    context.log.info("Executing with priority 2")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 3})
-def three(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "3"
-    context.log.info("Executing with priority 3")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 4})
-def four(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "4"
-    context.log.info("Executing with priority 4")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 5})
-def five(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "5"
-    context.log.info("Executing with priority 5")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 6})
-def six(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "6"
-    context.log.info("Executing with priority 6")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 7})
-def seven_(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "7"
-    context.log.info("Executing with priority 7")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 8})
-def eight(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "8"
-    context.log.info("Executing with priority 8")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 9})
-def nine(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "9"
-    context.log.info("Executing with priority 9")
-    return True
-
-
-@op(tags={"dagster-taskiq/priority": 10})
-def ten(context):
-    assert "dagster-taskiq/priority" in context.op.tags
-    assert context.op.tags["dagster-taskiq/priority"] == "10"
-    context.log.info("Executing with priority 10")
-    return True
-
-
-@job(executor_def=taskiq_executor)
-def priority_job():
-    for i in range(50):
-        zero.alias("zero_" + str(i))()
-        one.alias("one_" + str(i))()
-        two.alias("two_" + str(i))()
-        three.alias("three_" + str(i))()
-        four.alias("four_" + str(i))()
-        five.alias("five_" + str(i))()
-        six.alias("six_" + str(i))()
-        seven_.alias("seven_" + str(i))()
-        eight.alias("eight_" + str(i))()
-        nine.alias("nine" + str(i))()
-        ten.alias("ten_" + str(i))()
-
-
-@job(executor_def=taskiq_executor)
-def simple_priority_job():
-    zero()
-    one()
-    two()
-    three()
-    four()
-    five()
-    six()
-    seven_()
-    eight()
-    nine()
-    ten()
-
-
 @op
 def sleep_op(_):
     time.sleep(0.5)
@@ -268,42 +151,9 @@ def sleep_op(_):
 
 
 @job(executor_def=taskiq_executor)
-def low_job():
-    sleep_op.alias("low_one")()
-    sleep_op.alias("low_two")()
-    sleep_op.alias("low_three")()
-    sleep_op.alias("low_four")()
-    sleep_op.alias("low_five")()
-
-
-@job(executor_def=taskiq_executor)
-def hi_job():
-    sleep_op.alias("hi_one")()
-    sleep_op.alias("hi_two")()
-    sleep_op.alias("hi_three")()
-    sleep_op.alias("hi_four")()
-    sleep_op.alias("hi_five")()
-
-
-@job(executor_def=taskiq_executor)
 def interrupt_job():
     for i in range(50):
         sleep_op.alias("sleep_" + str(i))()
-
-
-# test_queues jobs
-
-
-@op(tags={"dagster-taskiq/queue": "fooqueue"})
-def fooqueue(context: OpExecutionContext):
-    assert context.op.tags["dagster-taskiq/queue"] == "fooqueue"
-    context.log.info("Executing on queue fooqueue")
-    return True
-
-
-@job(executor_def=taskiq_executor)
-def multiqueue_job():
-    fooqueue()
 
 
 @op

@@ -61,7 +61,11 @@ class MetricsCollector:
         logger.info("would_publish_metrics_to_cloudwatch", metric_count=sum(len(v) for v in self.metrics.values()))
 
     def get_summary(self) -> dict[str, Any]:
-        """Get metrics summary."""
+        """Get metrics summary.
+
+        Returns:
+            Dictionary containing metrics summary
+        """
         summary: dict[str, Any] = {
             "namespace": self.namespace,
             "collection_duration": time.time() - self.start_time,
@@ -85,5 +89,9 @@ metrics_collector = MetricsCollector()
 
 
 def get_metrics_collector() -> MetricsCollector:
-    """Get the global metrics collector instance."""
+    """Get the global metrics collector instance.
+
+    Returns:
+        The global MetricsCollector instance
+    """
     return metrics_collector

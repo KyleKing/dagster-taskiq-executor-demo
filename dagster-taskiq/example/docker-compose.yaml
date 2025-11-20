@@ -50,7 +50,7 @@ services:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-taskiq worker start -y /app/taskiq.yaml -q short-queue
+    command: dagster-taskiq worker start -y /app/taskiq.yaml
     restart: on-failure
     env_file: docker/docker.env
     cap_add:
@@ -71,7 +71,7 @@ services:
     profiles:
       - dagster
     image: dagster-example:latest
-    command: dagster-taskiq worker start -y /app/taskiq.yaml -q long-queue
+    command: dagster-taskiq worker start -y /app/taskiq.yaml
     restart: on-failure
     env_file: docker/docker.env
     cap_add:

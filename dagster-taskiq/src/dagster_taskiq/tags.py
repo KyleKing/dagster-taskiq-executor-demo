@@ -1,11 +1,8 @@
-# Used to set the priority for a particular step execution
-DAGSTER_TASKIQ_STEP_PRIORITY_TAG = "dagster-taskiq/priority"
+"""Tag constants for dagster-taskiq.
 
-# Used to set the priority for an overall job run
-DAGSTER_TASKIQ_RUN_PRIORITY_TAG = "dagster-taskiq/run_priority"
-
-# Used to select a Taskiq queue
-DAGSTER_TASKIQ_QUEUE_TAG = "dagster-taskiq/queue"
+This module defines tag keys used to configure Taskiq executor behavior
+for Dagster runs and steps.
+"""
 
 # Used to set the taskiq task_id for run monitoring
 DAGSTER_TASKIQ_TASK_ID_TAG = "dagster-taskiq/task_id"

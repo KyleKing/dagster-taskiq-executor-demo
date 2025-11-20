@@ -1,17 +1,20 @@
+"""Configuration utilities for dagster-taskiq.
+
+This module provides default configuration values and utilities for
+configuring Taskiq executors and workers.
+"""
+
+from typing import Any
+
 from dagster_taskiq.defaults import (
-    task_default_priority,
-    task_default_queue,
-    worker_max_messages,
     wait_time_seconds,
+    worker_max_messages,
 )
 
 DEFAULT_CONFIG = {
-    "task_default_priority": task_default_priority,
-    "task_default_queue": task_default_queue,
     "wait_time_seconds": wait_time_seconds,
     "max_number_of_messages": worker_max_messages,
     "worker_max_messages": worker_max_messages,
-    "delay_seconds": 0,
     "is_fair_queue": None,
     "use_task_id_for_deduplication": False,
     "extra_options": {},
@@ -19,10 +22,15 @@ DEFAULT_CONFIG = {
 }
 
 
-class dict_wrapper:
+class DictWrapper:
     """Wraps a dict to convert `obj['attr']` to `obj.attr`."""
 
-    def __init__(self, dictionary):
+    def __init__(self, dictionary: dict[str, Any]) -> None:
+        """Initialize the dictionary wrapper.
+
+        Args:
+            dictionary: Dictionary to wrap
+        """
         self.__dict__ = dictionary
 
 

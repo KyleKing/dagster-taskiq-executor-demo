@@ -1,11 +1,9 @@
-# Root mise.toml - Monorepo Orchestration
-# This file coordinates tasks across the entire repository
+experimental_monorepo_root = true
 
 [env]
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
-PROJECT_NAME = "dagster-taskiq-demo"
-PULUMI_CONFIG_PASSPHRASE = "See README!"
+MISE_EXPERIMENTAL = "1"
 _.file = {path = ".env"}
 
 [tasks."aws:clusters"]
@@ -39,16 +37,9 @@ description = "Build TaskIQ demo image with docker bake"
 run = "docker buildx bake taskiq-demo"
 sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
 
-[tasks."checks:all"]
-description = "Check all projects"
-run = [
-  "mise -C dagster-taskiq run checks",
-  "mise -C dagster-taskiq/example run checks",
-  "mise -C dagster-taskiq-demo run checks",
-  "mise -C taskiq-aio-multi-sqs run checks",
-  "mise -C deploy run checks",
-  "mise -C taskiq-demo run checks",
-]
+[tasks."dashboard:start"]
+description = "Start TaskIQ dashboard (requires dev dependencies)"
+run = "./scripts/run-dashboard.sh"
 
 [tasks."ecr:login"]
 description = "Login to LocalStack ECR"
@@ -64,7 +55,7 @@ if [ -n "$REPO_URI" ]; then
   awslocal ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
     docker login --username AWS --password-stdin "${REPO_URI%%/*}"
 else
-  echo "ECR repository not found. Run 'mise --cd deploy run pulumi:up' first."
+  echo "ECR repository not found. Run `mise run //deploy:pulumi:up` first."
   exit 1
 fi
 '''
@@ -78,44 +69,28 @@ run = "./scripts/build-and-push.sh"
 description = "Build and push TaskIQ demo image to LocalStack ECR"
 run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
+[tasks."ecs:status"]
+description = "Check ECS service status (requires SERVICE_NAME env var)"
+run = '''
+CLUSTER="${ECS_CLUSTER_NAME:-dagster-taskiq-demo-${ENVIRONMENT}}"
+SERVICE_NAME="${SERVICE_NAME}"
+if [ -z "$SERVICE_NAME" ]; then
+  echo "Error: SERVICE_NAME not set. Example: mise run ecs:status SERVICE_NAME=dagster-daemon"
+  exit 1
+fi
+awslocal ecs describe-services \
+  --cluster "$CLUSTER" \
+  --services "$SERVICE_NAME" \
+  --region ${AWS_DEFAULT_REGION} \
+  --query 'services[0].{Status:status,DesiredCount:desiredCount,RunningCount:runningCount,PendingCount:pendingCount}' \
+  --output table
+'''
+
 [tasks.env-setup]
 description = "Initial project setup (check env, install deps)"
 run = [
   "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
   "mise install"
-]
-
-[tasks."test:all"]
-description = "Test all projects"
-run = [
-  "mise -C dagster-taskiq run test",
-  "mise -C dagster-taskiq/example run test",
-  "mise -C dagster-taskiq-demo run test",
-  "mise -C taskiq-aio-multi-sqs run test",
-  "mise -C deploy run test",
-  "mise -C taskiq-demo run test",
-]
-
-[tasks."fixes:all"]
-description = "Lint and auto-fix all projects"
-run = [
-  "mise -C dagster-taskiq run fixes",
-  "mise -C dagster-taskiq/example run fixes",
-  "mise -C dagster-taskiq-demo run fixes",
-  "mise -C taskiq-aio-multi-sqs run fixes",
-  "mise -C deploy run fixes",
-  "mise -C taskiq-demo run fixes",
-]
-
-[tasks."install:all"]
-description = "Install all project dependencies"
-run = [
-  "mise -C dagster-taskiq run install",
-  "mise -C dagster-taskiq/example run install",
-  "mise -C dagster-taskiq-demo run install",
-  "mise -C taskiq-aio-multi-sqs run install",
-  "mise -C deploy run install",
-  "mise -C taskiq-demo run install",
 ]
 
 [tasks."localstack:logs"]
@@ -125,8 +100,8 @@ run = "docker compose logs -f localstack"
 
 [tasks."localstack:restart"]
 description = "Restart LocalStack container"
-run = "mise run localstack:start --detach"
-wait_for = ["localstack:stop"]
+run = "mise run //:localstack:start --detach"
+wait_for = ["//:localstack:stop"]
 
 [tasks."localstack:start"]
 description = "Start LocalStack container (or run in background with `pitchfork start localstack`)"
@@ -145,9 +120,21 @@ description = "Stop LocalStack container"
 alias = "stop"
 run = "docker compose down"
 
-[tasks."dashboard:start"]
-description = "Start TaskIQ dashboard (requires dev dependencies)"
-run = "./scripts/run-dashboard.sh"
+[tasks."logs:auto-scaler"]
+description = "Tail auto-scaler logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/auto-scaler-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:dagster-daemon"]
+description = "Tail Dagster daemon logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/dagster-daemon-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:dagster-webserver"]
+description = "Tail Dagster webserver logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/dagster-webserver-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+
+[tasks."logs:taskiq-worker"]
+description = "Tail TaskIQ worker logs from CloudWatch"
+run = "awslocal logs tail '/aws/ecs/taskiq-worker-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
 
 [tasks.mdformat]
 description = "Format all markdown files"
@@ -163,6 +150,20 @@ description = "Format all pkl files"
 run = "pkl format --write hk.pkl"
 sources = ["hk.pkl"]
 
+[tasks."queue:depth"]
+description = "Check SQS queue depth (requires QUEUE_URL env var or deploy stack output)"
+run = '''
+QUEUE_URL="${QUEUE_URL:-$(cd deploy && uv run pulumi stack output queueUrl --stack ${ENVIRONMENT} 2>/dev/null || echo "")}"
+if [ -z "$QUEUE_URL" ]; then
+  echo "Error: QUEUE_URL not set. Get it from: cd deploy && uv run pulumi stack output queueUrl --stack ${ENVIRONMENT}"
+  exit 1
+fi
+awslocal sqs get-queue-attributes \
+  --queue-url "$QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
+  --region ${AWS_DEFAULT_REGION}
+'''
+
 [tasks.toml-sort]
 description = "Format all toml files"
 run = "toml-sort --trailing-comma-inline-array --in-place **/*.toml"
@@ -171,7 +172,7 @@ sources = ["**/*.toml"]
 [tools]
 "asdf:postgres" = "18"
 hadolint = "latest"
-node = "latest"  # Why do I need node?
+node = "latest" # Why do I need node?
 "pipx:awscli-local" = "latest"
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"

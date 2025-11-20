@@ -1,5 +1,14 @@
+[env]
+PROJECT_NAME = "dagster-taskiq-demo"
+PULUMI_CONFIG_PASSPHRASE = "See README!"
+
 [task_config]
 includes = ["../tasks.toml"]
+
+[tasks."build:images"]
+description = "Build and push all required Docker images to ECR"
+run = "../deploy/scripts/ensure-images.sh"
+depends = ["//:localstack:start"]
 
 [tasks."pulumi:config"]
 description = "Show Pulumi configuration"
@@ -23,21 +32,77 @@ run = "uv run pulumi preview --stack local"
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:refresh"]
-description = "Refresh Pulumi state"
+description = "Refresh Pulumi state to sync with actual infrastructure"
 run = "uv run pulumi refresh --yes --stack local"
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:reset"]
-description = "Reset LocalStack and Pulumi state"
-confirm = "This will delete all LocalStack and Pulumi data. Continue?"
+description = "Reset LocalStack and Pulumi state (alias for soft reset)"
+run = "mise run :pulumi:reset:soft"
+
+[tasks."pulumi:reset:hard"]
+description = "Hard reset: delete stack, clean LocalStack, recreate everything"
+confirm = "This will DELETE the Pulumi stack and all LocalStack data. Continue?"
 run = [
+  "pitchfork stop localstack || true",
   "rm -rf volume/*",
-  "mise run localstack:start --detach",
+  "uv run pulumi stack rm --yes --stack local || true",
+  "pitchfork start localstack",
+  "sleep 5",
+  "mise run :pulumi:state:init",
 ]
-wait_for = ["localstack:stop"]
-depends_post = ["pulumi:refresh"]
+
+[tasks."pulumi:reset:soft"]
+description = "Soft reset: destroy resources, refresh state, then redeploy"
+confirm = "This will destroy all Pulumi-managed resources and refresh state. Continue?"
+run = [
+  "mise run :pulumi:down",
+  "pitchfork stop localstack",
+  "rm -rf volume/*",
+  "pitchfork start localstack",
+  "sleep 5",
+  "mise run :pulumi:state:init",
+  "mise run :pulumi:refresh",
+]
+
+[tasks."pulumi:state:delete"]
+description = "Delete Pulumi stack (removes state, does not destroy resources)"
+confirm = "This will delete the Pulumi stack state. Resources may remain in LocalStack. Continue?"
+run = "uv run pulumi stack rm --yes --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."pulumi:state:init"]
+description = "Initialize Pulumi stack if it doesn't exist"
+run = "uv run pulumi stack init local || true"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."pulumi:state:list"]
+description = "List all resources in Pulumi state"
+run = "uv run pulumi stack --show-urns --stack local || uv run pulumi stack --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."pulumi:state:repair"]
+description = "Attempt to repair corrupted Pulumi state"
+run = "uv run pulumi state repair --yes --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
 
 [tasks."pulumi:up"]
-description = "Deploy infrastructure with Pulumi (update)"
-run = "uv run pulumi up --yes --stack local"
+description = "Deploy infrastructure with Pulumi (update) - builds images first"
+run = [
+  "mise run build:images",
+  "uv run pulumi up --yes --stack local",
+]
 env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."pulumi:validate"]
+description = "Validate Pulumi state and detect issues (preview without applying)"
+run = "uv run pulumi preview --stack local --diff"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."rebuild:images"]
+description = "Rebuild images and update Pulumi stack (for code changes)"
+run = [
+  "mise run build:images",
+  "mise run pulumi:up",
+]
+depends = ["//:localstack:start"]

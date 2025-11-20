@@ -129,6 +129,86 @@ mise run format
 - **Structured Logs**: Comprehensive logging across all components
 - **Auto-Scaling**: Monitor ECS service desired count during load scenarios
 
+### Observability Commands
+
+All services log to CloudWatch Logs. Use these commands to tail logs:
+
+```bash
+# From project root
+
+# Dagster daemon logs
+mise run logs:dagster-daemon
+
+# Dagster webserver logs
+mise run logs:dagster-webserver
+
+# TaskIQ worker logs
+mise run logs:taskiq-worker
+
+# Auto-scaler logs
+mise run logs:auto-scaler
+```
+
+### CloudWatch Log Tailing Examples
+
+Using `awslocal` directly:
+
+```bash
+# Tail Dagster daemon logs (last 5 minutes, follow)
+awslocal logs tail '/aws/ecs/dagster-daemon-local' --follow --since 5m --region us-east-1
+
+# Tail TaskIQ worker logs
+awslocal logs tail '/aws/ecs/taskiq-worker-local' --follow --since 5m --region us-east-1
+
+# Tail auto-scaler logs
+awslocal logs tail '/aws/ecs/auto-scaler-local' --follow --since 5m --region us-east-1
+
+# Get logs from specific time range
+awslocal logs tail '/aws/ecs/dagster-daemon-local' --since 1h --region us-east-1
+```
+
+### ECS Service Monitoring
+
+```bash
+# Check service status
+mise run ecs:status SERVICE_NAME=taskiq-worker
+
+# List all services
+mise run aws:services
+
+# List running tasks
+mise run aws:tasks
+```
+
+### Queue Monitoring
+
+```bash
+# Check queue depth (requires QUEUE_URL or deploy stack output)
+mise run queue:depth
+
+# Get queue URL from Pulumi stack
+cd ../deploy
+uv run pulumi stack output queueUrl --stack local
+
+# Check queue attributes directly
+QUEUE_URL=$(uv run pulumi stack output queueUrl --stack local)
+awslocal sqs get-queue-attributes \
+  --queue-url "$QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
+  --region us-east-1
+```
+
+### CloudWatch Log Groups
+
+All logs are stored in these CloudWatch log groups (replace `local` with your environment):
+
+- `/aws/ecs/dagster-daemon-local`
+- `/aws/ecs/dagster-webserver-local`
+- `/aws/ecs/taskiq-worker-local`
+- `/aws/ecs/auto-scaler-local`
+
+Access via LocalStack UI: https://app.localstack.cloud
+
 ## Configuration
 
 Key configuration files:
@@ -152,3 +232,5 @@ Key configuration files:
 - **Auto-Scaling**: Monitor ECS desired count during load changes
 - **Failure Recovery**: Verify jobs retry on different workers
 - **Performance**: Monitor execution times and queue depth
+
+See [../TESTING.md](../TESTING.md) for comprehensive testing procedures and known limitations.

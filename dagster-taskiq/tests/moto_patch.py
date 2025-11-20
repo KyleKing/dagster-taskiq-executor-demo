@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 try:
     from moto.aiobotocore import patch as aiobotocore_patch
@@ -8,15 +8,15 @@ except ImportError:
     # Fallback to custom patch if moto's aiobotocore patch is not available
     from unittest.mock import MagicMock
 
+    import aiobotocore.awsrequest
+    import aiobotocore.endpoint
     import aiohttp
     import aiohttp.client_reqrep
     import aiohttp.typedefs
-    import aiobotocore.awsrequest
-    import aiobotocore.endpoint
     import botocore.awsrequest
 
     class _MockAWSResponse(aiobotocore.awsrequest.AioAWSResponse):
-        def __init__(self, response: botocore.awsrequest.AWSResponse):  # type: ignore[override]
+        def __init__(self, response: botocore.awsrequest.AWSResponse) -> None:  # type: ignore[override]
             self._moto_response = response
             self.status_code = response.status_code
             self.raw = _MockHttpClientResponse(response)
@@ -34,7 +34,7 @@ except ImportError:
             return self._moto_response.headers
 
     class _MockHttpClientResponse(aiohttp.client_reqrep.ClientResponse):
-        def __init__(self, response: botocore.awsrequest.AWSResponse):
+        def __init__(self, response: botocore.awsrequest.AWSResponse) -> None:
             self.response = response
             self.content = MagicMock(aiohttp.StreamReader)
 
@@ -46,13 +46,11 @@ except ImportError:
         @property
         def raw_headers(self) -> aiohttp.typedefs.RawHeaders:
             return tuple(
-                (str(key).encode("utf-8"), str(value).encode("utf-8"))
-                for key, value in self.response.headers.items()
+                (str(key).encode("utf-8"), str(value).encode("utf-8")) for key, value in self.response.headers.items()
             )
 
     def apply_aiobotocore_patch() -> Callable[[], None]:
         """Patch aiobotocore to operate against moto-backed AWS stubs."""
-
         original_convert = aiobotocore.endpoint.convert_to_response_dict
 
         def _patched_convert(
@@ -67,7 +65,9 @@ except ImportError:
             aiobotocore.endpoint.convert_to_response_dict = original_convert
 
         return _restore
+
 else:
+
     def apply_aiobotocore_patch() -> Callable[[], None]:
         """Use moto's built-in aiobotocore patch."""
         aiobotocore_patch.apply_patches()

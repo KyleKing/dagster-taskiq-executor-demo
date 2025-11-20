@@ -1,7 +1,5 @@
 """Dagster module - bundles all Dagster-related infrastructure."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -355,7 +353,7 @@ def create_dagster_infrastructure(
     # Target group for Dagster webserver
     dagster_target_group = lb.TargetGroup(
         f"{resource_name}-dagster-tg",
-        name=f"{project_name}-dagster-tg-{environment}",
+        name=f"{project_name}-dtg-{environment}",
         port=3000,
         protocol="HTTP",
         vpc_id=vpc_id,
@@ -377,7 +375,7 @@ def create_dagster_infrastructure(
     # Target group for TaskIQ demo API
     taskiq_target_group = lb.TargetGroup(
         f"{resource_name}-taskiq-tg",
-        name=f"{project_name}-taskiq-tg-{environment}",
+        name=f"{project_name}-ttg-{environment}",
         port=8000,
         protocol="HTTP",
         vpc_id=vpc_id,

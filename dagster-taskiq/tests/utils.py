@@ -1,12 +1,13 @@
 import os
+import pathlib
 import signal
-import subprocess
+import subprocess  # noqa: S404
+import sys
 import tempfile
 import threading
-import sys
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 
 from dagster._core.definitions.reconstruct import ReconstructableJob
 from dagster._core.events import DagsterEvent
@@ -19,11 +20,11 @@ from dagster._core.test_utils import instance_for_test
 BUILDKITE = os.getenv("BUILDKITE")
 
 
-REPO_FILE = os.path.join(os.path.dirname(__file__), "repo.py")
+REPO_FILE = str(pathlib.Path(__file__).parent / "repo.py")
 
 
 @contextmanager
-def tempdir_wrapper(tempdir: Optional[str] = None) -> Iterator[str]:
+def tempdir_wrapper(tempdir: str | None = None) -> Iterator[str]:
     if tempdir:
         yield tempdir
     else:
@@ -32,24 +33,24 @@ def tempdir_wrapper(tempdir: Optional[str] = None) -> Iterator[str]:
 
 
 @contextmanager
-def _instance_wrapper(instance: Optional[DagsterInstance]) -> Iterator[DagsterInstance]:
+def _instance_wrapper(instance: DagsterInstance | None) -> Iterator[DagsterInstance]:
     if instance:
         yield instance
     else:
-        with instance_for_test() as instance:
-            yield instance
+        with instance_for_test() as instance_ref:
+            yield instance_ref
 
 
 @contextmanager
-def execute_job_on_taskiq(
+def execute_job_on_taskiq(  # noqa: PLR0917
     job_name: str,
-    instance: Optional[DagsterInstance] = None,
-    run_config: Optional[Mapping[str, Any]] = None,
-    tempdir: Optional[str] = None,
-    tags: Optional[Mapping[str, str]] = None,
-    subset: Optional[Sequence[str]] = None,
+    instance: DagsterInstance | None = None,
+    run_config: Mapping[str, Any] | None = None,
+    tempdir: str | None = None,
+    tags: Mapping[str, str] | None = None,
+    subset: Sequence[str] | None = None,
 ) -> Iterator[ExecutionResult]:
-    with tempdir_wrapper(tempdir) as tempdir:
+    with tempdir_wrapper(tempdir) as tempdir_path:
         job_def = ReconstructableJob.for_file(REPO_FILE, job_name).get_subset(op_selection=subset)
         with _instance_wrapper(instance) as wrapped_instance:
             if run_config is None:
@@ -62,7 +63,7 @@ def execute_job_on_taskiq(
                     execution_config["endpoint_url"] = endpoint_url
 
                 run_config = {
-                    "resources": {"io_manager": {"config": {"base_dir": tempdir}}},
+                    "resources": {"io_manager": {"config": {"base_dir": tempdir_path}}},
                     "execution": {
                         "config": execution_config,
                     },
@@ -79,14 +80,14 @@ def execute_job_on_taskiq(
 @contextmanager
 def execute_eagerly_on_taskiq(
     job_name: str,
-    instance: Optional[DagsterInstance] = None,
-    tempdir: Optional[str] = None,
-    tags: Optional[Mapping[str, str]] = None,
-    subset: Optional[Sequence[str]] = None,
+    instance: DagsterInstance | None = None,
+    tempdir: str | None = None,
+    tags: Mapping[str, str] | None = None,
+    subset: Sequence[str] | None = None,
 ) -> Iterator[ExecutionResult]:
-    with tempfile.TemporaryDirectory() as tempdir:
+    with tempfile.TemporaryDirectory() as tempdir_path:
         run_config = {
-            "resources": {"io_manager": {"config": {"base_dir": tempdir}}},
+            "resources": {"io_manager": {"config": {"base_dir": tempdir_path}}},
             "execution": {"config": {"config_source": {"task_always_eager": True}}},
         }
 
@@ -94,7 +95,7 @@ def execute_eagerly_on_taskiq(
             job_name,
             instance=instance,
             run_config=run_config,
-            tempdir=tempdir,
+            tempdir=tempdir_path,
             tags=tags,
             subset=subset,
         ) as result:
@@ -105,16 +106,18 @@ def execute_on_thread(
     job_name: str,
     done: threading.Event,
     instance_ref: InstanceRef,
-    tempdir: Optional[str] = None,
-    tags: Optional[Mapping[str, str]] = None,
+    tempdir: str | None = None,
+    tags: Mapping[str, str] | None = None,
 ) -> None:
-    with DagsterInstance.from_ref(instance_ref) as instance:
-        with execute_job_on_taskiq(job_name, tempdir=tempdir, tags=tags, instance=instance):
-            done.set()
+    with (
+        DagsterInstance.from_ref(instance_ref) as instance,
+        execute_job_on_taskiq(job_name, tempdir=tempdir, tags=tags, instance=instance),
+    ):
+        done.set()
 
 
 @contextmanager
-def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
+def start_taskiq_worker(queue: str | None = None) -> Iterator[None]:
     # Start a Taskiq worker via a patched entrypoint that applies moto compatibility.
     cmd = [sys.executable, "-m", "tests.worker_entrypoint", "worker", "start"]
     if queue:
@@ -123,21 +126,19 @@ def start_taskiq_worker(queue: Optional[str] = None) -> Iterator[None]:
 
     env = os.environ.copy()
     roots = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")),
-        os.path.abspath(os.path.dirname(__file__)),
+        (pathlib.Path(__file__).parent / ".." / "src").resolve(),
+        pathlib.Path(__file__).parent.resolve(),
     ]
     existing_pythonpath = env.get("PYTHONPATH")
-    python_path = os.pathsep.join(roots)
-    env["PYTHONPATH"] = (
-        f"{python_path}{os.pathsep}{existing_pythonpath}"
-        if existing_pythonpath
-        else python_path
-    )
+    python_path = os.pathsep.join(str(p) for p in roots)
+    env["PYTHONPATH"] = f"{python_path}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else python_path
 
-    process = subprocess.Popen(cmd, env=env)
+    # Command is static, not user input, so subprocess is safe
+    process = subprocess.Popen(cmd, env=env)  # noqa: S603
 
     # Give the worker a moment to start
     import time
+
     time.sleep(2)
 
     try:

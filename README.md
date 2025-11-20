@@ -1,8 +1,8 @@
 # Dagster TaskIQ Executor Demo
 
-Based on dagster-celery, this project demonstrates a custom async executor using SQS and TaskIQ terminology for better performance. The demo includes a standalone TaskIQ project with FastAPI and a full Dagster integration with custom async workers. LocalStack and Pulumi are used to locally evaluate the executor.
+Based on dagster-celery, this project demonstrates a custom async executor using SQS and TaskIQ for better performance. The demo includes a standalone TaskIQ project with FastAPI and a full Dagster integration. LocalStack and Pulumi are used to locally evaluate the executor.
 
-**Note**: While named "taskiq", the `dagster-taskiq-demo` uses custom async workers with aioboto3 for SQS (not the TaskIQ framework) to better integrate with Dagster's execution model. See [`dagster-taskiq-demo/README.md`](./dagster-taskiq-demo/README.md) for architecture details.
+**Note**: This project uses TaskIQ's SQS broker with custom Dagster integration for better execution model compatibility. See [`dagster-taskiq-demo/README.md`](./dagster-taskiq-demo/README.md) for architecture details.
 
 ## Python Version Requirements
 
@@ -16,10 +16,15 @@ For local development, **Python 3.13** is recommended to support all subprojects
 
 ## Project Status
 
-This is an experimental migration from dagster-celery with known limitations. See:
-- [`CLEANUP_REPORT.md`](./CLEANUP_REPORT.md) - Comprehensive review and cleanup plan
-- [`dagster-taskiq/IMPLEMENTATION_PROGRESS.md`](./dagster-taskiq/IMPLEMENTATION_PROGRESS.md) - Implementation roadmap
-- [`dagster-taskiq/PARITY_REVIEW.md`](./dagster-taskiq/PARITY_REVIEW.md) - Feature parity analysis
+This is an experimental migration from dagster-celery. Key simplifications:
+- **Single queue architecture** - Multi-queue routing removed for simplicity
+- **No priority-based delays** - Simplified task scheduling
+- **Cancellation support** - Infrastructure in place, worker implementation completed
+
+See also:
+- [`TESTING.md`](./TESTING.md) - Comprehensive testing procedures
+- [`TODO.md`](./TODO.md) - Remaining work and known limitations
+- [`dagster-taskiq/PARITY_REVIEW.md`](./dagster-taskiq/PARITY_REVIEW.md) - Feature parity analysis (historical)
 
 ## Quick Start
 
@@ -62,7 +67,7 @@ This is an experimental migration from dagster-celery with known limitations. Se
 1. **Access UIs**:
 
    - LocalStack: https://app.localstack.cloud
-   - Dagster: http://localhost:3000 (access via port-forwarding from ECS task in LocalStack)
+   - Dagster: Get URL from `cd deploy && uv run pulumi stack output dagsterWebserverUrl --stack local`
    - (Optional) TaskIQ Dashboard: http://localhost:8080 (`./scripts/run-dashboard.sh`)
 
 ## Development Tasks
@@ -116,6 +121,84 @@ uv run python -m dagster_taskiq_demo.load_simulator.cli network-partition --max-
 cd deploy && mise run pulumi:up
 ```
 
+## Observability
+
+### Log Viewing
+
+All services log to CloudWatch Logs. Use these commands to tail logs:
+
+```bash
+# Dagster daemon logs
+mise run logs:dagster-daemon
+
+# Dagster webserver logs
+mise run logs:dagster-webserver
+
+# TaskIQ worker logs
+mise run logs:taskiq-worker
+
+# Auto-scaler logs
+mise run logs:auto-scaler
+```
+
+### ECS Service Status
+
+Check service health and task counts:
+
+```bash
+# List all services
+mise run aws:services
+
+# Check specific service status
+mise run ecs:status SERVICE_NAME=dagster-daemon
+mise run ecs:status SERVICE_NAME=dagster-webserver
+mise run ecs:status SERVICE_NAME=taskiq-worker
+
+# List running tasks
+mise run aws:tasks
+```
+
+### Queue Monitoring
+
+Monitor SQS queue depth and attributes:
+
+```bash
+# Check queue depth (messages waiting and in-flight)
+mise run queue:depth
+
+# List all queues
+mise run aws:queues
+```
+
+### CloudWatch Log Groups
+
+All logs are stored in CloudWatch log groups:
+- `/aws/ecs/dagster-daemon-{environment}`
+- `/aws/ecs/dagster-webserver-{environment}`
+- `/aws/ecs/taskiq-worker-{environment}`
+- `/aws/ecs/auto-scaler-{environment}`
+
+Access via LocalStack UI: https://app.localstack.cloud
+
+### Dagster UI Access
+
+Dagster UI is served from ECS in LocalStack. Get the load balancer URL:
+
+```bash
+cd deploy
+uv run pulumi stack output dagsterWebserverUrl --stack local
+```
+
+## Testing
+
+For comprehensive manual testing procedures, see [TESTING.md](TESTING.md).
+
+Quick test workflow:
+1. Submit a job via Dagster UI
+2. Monitor queue depth: `mise run queue:depth`
+3. Watch worker logs: `mise run logs:taskiq-worker`
+4. Verify job completes in Dagster UI
+
 ## Troubleshooting
 
 **Common Issues**:
@@ -123,6 +206,9 @@ cd deploy && mise run pulumi:up
 - **Pulumi locks stuck**: `cd deploy && pulumi cancel`
 - **LocalStack not responding**: `mise run localstack:restart`
 - **Queue not processing**: Verify SQS configuration and worker health
+  - Check worker service: `mise run ecs:status SERVICE_NAME=taskiq-worker`
+  - Check worker logs: `mise run logs:taskiq-worker`
+  - Check queue depth: `mise run queue:depth`
 
 **Cleanup**:
 

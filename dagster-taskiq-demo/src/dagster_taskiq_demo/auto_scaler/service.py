@@ -23,7 +23,7 @@ def main() -> None:
     auto_scaler_service = AutoScalerService(settings)
 
     # Handle shutdown signals
-    def signal_handler(signum: int, frame: Any) -> None:
+    def signal_handler(signum: int, _frame: Any) -> None:
         logger.info("Received signal %s, shutting down", signum)
         sys.exit(0)
 
@@ -35,8 +35,8 @@ def main() -> None:
         auto_scaler_service.run_service()
     except KeyboardInterrupt:
         logger.info("Service interrupted by user")
-    except Exception as e:
-        logger.exception("Service failed with error: %s", e)
+    except Exception:
+        logger.exception("Service failed with error")
         sys.exit(1)
 
 

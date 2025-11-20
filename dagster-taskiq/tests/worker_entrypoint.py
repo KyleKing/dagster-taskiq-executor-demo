@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+
 import boto3
 
 
@@ -9,7 +10,7 @@ def main() -> None:
     queue_url = os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL")
     if queue_url:
         # Extract queue name from URL
-        queue_name = queue_url.split('/')[-1]
+        queue_name = queue_url.split("/")[-1]
         sqs = boto3.client(
             "sqs",
             endpoint_url=os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL"),

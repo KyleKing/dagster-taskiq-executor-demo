@@ -1,4 +1,7 @@
 // Install with `hk install --mise` to ensure local tools are available
+// Docs: https://hk.jdx.dev/about.html
+//  `hk run pre-push --fix --from-ref=main`
+//  `hk run pre-commit --all --step=pyright:dagster-taskiq`
 
 amends "package://github.com/jdx/hk/releases/download/v1.20.0/hk@1.20.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v1.20.0/hk@1.20.0#/Builtins.pkl"
@@ -7,22 +10,31 @@ min_hk_version = "1.20.0"
 
 local linters = new Mapping<String, Step> {
   // ["actionlint"] = Builtins.actionlint // GitHub Actions
-  // ["check-added-large-files"] = Builtins.check_added_large_files - flags uv.lock
+  ["check-added-large-files"] = (Builtins.check_added_large_files) {
+    exclude = "**/uv.lock"
+  }
   ["check-merge-conflict"] = Builtins.check_merge_conflict
   ["check-symlinks"] = Builtins.check_symlinks
   ["end-of-file-fixer"] = Builtins.newlines
   // ["hadolint"] = Builtins.hadolint // Dockerfile - flags `COPY --from=<>` from Bake
+  ["mdformat"] = new Step {
+    glob = "**/*.md"
+    check = "mdformat --check {{files}}"
+    fix = "mdformat {{files}}"
+  }
   ["mixed-line-ending"] = Builtins.mixed_line_ending
   ["pch-check-symlinks"] = Builtins.check_symlinks
-  ["python-check-ast"] = Builtins.python_check_ast
   ["python-debug-statements"] = Builtins.python_debug_statements
   ["trailing-whitespace"] = Builtins.trailing_whitespace
-  ["yamllint"] = Builtins.yamllint
   ["toml-sort"] = new Step {
-    // PLANNED: only supports pyproject.toml for now. See mise.toml
-    glob = List("**/pyproject.toml")
+    glob = "**/*.toml"
     check = "toml-sort --check {{files}}"
-    fix = "toml-sort --in-place {{files}}"
+    fix = "toml-sort --trailing-comma-inline-array --in-place {{files}}"
+  }
+  ["pkl"] = (Builtins.pkl) {
+    check = "pkl format {{files}}"
+    fix = "pkl format --write {{files}}"
+    stage = "**/*.pkl"
   }
   // TODO: See other builtins from: https://hk.jdx.dev/builtins.html
 }
@@ -34,7 +46,7 @@ local commit_msg_checks = new Mapping<String, Step> {
 }
 local pre_push_checks = new Mapping<String, Step> {
   ["checks"] {
-    check = "mise run checks:all"
+    check = "mise run //...:checks"
   }
   ["commitizen-branch"] {
     check = "cz check --rev-range origin/HEAD..HEAD"
@@ -45,7 +57,6 @@ local pre_push_checks = new Mapping<String, Step> {
 hooks {
   ["pre-commit"] {
     fix = true
-    stash = "patch-file" // stashes unstaged changes while running fix steps
     steps = linters
   }
   ["pre-push"] {
@@ -55,7 +66,6 @@ hooks {
       //     check = "no-commit-to-branch --branch=main"
       // }
       ...pre_push_checks
-      ...linters
     }
   }
   ["commit-msg"] {
@@ -65,7 +75,10 @@ hooks {
   // "fix" and "check" are special steps for `hk fix` and `hk check` commands
   ["fix"] {
     fix = true
-    steps = linters
+    steps {
+      ...pre_push_checks
+      ...linters
+    }
   }
   ["check"] {
     steps {

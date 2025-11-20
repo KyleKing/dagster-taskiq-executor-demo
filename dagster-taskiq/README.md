@@ -1,33 +1,24 @@
 # Dagster TaskIQ Executor
 
-A Dagster executor implementation using TaskIQ and AWS SQS for distributed job execution. Direct migration from the dagster-celery executor with improved async support and SQS-based task distribution.
+A Dagster executor implementation using TaskIQ with AWS SQS for distributed task execution.
 
-## Status
+## Overview
 
-**Experimental** - This executor is under active development with known limitations. See:
-- [IMPLEMENTATION_PROGRESS.md](./IMPLEMENTATION_PROGRESS.md) - Current roadmap and progress
-- [PARITY_REVIEW.md](./PARITY_REVIEW.md) - Feature parity analysis with dagster-celery
+This package provides a TaskIQ-based executor for Dagster that uses AWS SQS for task distribution and S3 for result storage. It's a direct migration from the Dagster-Celery implementation, simplified to use a single SQS queue with TaskIQ's native APIs.
 
-### Known Limitations
+## Features
 
-- **Queue routing not implemented** - All tasks route to single queue (ignoring `DAGSTER_TASKIQ_QUEUE_TAG`)
-- **Priority inversion bug** - Higher priority may cause longer delays
-- **Cancellation not supported** - Cannot terminate running jobs
-- **Worker health checks return UNKNOWN** - Health monitoring not functional
-
-See [PARITY_REVIEW.md](./PARITY_REVIEW.md) for complete list of gaps vs dagster-celery.
+- **Single Queue Architecture**: Simplified to a single SQS queue (no multi-queue routing)
+- **FIFO Queue Support**: Automatic detection and configuration of FIFO queues
+- **S3 Result Backend**: Results stored in S3 with support for extended payloads (>256KB)
+- **Cancellation Support**: ✅ Fully implemented - Workers check cancellation queue and cancel tasks
+- **Worker Health Checks**: ✅ Implemented - Uses result backend to check task status
+- **LocalStack Compatible**: Works with LocalStack for local development and testing
 
 ## Installation
 
 ```bash
 pip install dagster-taskiq
-```
-
-### Optional Dependencies
-
-```bash
-# For cancellation support (experimental, Phase 3)
-pip install dagster-taskiq[cancellation]
 ```
 
 ## Requirements
@@ -36,76 +27,18 @@ pip install dagster-taskiq[cancellation]
 - Dagster 1.5+
 - TaskIQ 0.11+
 - AWS SQS (or LocalStack for development)
-- PostgreSQL (for idempotency storage)
-
-## Quick Start
-
-### 1. Configure Dagster Instance
-
-Add to your `dagster.yaml`:
-
-```yaml
-run_launcher:
-  module: dagster_taskiq
-  class: TaskiqRunLauncher
-  config:
-    queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks"
-    region_name: "us-east-1"
-    # Optional: endpoint_url for LocalStack
-    endpoint_url: "http://localhost:4566"
-
-execution:
-  config:
-    executor:
-      config:
-        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks"
-        region_name: "us-east-1"
-        # Optional: endpoint_url for LocalStack
-        endpoint_url: "http://localhost:4566"
-```
-
-### 2. Start Workers
-
-```bash
-# Start TaskIQ workers
-dagster-taskiq worker start \
-  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks \
-  --region us-east-1
-```
-
-### 3. Run Jobs
-
-Jobs will automatically execute on the worker pool:
-
-```python
-from dagster import job, op
-
-@op
-def my_op():
-    return "Hello from TaskIQ worker!"
-
-@job(executor_def=taskiq_executor)
-def my_job():
-    my_op()
-```
+- AWS S3 for result storage
 
 ## Configuration
 
-### Executor Configuration
-
-Available configuration options for the executor:
+### Basic Configuration
 
 ```yaml
 execution:
   config:
-    executor:
-      config:
-        queue_url: string           # Required: SQS queue URL
-        region_name: string          # Required: AWS region
-        endpoint_url: string         # Optional: For LocalStack/custom endpoints
-        s3_bucket_name: string       # Optional: S3 bucket for large payloads
-        s3_result_backend: string    # Optional: S3 backend for results
-        is_fair_queue: boolean       # Optional: Use FIFO queue MessageGroupId
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
+    region_name: 'us-east-1'
+    endpoint_url: 'http://localhost:4566'  # Optional, for LocalStack
 ```
 
 ### Run Launcher Configuration
@@ -115,66 +48,125 @@ run_launcher:
   module: dagster_taskiq
   class: TaskiqRunLauncher
   config:
-    queue_url: string           # Required: SQS queue URL
-    region_name: string          # Required: AWS region
-    endpoint_url: string         # Optional: For LocalStack
-    default_queue: string        # Optional: Default queue name (not yet implemented)
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
+    region_name: 'us-east-1'
+    endpoint_url: 'http://localhost:4566'  # Optional, for LocalStack
 ```
 
-### Worker Configuration
+### FIFO Queue Configuration
+
+FIFO queues are automatically detected by the `.fifo` suffix in the queue URL. The `is_fair_queue` option is automatically set based on queue type:
+
+```yaml
+execution:
+  config:
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks.fifo'
+    # is_fair_queue is automatically set to True for FIFO queues
+```
+
+You can explicitly set `is_fair_queue` in `config_source`, but it will be ignored (with a warning) if the queue URL is not FIFO:
+
+```yaml
+execution:
+  config:
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
+    config_source:
+      is_fair_queue: true  # Warning: ignored for non-FIFO queues
+```
+
+### S3 Extended Payloads
+
+For messages larger than 256KB, configure S3 extended payload support:
+
+```yaml
+execution:
+  config:
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
+    config_source:
+      s3_bucket_name: 'my-taskiq-bucket'  # Used for both results and extended payloads
+      s3_endpoint_url: 'http://localhost:4566'  # Optional, for LocalStack
+```
+
+The S3 bucket is automatically used for extended payloads when configured.
+
+### Cancellation
+
+Cancellation support can be enabled via environment variable or config:
 
 ```bash
-dagster-taskiq worker start \
-  --queue-url <SQS_QUEUE_URL> \
-  --region <AWS_REGION> \
-  [--endpoint-url <ENDPOINT>] \
-  [--concurrency <NUM_WORKERS>]
+export DAGSTER_TASKIQ_ENABLE_CANCELLATION=1
 ```
 
-## Architecture
+Or in config:
 
-### Components
+```yaml
+execution:
+  config:
+    config_source:
+      enable_cancellation: true
+```
 
-- **TaskiqExecutor**: Dagster executor that submits ops to SQS
-- **TaskiqRunLauncher**: Dagster run launcher for full job execution
-- **Core Execution Loop**: Async worker loop consuming from SQS
-- **SQS Broker**: TaskIQ broker using `taskiq-aio-multi-sqs`
-- **S3 Backend**: Optional result backend for large payloads
+When enabled, the system uses a separate SQS queue (named `{queue-name}-cancels`) for cancellation messages. Workers automatically listen for cancellation requests and cancel running tasks when requested.
 
-### Execution Flow
+**Note**: Cancellation requires both the executor and workers to have cancellation enabled. The cancel queue must be created manually (see `CANCELLATION.md` for details).
 
-1. Dagster daemon launches job via `TaskiqRunLauncher`
-2. Executor submits individual ops to SQS queue
-3. Workers poll SQS and execute ops asynchronously
-4. Results stored in idempotency storage (PostgreSQL)
-5. Executor polls for completion
+For comprehensive cancellation documentation, troubleshooting, and examples, see [`CANCELLATION.md`](CANCELLATION.md).
 
-### Priority Handling
+### Advanced Configuration
 
-Priority mapping (in progress, see IMPLEMENTATION_PROGRESS.md):
-- Uses SQS DelaySeconds for priority (0-900 seconds)
-- Higher Dagster priority = lower delay
-- Default priority (5) = 0 delay
-- Known issue: Priority inversion bug exists
+Additional broker options can be passed via `config_source`:
 
-### Idempotency
+```yaml
+execution:
+  config:
+    queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
+    config_source:
+      wait_time_seconds: 20
+      max_number_of_messages: 1
+      use_task_id_for_deduplication: false
+      extra_options: {}
+```
 
-- PostgreSQL-backed idempotency storage
-- Exactly-once execution semantics
-- Prevents duplicate execution on worker failures
+## Usage
 
-## CLI Commands
+### Basic Job Definition
+
+```python
+from dagster import job, op
+from dagster_taskiq import taskiq_executor
+
+@op
+def my_op():
+    return "Hello from TaskIQ worker!"
+
+@job(executor_def=taskiq_executor)
+def my_taskiq_job():
+    my_op()
+```
+
+### Running Workers
+
+Start TaskIQ workers using the CLI:
+
+```bash
+dagster-taskiq worker start
+```
+
+Or programmatically:
+
+```python
+from dagster_taskiq.cli import worker_start_command
+worker_start_command(args)
+```
+
+### CLI Commands
 
 ```bash
 # Start worker
-dagster-taskiq worker start --queue-url <URL> --region <REGION>
+dagster-taskiq worker start
 
 # Get version info
 dagster-taskiq --version
-
-# Worker commands (not yet implemented)
-# dagster-taskiq worker status
-# dagster-taskiq worker terminate
 ```
 
 ## Development
@@ -182,6 +174,7 @@ dagster-taskiq --version
 ### Running Tests
 
 ```bash
+cd dagster-taskiq
 mise run test           # Run all tests
 mise run test -- -v     # Verbose output
 mise run test -- -k "test_name"  # Run specific test
@@ -197,39 +190,68 @@ mise run typecheck      # Type checking
 mise run checks         # All checks
 ```
 
-## Differences from dagster-celery
+### LocalStack Setup
 
-### Features Not Yet Implemented
+For local development, use LocalStack:
 
-- **Queue routing**: `DAGSTER_TASKIQ_QUEUE_TAG` ignored
-- **Task cancellation**: Cannot terminate running tasks
-- **Worker health checks**: Always return UNKNOWN status
-- **Config source**: `config_source` parameter ignored
+```bash
+# Start LocalStack (see docker-compose.yml)
+docker-compose up -d localstack
 
-### Architecture Differences
+# Set environment variables
+export DAGSTER_TASKIQ_SQS_ENDPOINT_URL=http://localhost:4566
+export DAGSTER_TASKIQ_S3_ENDPOINT_URL=http://localhost:4566
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+```
 
-- Uses SQS instead of Redis/RabbitMQ
-- Async-first implementation with asyncio
-- Custom worker implementation (not using TaskIQ's task framework)
-- Result polling via idempotency storage instead of result backend
+## Architecture
 
-### Configuration Differences
+### Components
 
-- AWS-specific configuration (queue_url, region_name)
-- No broker/backend URLs (uses SQS queue URLs)
-- No include/exclude patterns for task discovery
+- **TaskiqExecutor**: Dagster executor that submits ops to SQS
+- **TaskiqRunLauncher**: Dagster run launcher for full job execution
+- **Core Execution Loop**: Async worker loop consuming from SQS
+- **SQS Broker**: TaskIQ broker using `taskiq-aio-multi-sqs`
+- **S3 Backend**: Result backend for large payloads and task results
 
-See [PARITY_REVIEW.md](./PARITY_REVIEW.md) for comprehensive comparison.
+### Execution Flow
 
-## Implementation Progress
+1. Dagster daemon launches job via `TaskiqRunLauncher`
+2. Executor submits individual ops to SQS queue
+3. Workers poll SQS and execute ops asynchronously
+4. Results stored in S3 result backend
+5. Executor polls result backend for completion
 
-The executor is being developed in phases:
+## Known Limitations
 
-- **Phase 1**: Stabilize core behavior ✅ Mostly complete
-- **Phase 2**: Complete TaskIQ API adoption 🔄 In progress
-- **Phase 3**: Implement cancellation ⏸️ Planned
+- **Multi-queue routing**: Not supported (simplified to single queue)
+- **Priority-based delays**: Not supported (removed in simplification)
+- **LocalStack**: Some SQS features may not work identically to AWS. See [`LOCALSTACK.md`](LOCALSTACK.md) for details and workarounds.
 
-See [IMPLEMENTATION_PROGRESS.md](./IMPLEMENTATION_PROGRESS.md) for detailed status.
+## Migration from Dagster-Celery
+
+Key differences from Dagster-Celery:
+
+### Architecture Changes
+
+- **Single queue**: No multi-queue routing or priority-based delays
+- **TaskIQ APIs**: Uses TaskIQ's native broker APIs instead of custom implementations
+- **S3 results**: Results stored in S3 (not Redis)
+- **Cancellation**: Uses SQS-based cancellation (not Redis-based)
+
+### Features Removed for Simplicity
+
+- Multi-queue routing via tags (`DAGSTER_TASKIQ_QUEUE_TAG` not supported)
+- Priority-based task scheduling with delays
+- Redis backend support
+
+### Features Retained/Implemented
+
+- ✅ Task cancellation (SQS-based, fully implemented)
+- ✅ Worker health checks (S3 result backend-based)
+- ✅ FIFO queue support with automatic detection
+- ✅ Extended message support (S3-backed for >256KB)
 
 ## Troubleshooting
 
@@ -248,13 +270,15 @@ See [IMPLEMENTATION_PROGRESS.md](./IMPLEMENTATION_PROGRESS.md) for detailed stat
 
 ### LocalStack integration issues
 
-- SQS DelaySeconds support is unreliable in LocalStack
-- Some integration tests may fail with LocalStack
+- Some SQS features may not work identically to AWS
+- See [`LOCALSTACK.md`](LOCALSTACK.md) for known issues and workarounds
 - Use real AWS for production testing
 
-### Priority not working as expected
+### Cancellation not working
 
-Known issue - priority inversion bug exists. See PARITY_REVIEW.md and IMPLEMENTATION_PROGRESS.md.
+- Ensure cancellation is enabled in both executor and worker configuration
+- Verify the cancel queue exists (named `{queue-name}-cancels`)
+- See [`CANCELLATION.md`](CANCELLATION.md) for detailed troubleshooting
 
 ## Example Usage
 
@@ -262,14 +286,13 @@ See the [`example/`](./example/) directory for a complete working example, or [`
 
 ## Contributing
 
-1. Read [IMPLEMENTATION_PROGRESS.md](./IMPLEMENTATION_PROGRESS.md) for current priorities
-2. Check [PARITY_REVIEW.md](./PARITY_REVIEW.md) for known gaps
-3. Run tests: `mise run checks`
-4. Follow code style guidelines in root AGENTS.md
+1. Run tests: `mise run checks`
+2. Follow code style guidelines in root AGENTS.md
+3. See [`../TODO.md`](../TODO.md) for current priorities
 
 ## License
 
-See [LICENSE](../LICENSE) file in repository root.
+Apache-2.0
 
 ## Related Projects
 
