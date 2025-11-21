@@ -31,15 +31,15 @@ class DagsterLoggingMiddleware(TaskiqMiddleware):
         >>> broker.add_middlewares(DagsterLoggingMiddleware())
     """
 
-    async def startup(self) -> None:
+    def startup(self) -> None:
         """Initialize middleware when broker starts."""
         logger.info("DagsterLoggingMiddleware initialized")
 
-    async def shutdown(self) -> None:
+    def shutdown(self) -> None:
         """Cleanup when broker shuts down."""
         logger.info("DagsterLoggingMiddleware shutting down")
 
-    async def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
+    def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
         """Log before task execution.
 
         Args:
@@ -67,23 +67,29 @@ class DagsterLoggingMiddleware(TaskiqMiddleware):
 
         if step_key:
             logger.info(
-                f"Executing Dagster step: {step_key} (run_id={run_id})",
+                "Executing Dagster step: %s (run_id=%s)",
+                step_key,
+                run_id,
                 extra=extra_info,
             )
         elif job_name:
             logger.info(
-                f"Executing Dagster job: {job_name} (run_id={run_id})",
+                "Executing Dagster job: %s (run_id=%s)",
+                job_name,
+                run_id,
                 extra=extra_info,
             )
         else:
             logger.info(
-                f"Executing task: {task_name} (task_id={task_id})",
+                "Executing task: %s (task_id=%s)",
+                task_name,
+                task_id,
                 extra=extra_info,
             )
 
         return message
 
-    async def post_save(
+    def post_save(
         self,
         message: TaskiqMessage,
         result: TaskiqResult[Any],
@@ -112,24 +118,30 @@ class DagsterLoggingMiddleware(TaskiqMiddleware):
             error_info = result.error if hasattr(result, "error") else "Unknown error"
             if step_key:
                 logger.error(
-                    f"Dagster step failed: {step_key} - {error_info}",
+                    "Dagster step failed: %s - %s",
+                    step_key,
+                    error_info,
                     extra=extra_info,
                 )
             else:
                 logger.error(
-                    f"Task failed: {task_name} - {error_info}",
+                    "Task failed: %s - %s",
+                    task_name,
+                    error_info,
                     extra=extra_info,
                 )
         else:
             # Task succeeded
             if step_key:
                 logger.info(
-                    f"Dagster step completed: {step_key}",
+                    "Dagster step completed: %s",
+                    step_key,
                     extra=extra_info,
                 )
             else:
                 logger.info(
-                    f"Task completed: {task_name}",
+                    "Task completed: %s",
+                    task_name,
                     extra=extra_info,
                 )
 
@@ -159,14 +171,14 @@ class DagsterMetricsMiddleware(TaskiqMiddleware):
         """
         super().__init__()
         self.metrics_backend = metrics_backend
-        logger.info(f"Metrics middleware configured with backend: {metrics_backend}")
+        logger.info("Metrics middleware configured with backend: %s", metrics_backend)
 
-    async def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
+    def pre_execute(self, message: TaskiqMessage) -> TaskiqMessage:
         """Record task start time."""
         # Future: Start timing
         return message
 
-    async def post_save(
+    def post_save(
         self,
         message: TaskiqMessage,
         result: TaskiqResult[Any],

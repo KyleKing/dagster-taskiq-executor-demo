@@ -6,20 +6,23 @@ parallelism for significant code simplification.
 
 Key Differences from Full Implementation:
 - Executes entire job as one task (no step-level parallelism)
-- Uses Dagster's execute_in_process() for internal orchestration
+- Uses Dagster's _execute_run_command_body() for distributed execution
 - Leverages TaskIQ's native result handling
 - No custom polling loops needed
 """
 
+import logging
+import sys
 from typing import Any
 
 from dagster import DagsterInstance
-from dagster._core.execution.api import execute_in_process
-from dagster._core.definitions.reconstruct import ReconstructableJob
+from dagster._cli.job import _execute_run_command_body
 from dagster._grpc.types import ExecuteRunArgs
-from dagster._serdes import serialize_value, unpack_value
+from dagster._serdes import unpack_value
 from dagster_shared.serdes import JsonSerializableValue
 from taskiq import AsyncBroker
+
+logger = logging.getLogger(__name__)
 
 
 def register_simple_tasks(broker: AsyncBroker) -> None:
@@ -39,23 +42,23 @@ def register_simple_tasks(broker: AsyncBroker) -> None:
     """
 
     @broker.task(name="dagster_execute_job", labels={"component": "dagster"})
-    async def execute_job(execute_job_args_packed: JsonSerializableValue) -> JsonSerializableValue:
+    def execute_job(execute_job_args_packed: JsonSerializableValue) -> int:
         """Execute a complete Dagster job as a single task.
 
-        This task executes an entire Dagster job using execute_in_process(),
-        which handles step-level orchestration internally. This is simpler than
-        the full implementation but doesn't provide step-level parallelism across
-        workers.
+        This task executes an entire Dagster job using _execute_run_command_body(),
+        which is the same API used by dagster-celery. This handles step-level
+        orchestration internally and is simpler than the full implementation but
+        doesn't provide step-level parallelism across workers.
 
         Args:
             execute_job_args_packed: Serialized ExecuteRunArgs containing:
-                - run_id: The Dagster run ID
-                - job: The reconstructable job definition
-                - run_config: Job configuration
+                - run_id: The Dagster run ID to execute
                 - instance_ref: Dagster instance reference
+                - job_origin: Origin information for reconstructing the job
+                - set_exit_code_on_failure: Whether to set exit code on failure
 
         Returns:
-            Serialized list of DagsterEvent objects from the execution
+            Exit code (0 for success, non-zero for failure)
 
         Note:
             All steps execute sequentially in a single worker. Dagster's internal
@@ -68,24 +71,31 @@ def register_simple_tasks(broker: AsyncBroker) -> None:
             as_type=ExecuteRunArgs,
         )
 
-        # Get Dagster instance
-        with DagsterInstance.from_ref(args.instance_ref) as instance:
-            # Reconstruct the job
-            job = ReconstructableJob.from_dict(args.job_dict) if hasattr(args, "job_dict") else args.job
+        # Helper to discard output (like /dev/null)
+        def _send_to_null(_output: str) -> None:
+            pass
 
-            # Execute the entire job using Dagster's built-in orchestration
-            # This handles step dependencies, parallelism (via threads/processes),
-            # and event streaming internally
-            result = execute_in_process(
-                job=job,
+        # Get Dagster instance and execute the run
+        # This uses the same API as dagster-celery for consistency
+        with DagsterInstance.from_ref(args.instance_ref) as instance:
+            exit_code = _execute_run_command_body(
                 instance=instance,
-                run_config=args.run_config,
-                raise_on_error=False,  # Return errors in result rather than raising
+                run_id=args.run_id,  # Use the provided run_id (don't generate new one)
+                write_stream_fn=_send_to_null,
+                set_exit_code_on_failure=(
+                    args.set_exit_code_on_failure
+                    if args.set_exit_code_on_failure is not None
+                    else True
+                ),
             )
 
-            # Serialize all events from the execution
-            events = list(result.all_events) if hasattr(result, "all_events") else []
-            return serialize_value(events)
+            logger.info(
+                "Dagster job execution completed: run_id=%s, exit_code=%s",
+                args.run_id,
+                exit_code,
+            )
+
+            return exit_code
 
     # Store reference for later use
     broker._dagster_execute_job_task = execute_job  # type: ignore[attr-defined]

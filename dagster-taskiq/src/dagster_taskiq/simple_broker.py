@@ -31,7 +31,7 @@ def _parse_queue_name(queue_url: str) -> str:
     queue_name = parts[-1] if parts and parts[-1] else ""
 
     if not queue_name:
-        msg = f"Cannot extract queue name from URL: {queue_url}"
+        msg = "Cannot extract queue name from URL: %s" % queue_url
         raise ValueError(msg)
 
     return queue_name
