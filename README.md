@@ -23,7 +23,7 @@ This is an experimental migration from dagster-celery. Key simplifications:
 
 See also:
 - [`TESTING.md`](./TESTING.md) - Comprehensive testing procedures
-- [`TODO.md`](./TODO.md) - Remaining work and known limitations
+- [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) - Known limitations and workarounds
 - [`dagster-taskiq/PARITY_REVIEW.md`](./dagster-taskiq/PARITY_REVIEW.md) - Feature parity analysis (historical)
 
 ## Quick Start
@@ -66,9 +66,13 @@ See also:
 
 1. **Access UIs**:
 
-   - LocalStack: https://app.localstack.cloud
-   - Dagster: Get URL from `cd deploy && uv run pulumi stack output dagsterWebserverUrl --stack local`
-   - (Optional) TaskIQ Dashboard: http://localhost:8080 (`./scripts/run-dashboard.sh`)
+   - **LocalStack**: https://app.localstack.cloud
+   - **Dagster UI**: After deploying infrastructure (step 3), get the load balancer URL:
+     ```bash
+     cd deploy && uv run pulumi stack output dagsterWebserverUrl --stack local
+     ```
+     Access Dagster at the returned URL (served from ECS in LocalStack)
+   - **(Optional) TaskIQ Dashboard**: http://localhost:8080 (run `./scripts/run-dashboard.sh`)
 
 ## Development Tasks
 

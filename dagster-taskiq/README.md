@@ -212,7 +212,7 @@ export AWS_SECRET_ACCESS_KEY=test
 - **TaskiqExecutor**: Dagster executor that submits ops to SQS
 - **TaskiqRunLauncher**: Dagster run launcher for full job execution
 - **Core Execution Loop**: Async worker loop consuming from SQS
-- **SQS Broker**: TaskIQ broker using `taskiq-aio-multi-sqs`
+- **SQS Broker**: TaskIQ broker using `taskiq-aio-sqs`
 - **S3 Backend**: Result backend for large payloads and task results
 
 ### Execution Flow
@@ -297,5 +297,5 @@ Apache-2.0
 ## Related Projects
 
 - [dagster-taskiq-demo](../dagster-taskiq-demo/) - Full demo application with load testing
-- [taskiq-aio-multi-sqs](../taskiq-aio-multi-sqs/) - Async SQS broker library
 - [taskiq-demo](../taskiq-demo/) - Standalone TaskIQ demo with FastAPI
+- [taskiq-aio-sqs](https://github.com/taskiq-python/taskiq-aio-sqs) - Async SQS broker library (external dependency)
