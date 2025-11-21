@@ -20,13 +20,12 @@ TaskIQ provides a middleware system with the following capabilities:
 **Lifecycle Hooks**:
 - `startup()` - Executes when broker initializes
 - `shutdown()` - Executes during broker shutdown
-- `pre_execute()` - Runs before task execution; can intercept/modify `TaskiqMessage`
-- `post_save()` - Runs after task execution; can observe `TaskiqResult`
-
-**Additional Middleware Hooks**:
 - `pre_send()` - Before message is sent (client-side)
 - `post_send()` - After message is sent (client-side)
-- `on_error()` - After task execution if exception occurred
+- `pre_execute()` - Runs before task execution; can intercept/modify `TaskiqMessage`
+- `post_execute()` - Runs after task execution completes (before result is saved)
+- `post_save()` - Runs after task result is saved to result backend; can observe `TaskiqResult`
+- `on_error()` - Runs if task execution raises an exception
 
 **Capabilities**:
 - ✅ Modify task messages before execution
@@ -347,7 +346,7 @@ class PipelineMiddleware(TaskiqMiddleware):
 |------------|----------------------|---------------|
 | **Task Interception** | ✅ Can intercept per-task | ❌ Needs orchestration across multiple tasks |
 | **Message Modification** | ✅ Can modify TaskiqMessage | ❌ Needs custom task signatures |
-| **Result Observation** | ✅ Can observe TaskiqResult | ❌ Needs continuous polling, not one-time hook |
+| **Result Inspection** | ✅ Can observe TaskiqResult | ❌ Needs continuous polling, not one-time hook |
 | **Custom Broker Methods** | ❌ Cannot add methods | ✅ Needs `cancel_task()`, `listen_canceller()` |
 | **Separate Queues** | ❌ Cannot create queues | ✅ Needs cancellation queue |
 | **Execution Loop** | ❌ No orchestration | ✅ Needs complex DAG execution |
@@ -452,7 +451,7 @@ The dagster-taskiq integration is not a "plugin" for TaskIQ, but rather a **Task
 4. Middleware that can create separate queues
 5. Essentially, middleware that **is** the application, not just hooks
 
-At that point, you're not using "middleware" - you're building a custom broker/orchestration system, which is exactly what dagster-taskiq does.
+At that point, you're not using "middleware" - you're building a custom broker/orchestration system, which is what dagster-taskiq does.
 
 ### Lessons for Other Integrations
 
