@@ -1,6 +1,30 @@
 # Dagster TaskIQ Executor Demo
 
-Based on dagster-celery, this project demonstrates a potentially new executor based on taskiq for better performance. Locally are projects demonstrating taskiq standalone with FastAPI and separately as an executor for Dagster. LocalStack and Pulumi are used to locally evaluate the new executor.
+Based on dagster-celery, this project demonstrates a custom async executor using SQS and TaskIQ for better performance. The demo includes a standalone TaskIQ project with FastAPI and a full Dagster integration. LocalStack and Pulumi are used to locally evaluate the executor.
+
+**Note**: This project uses TaskIQ's SQS broker with custom Dagster integration for better execution model compatibility. See [`dagster-taskiq-demo/README.md`](./dagster-taskiq-demo/README.md) for architecture details.
+
+## Python Version Requirements
+
+- **dagster-taskiq**: Python 3.11+
+- **dagster-taskiq-demo**: Python 3.13+ (strict requirement)
+- **taskiq-demo**: Python 3.11+
+- **taskiq-aio-multi-sqs**: Python 3.11+
+- **deploy**: Python 3.11+
+
+For local development, **Python 3.13** is recommended to support all subprojects.
+
+## Project Status
+
+This is an experimental migration from dagster-celery. Key simplifications:
+- **Single queue architecture** - Multi-queue routing removed for simplicity
+- **No priority-based delays** - Simplified task scheduling
+- **Cancellation support** - Infrastructure in place, worker implementation completed
+
+See also:
+- [`TESTING.md`](./TESTING.md) - Comprehensive testing procedures
+- [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) - Known limitations and workarounds
+- [`dagster-taskiq/PARITY_REVIEW.md`](./dagster-taskiq/PARITY_REVIEW.md) - Feature parity analysis (historical)
 
 ## Quick Start
 
@@ -42,9 +66,13 @@ Based on dagster-celery, this project demonstrates a potentially new executor ba
 
 1. **Access UIs**:
 
-   - LocalStack: https://app.localstack.cloud
-   - Dagster: http://localhost:3000 (TODO: this is from ECS in LocalStack!)
-   - (Optional) TaskIQ Dashboard: http://localhost:8080 (`./scripts/run-dashboard.sh`)
+   - **LocalStack**: https://app.localstack.cloud
+   - **Dagster UI**: After deploying infrastructure (step 3), get the load balancer URL:
+     ```bash
+     cd deploy && uv run pulumi stack output dagsterWebserverUrl --stack local
+     ```
+     Access Dagster at the returned URL (served from ECS in LocalStack)
+   - **(Optional) TaskIQ Dashboard**: http://localhost:8080 (run `./scripts/run-dashboard.sh`)
 
 ## Development Tasks
 
@@ -158,14 +186,12 @@ Access via LocalStack UI: https://app.localstack.cloud
 
 ### Dagster UI Access
 
-**Note**: Dagster UI is served from ECS in LocalStack. Get the load balancer URL:
+Dagster UI is served from ECS in LocalStack. Get the load balancer URL:
 
 ```bash
 cd deploy
 uv run pulumi stack output dagsterWebserverUrl --stack local
 ```
-
-Or access via port forwarding if configured. The default port 3000 mentioned in setup refers to the container port, not the host port.
 
 ## Testing
 
