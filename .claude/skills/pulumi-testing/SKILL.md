@@ -2,7 +2,7 @@
 name: pulumi-testing
 description: Guide for writing effective Pulumi infrastructure tests using pytest with minimal mocking and high coverage (>80%)
 allowed-tools: "Read,Write,Edit,Bash,Grep,Glob"
-version: 1.0.0
+version: 2.0.0
 ---
 
 # Pulumi Infrastructure Testing with Pytest
@@ -258,6 +258,393 @@ def pulumi_stack_localstack(localstack_endpoint):
     up_result = stack.up(on_output=print)
     yield {"stack": stack, "outputs": up_result.outputs}
     stack.destroy(on_output=print)
+```
+
+## LocalStack State Management (Critical for Development)
+
+### The Problem: Lifecycle Mismatch
+
+**LocalStack** (Docker container) is **ephemeral** - it can be destroyed and recreated easily.
+**Pulumi state** (on your laptop) is **persistent** - it survives across LocalStack restarts.
+
+This mismatch causes **state divergence** when:
+- LocalStack container restarts (resources gone, but Pulumi thinks they exist)
+- LocalStack Docker volume is deleted
+- LocalStack crashes or becomes corrupted
+- You switch between LocalStack instances
+
+**Symptoms of divergence:**
+```
+Error: reading S3 Bucket (my-bucket): NotFound: Not Found
+Error: error reading SQS Queue (my-queue): AWS.SimpleQueueService.NonExistentQueue
+pulumi:pulumi:Stack my-project-dev **failed** 1 error
+```
+
+### Solution 1: Development Workflow Script
+
+Use the provided `{baseDir}/scripts/localstack-dev.sh` utility:
+
+**Common operations:**
+```bash
+# Check status of LocalStack and Pulumi
+./scripts/localstack-dev.sh status
+
+# Start LocalStack
+./scripts/localstack-dev.sh start
+
+# After LocalStack container restart (most common issue)
+./scripts/localstack-dev.sh restart
+./scripts/localstack-dev.sh sync    # Sync Pulumi state with reality
+
+# Check if state is diverged
+./scripts/localstack-dev.sh check
+
+# Before making risky changes
+./scripts/localstack-dev.sh backup
+pulumi up
+# If it breaks:
+./scripts/localstack-dev.sh restore <backup-file>
+
+# Nuclear option: destroy everything and start fresh
+./scripts/localstack-dev.sh fresh-start
+```
+
+**Script features:**
+- Automatically starts LocalStack with persistence enabled
+- Detects state divergence
+- Syncs Pulumi state with LocalStack reality using `pulumi refresh`
+- Backs up and restores Pulumi state
+- Provides fresh-start workflow for complete reset
+
+### Solution 2: Automatic Pytest Fixtures
+
+Add automatic state synchronization to your tests using `{baseDir}/scripts/pytest_localstack_sync.py`:
+
+**Setup in conftest.py:**
+```python
+# tests/conftest.py
+import sys
+from pathlib import Path
+
+# Add skills scripts to path
+sys.path.insert(0, str(Path(__file__).parent.parent / ".claude/skills/pulumi-testing/scripts"))
+
+# Import fixtures
+from pytest_localstack_sync import (
+    ensure_localstack,
+    localstack_state_sync,
+    fresh_localstack,
+    localstack_endpoint
+)
+```
+
+**Benefits:**
+- `ensure_localstack` (autouse) - Automatically starts LocalStack before all tests
+- `localstack_state_sync` - Syncs state before/after each test
+- `fresh_localstack` - Provides completely fresh state for test isolation
+- Automatically detects and reports state divergence errors
+
+**Usage in tests:**
+```python
+import pytest
+
+# Automatic sync for this test
+@pytest.mark.state_sync
+def test_deployment(localstack_state_sync):
+    """State is synced before and after this test."""
+    # Deploy infrastructure
+    stack.up()
+    # Test something
+    assert ...
+
+# Completely isolated test
+@pytest.mark.fresh_state
+def test_from_scratch(fresh_localstack):
+    """Fresh LocalStack, no existing resources."""
+    # Perfect for testing initial deployment
+    ...
+```
+
+### Solution 3: LocalStack with Persistence
+
+**Configure LocalStack to persist data across restarts:**
+
+```bash
+# docker-compose.yml
+version: "3.8"
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,dynamodb,iam,sts,lambda,ecs,rds,ec2
+      - DEBUG=1
+      - PERSISTENCE=1                  # Enable persistence
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - localstack-data:/tmp/localstack  # Persist data
+volumes:
+  localstack-data:
+```
+
+**Benefits:**
+- LocalStack state survives container restarts
+- Reduces state divergence issues
+- Faster restart (don't need to redeploy)
+
+**Limitations:**
+- Still diverges if volume is deleted
+- Persistence has some bugs/limitations in LocalStack
+- Not all services persist perfectly
+
+### Solution 4: State Backend Strategy
+
+**Use file:// backend with explicit state file:**
+
+```yaml
+# Pulumi.yaml
+name: my-project
+runtime: python
+backend:
+  url: file://./pulumi-state  # Local directory
+
+# .gitignore
+pulumi-state/
+```
+
+**Benefits:**
+- State is in your project directory
+- Easy to see when state changes
+- Can be backed up/restored easily
+- Clear separation per project
+
+**Delete state when LocalStack is destroyed:**
+```bash
+# When doing fresh start
+docker rm -f localstack
+docker volume rm localstack-data
+rm -rf pulumi-state/  # Also delete state
+pulumi stack init dev  # Recreate stack
+pulumi up  # Fresh deployment
+```
+
+### Solution 5: Pulumi Refresh Automation
+
+**Add pre-deployment refresh to catch divergence early:**
+
+```bash
+# deploy.sh
+#!/bin/bash
+set -e
+
+# Always refresh before deploy
+pulumi refresh --yes
+
+# Then deploy
+pulumi up --yes
+```
+
+**Or in Automation API:**
+```python
+def deploy_with_auto_sync(stack):
+    """Deploy with automatic state synchronization."""
+    try:
+        # Try refresh first
+        stack.refresh()
+    except Exception as e:
+        print(f"Refresh failed: {e}")
+        print("State may be diverged - attempting to continue")
+
+    # Deploy
+    up_result = stack.up()
+    return up_result
+```
+
+### Solution 6: State Divergence Recovery Script
+
+Use `{baseDir}/scripts/sync-localstack-state.py` for advanced recovery:
+
+```bash
+# Check for divergence
+python scripts/sync-localstack-state.py --check
+
+# Try to fix by refreshing
+python scripts/sync-localstack-state.py --refresh
+
+# Nuclear option: clear state and redeploy
+python scripts/sync-localstack-state.py --reset
+```
+
+**What it does:**
+- Detects if LocalStack is running
+- Compares Pulumi state with LocalStack reality
+- Offers recovery options:
+  - `--refresh`: Update Pulumi state from LocalStack (safe)
+  - `--reset`: Clear everything and redeploy (nuclear)
+- Backs up state before destructive operations
+
+### Best Practices for LocalStack Development
+
+**1. Always use the workflow script:**
+```bash
+# Don't do this:
+docker restart localstack
+pulumi up  # ← Will fail with state divergence
+
+# Do this:
+./scripts/localstack-dev.sh restart
+./scripts/localstack-dev.sh sync
+pulumi up  # ← Works correctly
+```
+
+**2. Add state sync to your development workflow:**
+```bash
+# .envrc (for direnv) or .bashrc
+alias pup='./scripts/localstack-dev.sh sync && pulumi up'
+alias pdown='pulumi destroy --yes && ./scripts/localstack-dev.sh sync'
+alias preset='./scripts/localstack-dev.sh fresh-start'
+```
+
+**3. Use pre-commit hooks:**
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+# Check for state divergence before committing
+./scripts/localstack-dev.sh check || {
+    echo "WARNING: Pulumi state may be diverged from LocalStack"
+    echo "Run: ./scripts/localstack-dev.sh sync"
+    exit 1
+}
+```
+
+**4. Document the workflow in your README:**
+```markdown
+## LocalStack Development
+
+**First time setup:**
+```bash
+./scripts/localstack-dev.sh start
+pulumi stack init dev
+pulumi up
+```
+
+**After LocalStack restart:**
+```bash
+./scripts/localstack-dev.sh restart
+./scripts/localstack-dev.sh sync
+```
+
+**When things break:**
+```bash
+./scripts/localstack-dev.sh check    # Diagnose
+./scripts/localstack-dev.sh sync     # Try to fix
+./scripts/localstack-dev.sh fresh-start  # Nuclear option
+```
+```
+
+**5. Use makefiles for common operations:**
+```makefile
+# Makefile
+.PHONY: localstack-start localstack-sync localstack-reset
+
+localstack-start:
+	./scripts/localstack-dev.sh start
+
+localstack-sync:
+	./scripts/localstack-dev.sh sync
+
+localstack-reset:
+	./scripts/localstack-dev.sh fresh-start
+
+test-local: localstack-sync
+	PULUMI_CONFIG_PASSPHRASE="" pytest tests/ -m localstack
+```
+
+**6. Test state recovery in CI:**
+```yaml
+# .github/workflows/test.yml
+- name: Test state recovery
+  run: |
+    # Deploy infrastructure
+    pulumi up --yes
+
+    # Simulate LocalStack failure
+    docker restart localstack
+    sleep 10
+
+    # Verify recovery works
+    ./scripts/localstack-dev.sh sync
+    pulumi refresh --yes
+```
+
+### Common Scenarios and Solutions
+
+**Scenario 1: LocalStack container restarted**
+```bash
+$ pulumi up
+Error: reading S3 Bucket (my-bucket): NotFound: Not Found
+
+# Solution:
+$ ./scripts/localstack-dev.sh restart  # Ensure LocalStack is running
+$ ./scripts/localstack-dev.sh sync     # Sync state
+$ pulumi up                             # Now works
+```
+
+**Scenario 2: Switched to different LocalStack instance**
+```bash
+# You're using a different LocalStack (e.g., different Docker container)
+$ ./scripts/localstack-dev.sh check
+Diverged: True
+Reason: Refresh failed - likely state divergence
+
+# Solution:
+$ ./scripts/localstack-dev.sh fresh-start  # Nuclear option
+# This destroys everything and redeploys
+```
+
+**Scenario 3: State file corrupted**
+```bash
+$ pulumi up
+error: failed to load checkpoint: ...
+
+# Solution:
+$ ls pulumi-state-backup-*.json  # Find recent backup
+$ ./scripts/localstack-dev.sh restore pulumi-state-backup-dev-20250115.json
+```
+
+**Scenario 4: Want to test deployment from scratch**
+```bash
+# Option 1: Use fresh_localstack fixture in tests
+@pytest.mark.fresh_state
+def test_initial_deployment(fresh_localstack):
+    ...
+
+# Option 2: Manual fresh start
+$ ./scripts/localstack-dev.sh fresh-start
+```
+
+**Scenario 5: LocalStack works but Pulumi is confused**
+```bash
+# Pulumi thinks resources exist but they don't in LocalStack
+$ pulumi refresh --yes  # Update state from reality
+
+# If refresh fails:
+$ python scripts/sync-localstack-state.py --reset
+```
+
+### Utilities Reference
+
+**Location:** `.claude/skills/pulumi-testing/scripts/`
+
+**Files:**
+- `localstack-dev.sh` - Main development workflow script
+- `sync-localstack-state.py` - Advanced state synchronization
+- `pytest_localstack_sync.py` - Pytest fixtures for automatic sync
+
+**Make scripts executable:**
+```bash
+chmod +x .claude/skills/pulumi-testing/scripts/*.sh
 ```
 
 ## Running Tests
