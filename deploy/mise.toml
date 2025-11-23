@@ -106,3 +106,144 @@ run = [
   "mise run pulumi:up",
 ]
 depends = ["//:localstack:start"]
+
+# ==============================================================================
+# LocalStack State Management
+# ==============================================================================
+
+[tasks."localstack:start"]
+description = "Start LocalStack container"
+run = "./scripts/localstack-dev.sh start"
+
+[tasks."localstack:stop"]
+description = "Stop LocalStack container (preserves state)"
+run = "./scripts/localstack-dev.sh stop"
+
+[tasks."localstack:restart"]
+description = "Restart LocalStack container"
+run = "./scripts/localstack-dev.sh restart"
+
+[tasks."localstack:sync"]
+description = "Sync Pulumi state with LocalStack reality"
+run = "./scripts/localstack-dev.sh sync"
+
+[tasks."localstack:check"]
+description = "Check if Pulumi and LocalStack are in sync"
+run = "./scripts/localstack-dev.sh check"
+
+[tasks."localstack:reset"]
+description = "Nuclear option: destroy everything and start fresh"
+confirm = "This will DESTROY LocalStack and Pulumi state. Continue?"
+run = "./scripts/localstack-dev.sh fresh-start"
+
+[tasks."localstack:backup"]
+description = "Backup current Pulumi state"
+run = "./scripts/localstack-dev.sh backup"
+
+[tasks."localstack:restore"]
+description = "Restore Pulumi state from backup (requires backup file as arg)"
+run = "./scripts/localstack-dev.sh restore"
+
+[tasks."localstack:status"]
+description = "Show LocalStack and Pulumi status"
+run = "./scripts/localstack-dev.sh status"
+
+# ==============================================================================
+# Testing
+# ==============================================================================
+
+[tasks."test:unit"]
+description = "Run unit tests (fast, with mocks)"
+run = "uv run pytest tests/ -m 'unit' -v"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."test:integration"]
+description = "Run integration tests (deploy to LocalStack)"
+run = "uv run pytest tests/integration/ -m 'integration' -v"
+depends = ["localstack:sync"]
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."test:opa"]
+description = "Run OPA policy tests"
+run = """
+if command -v opa >/dev/null 2>&1; then
+  echo "Running OPA policy tests..."
+  opa test tests/policies/ -v
+  echo ""
+  echo "Checking OPA coverage..."
+  opa test --coverage tests/policies/
+else
+  echo "ERROR: OPA not installed"
+  echo "Install: curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64"
+  echo "         chmod +x opa && sudo mv opa /usr/local/bin/"
+  exit 1
+fi
+"""
+
+[tasks."test:all"]
+description = "Run all tests (unit, integration, OPA)"
+depends = ["localstack:sync", "test:unit", "test:integration", "test:opa"]
+
+[tasks."test:coverage"]
+description = "Run tests with coverage report"
+run = """
+uv run pytest tests/ \
+  --cov=components \
+  --cov=modules \
+  --cov-report=term-missing \
+  --cov-report=html \
+  --cov-report=xml
+"""
+depends = ["localstack:sync"]
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."test:quick"]
+description = "Quick test workflow for development (unit tests only)"
+depends = ["localstack:sync", "test:unit"]
+
+# ==============================================================================
+# Development Workflows
+# ==============================================================================
+
+[tasks."deploy:local"]
+description = "Deploy to LocalStack (with state sync)"
+depends = ["localstack:sync"]
+run = "uv run pulumi up --yes --stack local"
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks."destroy:local"]
+description = "Destroy LocalStack infrastructure"
+confirm = "This will destroy all Pulumi-managed resources. Continue?"
+run = [
+  "uv run pulumi destroy --yes --stack local",
+  "./scripts/localstack-dev.sh sync",
+]
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks.clean]
+description = "Remove test artifacts and cache"
+run = """
+rm -rf .pytest_cache __pycache__ .coverage htmlcov *.pyc
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find . -type f -name "*.pyc" -delete 2>/dev/null || true
+"""
+
+# ==============================================================================
+# CI/CD Helpers
+# ==============================================================================
+
+[tasks."ci:test"]
+description = "Full CI test suite"
+depends = ["localstack:start", "test:all"]
+
+[tasks."ci:validate"]
+description = "Validate infrastructure policies and preview changes"
+run = [
+  "mise run test:opa",
+  "uv run pulumi preview --stack local",
+]
+env = {PULUMI_CONFIG_PASSPHRASE = "localstack"}
+
+[tasks.validate]
+description = "Full validation workflow (start LocalStack, run all tests, validate policies)"
+depends = ["localstack:start", "test:all", "ci:validate"]

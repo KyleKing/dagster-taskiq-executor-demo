@@ -15,13 +15,13 @@ Following the **pulumi-testing** skill guidance:
 
 ```bash
 # 1. Start LocalStack
-make localstack-start
+mise run localstack:start
 
 # 2. Run all tests
-make test-all
+mise run test:all
 
 # 3. Check coverage
-make test-coverage
+mise run test:coverage
 ```
 
 ## Test Structure
@@ -134,7 +134,7 @@ From `infrastructure_security.rego`:
 
 ```bash
 # Run all policy tests
-make test-opa
+mise run test:opa
 
 # Check coverage
 opa test --coverage tests/policies/
@@ -209,44 +209,44 @@ $ pulumi up
 Error: reading S3 Bucket (my-bucket): NotFound: Not Found
 
 # Solution:
-$ make localstack-sync
+$ mise run localstack:sync
 $ pulumi up  # Now works
 ```
 
 **Scenario 2: State completely corrupted**
 ```bash
-$ make localstack-reset  # Destroys everything and redeploys
+$ mise run localstack:reset  # Destroys everything and redeploys
 ```
 
 **Scenario 3: Want fresh start for testing**
 ```bash
-$ make localstack-reset
-$ make test-integration
+$ mise run localstack:reset
+$ mise run test:integration
 ```
 
-## Make Commands
+## Mise Tasks
 
 ### LocalStack Management
-- `make localstack-start` - Start LocalStack container
-- `make localstack-sync` - Sync Pulumi state with LocalStack
-- `make localstack-reset` - Nuclear option: destroy everything
-- `make localstack-status` - Show status
+- `mise run localstack:start` - Start LocalStack container
+- `mise run localstack:sync` - Sync Pulumi state with LocalStack
+- `mise run localstack:reset` - Nuclear option: destroy everything
+- `mise run localstack:status` - Show status
 
 ### Testing
-- `make test-unit` - Unit tests (fast, mocked)
-- `make test-integration` - Integration tests (deploy to LocalStack)
-- `make test-opa` - OPA policy tests
-- `make test-all` - All tests
-- `make test-coverage` - Tests with coverage report
+- `mise run test:unit` - Unit tests (fast, mocked)
+- `mise run test:integration` - Integration tests (deploy to LocalStack)
+- `mise run test:opa` - OPA policy tests
+- `mise run test:all` - All tests
+- `mise run test:coverage` - Tests with coverage report
 
 ### Development
-- `make clean` - Remove test artifacts
-- `make deploy-local` - Deploy to LocalStack
-- `make destroy-local` - Destroy infrastructure
+- `mise run clean` - Remove test artifacts
+- `mise run deploy:local` - Deploy to LocalStack
+- `mise run destroy:local` - Destroy infrastructure
 
 ### CI/CD
-- `make ci-test` - Full CI test suite
-- `make ci-validate` - Validate policies and preview
+- `mise run ci:test` - Full CI test suite
+- `mise run ci:validate` - Validate policies and preview
 
 ## Running Tests
 
@@ -254,23 +254,23 @@ $ make test-integration
 
 ```bash
 # Quick feedback - unit tests only
-make test-unit
+mise run test:unit
 
 # Full integration tests
-make localstack-start
-make test-integration
+mise run localstack:start
+mise run test:integration
 
 # Check OPA policies
-make test-opa
+mise run test:opa
 
 # Everything
-make test-all
+mise run test:all
 ```
 
 ### With Coverage
 
 ```bash
-make test-coverage
+mise run test:coverage
 
 # View HTML report
 open htmlcov/index.html
@@ -330,13 +330,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Start LocalStack
-        run: make localstack-start
+        run: mise run localstack:start
 
       - name: Run OPA tests
-        run: make test-opa
+        run: mise run test:opa
 
       - name: Run integration tests
-        run: make test-integration
+        run: mise run test:integration
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -352,7 +352,7 @@ jobs:
 
 **Solution**:
 ```bash
-make localstack-sync
+mise run localstack:sync
 ```
 
 ### Tests Are Slow
@@ -368,13 +368,13 @@ make localstack-sync
 **Solutions**:
 ```bash
 # Check LocalStack is running
-make localstack-status
+mise run localstack:status
 
 # Try refreshing state
-make localstack-sync
+mise run localstack:sync
 
 # Nuclear option
-make localstack-reset
+mise run localstack:reset
 ```
 
 ### OPA Tests Failing
@@ -422,7 +422,7 @@ sudo mv opa /usr/local/bin/
 
 **Current coverage**:
 ```bash
-make test-coverage
+mise run test:coverage
 # View report in htmlcov/index.html
 ```
 
@@ -433,8 +433,8 @@ When adding new infrastructure:
 1. **Add integration test** - Test the deployed resource
 2. **Add OPA policy** - Enforce security/compliance
 3. **Add policy test** - Test both allow and deny cases
-4. **Update Makefile** - If new test category needed
-5. **Run full suite** - `make test-all`
+4. **Update mise.toml** - Add mise tasks if new test category needed
+5. **Run full suite** - `mise run test:all`
 
 ## References
 
