@@ -39,4 +39,4 @@ def test_worker_list_help():
         assert exc_info.value.code == 0
 
 
-# Note: Actual worker start/stop tests require LocalStack and are tested in integration tests
+# Note: Actual worker start/stop tests require moto and are tested in integration tests

@@ -49,7 +49,7 @@ def create_auto_scaler_infrastructure(
         environment: Environment name (local, dev, prod)
         region: AWS region
         container_image: Docker image for auto-scaler
-        aws_endpoint_url: AWS endpoint URL (for LocalStack)
+        aws_endpoint_url: AWS endpoint URL (optional, for custom endpoints)
         database_endpoint: PostgreSQL database endpoint
         queue_url: TaskIQ queue URL
         cluster_name: ECS cluster name

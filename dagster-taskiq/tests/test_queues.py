@@ -56,7 +56,7 @@ def test_make_app_fair_queue_detection(
     assert recorded["is_fair_queue"] is expected
 
 
-def test_s3_extended_payload_smoke(localstack):
+def test_s3_extended_payload_smoke(aws_mock):
     async def _exercise() -> None:
         backend = S3Backend(
             bucket_name=os.environ["DAGSTER_TASKIQ_S3_BUCKET_NAME"],

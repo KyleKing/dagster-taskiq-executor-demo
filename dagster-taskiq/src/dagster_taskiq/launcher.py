@@ -66,7 +66,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         Args:
             queue_url: SQS queue URL
             region_name: AWS region name
-            endpoint_url: Custom AWS endpoint (for LocalStack)
+            endpoint_url: Custom AWS endpoint (for testing or VPC endpoints)
             config_source: Additional configuration
             inst_data: Configurable class data
         """
@@ -411,7 +411,7 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             "endpoint_url": Field(
                 Noneable(StringSource),
                 is_required=False,
-                description="Custom AWS endpoint URL (for LocalStack). Default: None.",
+                description="Custom AWS endpoint URL (for testing or VPC endpoints). Default: None.",
             ),
             "config_source": Field(
                 Noneable(Permissive()),

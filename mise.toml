@@ -11,24 +11,24 @@ ECS_CLUSTER_NAME = "dagster-taskiq-demo-local"
 _.file = {path = ".env"}
 
 [tasks."aws:clusters"]
-description = "List ECS clusters in LocalStack"
-run = "awslocal ecs list-clusters --region ${AWS_DEFAULT_REGION}"
+description = "List ECS clusters"
+run = "aws ecs list-clusters --region ${AWS_DEFAULT_REGION}"
 
 [tasks."aws:images"]
 description = "List ECR images"
-run = "awslocal ecr list-images --repository-name ${PROJECT_NAME}-${ENVIRONMENT} --region ${AWS_DEFAULT_REGION}"
+run = "aws ecr list-images --repository-name ${PROJECT_NAME}-${ENVIRONMENT} --region ${AWS_DEFAULT_REGION}"
 
 [tasks."aws:queues"]
-description = "List SQS queues in LocalStack"
-run = "awslocal sqs list-queues --region ${AWS_DEFAULT_REGION}"
+description = "List SQS queues"
+run = "aws sqs list-queues --region ${AWS_DEFAULT_REGION}"
 
 [tasks."aws:services"]
 description = "List ECS services in the cluster"
-run = "awslocal ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
+run = "aws ecs list-services --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
 
 [tasks."aws:tasks"]
 description = "List running ECS tasks"
-run = "awslocal ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
+run = "aws ecs list-tasks --cluster ${ECS_CLUSTER_NAME:-dagster-taskiq-demo-dev} --region ${AWS_DEFAULT_REGION}"
 
 [tasks."build:dagster-taskiq-demo"]
 description = "Build Docker image with docker bake"
@@ -46,17 +46,17 @@ description = "Start TaskIQ dashboard (requires dev dependencies)"
 run = "./scripts/run-dashboard.sh"
 
 [tasks."ecr:login"]
-description = "Login to LocalStack ECR"
+description = "Login to ECR"
 hide = true
 run = '''
 REPO_NAME="${PROJECT_NAME}-${ENVIRONMENT}"
-REPO_URI=$(awslocal ecr describe-repositories \
+REPO_URI=$(aws ecr describe-repositories \
   --region ${AWS_DEFAULT_REGION} \
   --repository-names "${REPO_NAME}" \
   --query 'repositories[0].repositoryUri' \
   --output text 2>/dev/null || echo "")
 if [ -n "$REPO_URI" ]; then
-  awslocal ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+  aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
     docker login --username AWS --password-stdin "${REPO_URI%%/*}"
 else
   echo "ECR repository not found. Run `mise run //deploy:pulumi:up` first."
@@ -65,12 +65,12 @@ fi
 '''
 
 [tasks."ecr:push:dagster-taskiq-demo"]
-description = "Build and push Docker image to LocalStack ECR"
+description = "Build and push Docker image to ECR"
 depends = ["build"]
 run = "./scripts/build-and-push.sh"
 
 [tasks."ecr:push:taskiq-demo"]
-description = "Build and push TaskIQ demo image to LocalStack ECR"
+description = "Build and push TaskIQ demo image to ECR"
 run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
 [tasks."ecs:status"]
@@ -82,7 +82,7 @@ if [ -z "$SERVICE_NAME" ]; then
   echo "Error: SERVICE_NAME not set. Example: mise run ecs:status SERVICE_NAME=dagster-daemon"
   exit 1
 fi
-awslocal ecs describe-services \
+aws ecs describe-services \
   --cluster "$CLUSTER" \
   --services "$SERVICE_NAME" \
   --region ${AWS_DEFAULT_REGION} \
@@ -93,52 +93,25 @@ awslocal ecs describe-services \
 [tasks.env-setup]
 description = "Initial project setup (check env, install deps)"
 run = [
-  "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please edit .env with your LOCALSTACK_AUTH_TOKEN')",
-  "mise install"
+  "test -f .env || (echo 'Creating .env from .env.example...' && cp .env.example .env && echo 'Please configure .env with your AWS settings')",
+  "mise install",
 ]
-
-[tasks."localstack:logs"]
-description = "View LocalStack logs"
-alias = "logs"
-run = "docker compose logs -f localstack"
-
-[tasks."localstack:restart"]
-description = "Restart LocalStack container"
-run = "mise run //:localstack:start --detach"
-wait_for = ["//:localstack:stop"]
-
-[tasks."localstack:start"]
-description = "Start LocalStack container (or run in background with `pitchfork start localstack`)"
-alias = "start"
-run = "docker compose up --build --remove-orphans"
-
-[tasks."localstack:status"]
-description = "Check LocalStack health"
-run = '''
-echo "Checking LocalStack health..."
-(curl -s http://localhost:4566/_localstack/health | jq) || echo "LocalStack not running"
-'''
-
-[tasks."localstack:stop"]
-description = "Stop LocalStack container"
-alias = "stop"
-run = "docker compose down"
 
 [tasks."logs:auto-scaler"]
 description = "Tail auto-scaler logs from CloudWatch"
-run = "awslocal logs tail '/aws/ecs/auto-scaler-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+run = "aws logs tail '/aws/ecs/auto-scaler-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
 
 [tasks."logs:dagster-daemon"]
 description = "Tail Dagster daemon logs from CloudWatch"
-run = "awslocal logs tail '/aws/ecs/dagster-daemon-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+run = "aws logs tail '/aws/ecs/dagster-daemon-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
 
 [tasks."logs:dagster-webserver"]
 description = "Tail Dagster webserver logs from CloudWatch"
-run = "awslocal logs tail '/aws/ecs/dagster-webserver-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+run = "aws logs tail '/aws/ecs/dagster-webserver-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
 
 [tasks."logs:taskiq-worker"]
 description = "Tail TaskIQ worker logs from CloudWatch"
-run = "awslocal logs tail '/aws/ecs/taskiq-worker-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
+run = "aws logs tail '/aws/ecs/taskiq-worker-${ENVIRONMENT}' --follow --since 5m --region ${AWS_DEFAULT_REGION}"
 
 [tasks.mdformat]
 description = "Format all markdown files"
@@ -162,7 +135,7 @@ if [ -z "$QUEUE_URL" ]; then
   echo "Error: QUEUE_URL not set. Get it from: cd deploy && uv run pulumi stack output queueUrl --stack ${ENVIRONMENT}"
   exit 1
 fi
-awslocal sqs get-queue-attributes \
+aws sqs get-queue-attributes \
   --queue-url "$QUEUE_URL" \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
   --region ${AWS_DEFAULT_REGION}
@@ -177,7 +150,6 @@ sources = ["**/*.toml"]
 "asdf:postgres" = "18"
 hadolint = "latest"
 node = "latest" # Why do I need node?
-"pipx:awscli-local" = "latest"
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
 python = "3.14"

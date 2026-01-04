@@ -15,7 +15,7 @@ class NetworkResources:
 
 
 def fetch_default_network(*, provider: Provider) -> NetworkResources:
-    """Return the default VPC and subnet set provided by LocalStack.
+    """Return the default VPC and subnet set.
 
     Returns:
         NetworkResources: Wrapper containing VPC and subnet metadata.

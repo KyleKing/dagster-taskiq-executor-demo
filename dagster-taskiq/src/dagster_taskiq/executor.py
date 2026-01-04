@@ -51,7 +51,7 @@ TASKIQ_CONFIG = {
         Noneable(StringSource),
         is_required=False,
         default_value=None,
-        description="Custom AWS endpoint URL (for LocalStack). Default: None.",
+        description="Custom AWS endpoint URL (for testing or VPC endpoints). Default: None.",
     ),
     "config_source": Field(
         Noneable(Permissive()),
@@ -95,7 +95,7 @@ def taskiq_executor(init_context: Any) -> "TaskiqExecutor":
           config:
             queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789012/dagster-tasks'
             region_name: 'us-east-1'  # Optional
-            endpoint_url: 'http://localhost:4566'  # Optional, for LocalStack
+            endpoint_url: 'http://custom-endpoint:4566'  # Optional, for custom endpoints
             config_source: # Dict[str, Any]: Any additional parameters to pass to the
                 #...       # Taskiq broker.
 
@@ -202,7 +202,7 @@ class TaskiqExecutor(Executor):
             retries: The retry mode configuration
             queue_url: SQS queue URL
             region_name: AWS region name
-            endpoint_url: Custom AWS endpoint URL (for LocalStack)
+            endpoint_url: Custom AWS endpoint URL (for testing or VPC endpoints)
             config_source: Additional configuration for the Taskiq broker
         """
         self.queue_url = check.opt_str_param(queue_url, "queue_url", default=sqs_queue_url)

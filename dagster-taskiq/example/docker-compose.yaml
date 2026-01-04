@@ -14,22 +14,6 @@ services:
       timeout: 5s
       retries: 5
 
-  localstack:
-    image: localstack/localstack:3.0
-    ports:
-      - "4566:4566"
-    environment:
-      SERVICES: sqs
-      DEBUG: 1
-      DATA_DIR: /tmp/localstack/data
-      LAMBDA_EXECUTOR: local
-      DOCKER_HOST: unix:///var/run/docker.sock
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - dagster-localstack:/tmp/localstack
-    networks:
-      - dagster-network
-
   codelocation:
     profiles:
       - dagster
@@ -64,7 +48,6 @@ services:
       - dagster-network
     depends_on:
       - postgresql
-      - localstack
       - daemon
 
   worker-long:
@@ -85,7 +68,6 @@ services:
       - dagster-network
     depends_on:
       - postgresql
-      - localstack
       - daemon
 
   webserver:
@@ -139,7 +121,6 @@ services:
 
 volumes:
   dagster-postgres:
-  dagster-localstack:
 
 networks:
   dagster-network:

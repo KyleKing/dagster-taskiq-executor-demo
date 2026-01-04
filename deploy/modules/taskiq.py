@@ -52,7 +52,7 @@ def create_taskiq_infrastructure(
         environment: Environment name (local, dev, prod)
         region: AWS region
         container_image: Docker image for worker
-        aws_endpoint_url: AWS endpoint URL (for LocalStack)
+        aws_endpoint_url: AWS endpoint URL (optional, for custom endpoints)
         database_endpoint: PostgreSQL database endpoint
         execution_role_arn: ECS execution role ARN
         message_retention_seconds: SQS message retention (default: 14 days)

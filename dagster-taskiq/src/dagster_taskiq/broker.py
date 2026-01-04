@@ -24,7 +24,7 @@ class SqsBrokerConfig(BaseModel):
     """
 
     queue_url: str = Field(..., description="SQS queue URL")
-    endpoint_url: str | None = Field(None, description="Custom AWS endpoint URL (for LocalStack)")
+    endpoint_url: str | None = Field(None, description="Custom AWS endpoint URL (for testing or VPC endpoints)")
     region_name: str = Field("us-east-1", description="AWS region name")
     aws_access_key_id: str | None = Field(None, description="AWS access key ID")
     aws_secret_access_key: str | None = Field(None, description="AWS secret access key")

@@ -66,7 +66,7 @@ def workspace(instance, workspace_process_context: WorkspaceProcessContext) -> I
 
 
 @pytest.fixture
-def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
+def dagster_taskiq_worker(aws_mock, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker(queue="custom-queue"):
         yield
 

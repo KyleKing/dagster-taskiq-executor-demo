@@ -1,4 +1,4 @@
-"""Configuration settings for Dagster TaskIQ LocalStack demo."""
+"""Configuration settings for Dagster TaskIQ demo."""
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,14 +9,14 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # AWS/LocalStack Configuration
+    # AWS Configuration
     aws_region: str = Field(default="us-east-1", validation_alias="AWS_DEFAULT_REGION")
-    aws_endpoint_url: str = Field(
-        default="http://localhost:4566",
+    aws_endpoint_url: str | None = Field(
+        default=None,
         validation_alias="AWS_ENDPOINT_URL",
     )
-    aws_access_key_id: str = Field(default="test", validation_alias="AWS_ACCESS_KEY_ID")
-    aws_secret_access_key: str = Field(default="test", validation_alias="AWS_SECRET_ACCESS_KEY")
+    aws_access_key_id: str | None = Field(default=None, validation_alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str | None = Field(default=None, validation_alias="AWS_SECRET_ACCESS_KEY")
 
     # Database Configuration
     postgres_host: str = Field(default="localhost", validation_alias="POSTGRES_HOST")

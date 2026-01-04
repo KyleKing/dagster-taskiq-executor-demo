@@ -19,12 +19,12 @@ class ProjectSettings:
 
 @dataclass
 class AwsSettings:
-    """Configuration for the LocalStack AWS provider."""
+    """AWS provider configuration."""
 
     region: str
-    endpoint: str
-    access_key: str
-    secret_key: str
+    endpoint: str | None  # Optional: for testing with custom endpoints
+    access_key: str | None  # Optional: use IAM roles in production
+    secret_key: str | None  # Optional: use IAM roles in production
 
 
 @dataclass
@@ -113,9 +113,9 @@ class StackSettings:
         aws_cfg = _get_mapping("aws")
         aws = AwsSettings(
             region=str(aws_cfg.get("region", "us-east-1")),
-            endpoint=str(aws_cfg.get("endpoint", "http://localhost:4566")),
-            access_key=str(aws_cfg.get("accessKey", "test")),
-            secret_key=str(aws_cfg.get("secretKey", "test")),
+            endpoint=aws_cfg.get("endpoint"),  # None uses default AWS
+            access_key=aws_cfg.get("accessKey"),  # None uses IAM roles
+            secret_key=aws_cfg.get("secretKey"),  # None uses IAM roles
         )
 
         queue_cfg = _get_mapping("queue")

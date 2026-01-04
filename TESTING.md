@@ -6,13 +6,15 @@ This guide provides step-by-step procedures for manually testing the Dagster Tas
 
 Before starting tests, verify all prerequisites are met:
 
-### 1. LocalStack Health Check
+### 1. AWS Configuration
+
+Ensure AWS credentials are configured:
 
 ```bash
-mise run localstack:status
+aws sts get-caller-identity
 ```
 
-Expected: JSON response with all services showing "available"
+Expected: JSON response with account ID and ARN
 
 ### 2. Infrastructure Deployment
 
@@ -22,6 +24,7 @@ mise run pulumi:up
 ```
 
 Verify outputs include:
+
 - ECS cluster created
 - SQS queues created
 - RDS database created
@@ -35,6 +38,7 @@ cd deploy && mise run pulumi:up
 ```
 
 Verify images are available:
+
 ```bash
 mise run aws:images
 ```
@@ -58,35 +62,43 @@ Expected: All services show `Status: ACTIVE` with `RunningCount >= DesiredCount`
 ### Test 1: Submit Simple Dagster Job
 
 1. **Start Dagster locally** (if not running in ECS):
+
    ```bash
    cd dagster-taskiq-demo
    uv run python -m dagster dev
    ```
 
-2. **Access Dagster UI**: http://localhost:3000
+1. **Access Dagster UI**: http://localhost:3000
 
-3. **Submit a test job**:
+1. **Submit a test job**:
+
    - Navigate to Jobs in the UI
    - Select a simple job (e.g., `hello_world_job`)
    - Click "Launch Run"
    - Monitor the run status
 
-4. **Verify task appears in SQS queue**:
+1. **Verify task appears in SQS queue**:
+
    ```bash
    mise run queue:depth
    ```
+
    Expected: `ApproximateNumberOfMessages` increases briefly, then decreases as worker picks up task
 
-5. **Verify worker picks up task**:
+1. **Verify worker picks up task**:
+
    ```bash
    mise run logs:taskiq-worker
    ```
+
    Look for log entries showing:
+
    - Task received from SQS
    - Step execution started
    - Step execution completed
 
-6. **Verify job completes successfully**:
+1. **Verify job completes successfully**:
+
    - Check Dagster UI: Run status should show "Success"
    - Check logs for completion messages
 
@@ -100,6 +112,7 @@ watch -n 1 'mise run queue:depth'
 ```
 
 While a job runs, you should see:
+
 - Messages appear when tasks are submitted
 - Messages disappear as workers process them
 - Queue depth returns to zero when job completes
@@ -107,15 +120,19 @@ While a job runs, you should see:
 ### Test 3: Worker Health Verification
 
 1. **Check worker service health**:
+
    ```bash
    mise run ecs:status SERVICE_NAME=taskiq-worker
    ```
 
-2. **Check worker logs for errors**:
+1. **Check worker logs for errors**:
+
    ```bash
    mise run logs:taskiq-worker
    ```
+
    Look for:
+
    - Connection errors (should be none)
    - Task processing errors (should be none for successful jobs)
    - Health check messages
@@ -170,12 +187,13 @@ mise run aws:queues
 ### CloudWatch Log Groups
 
 All logs are stored in these CloudWatch log groups:
+
 - `/aws/ecs/dagster-daemon-{environment}`
 - `/aws/ecs/dagster-webserver-{environment}`
 - `/aws/ecs/taskiq-worker-{environment}`
 - `/aws/ecs/auto-scaler-{environment}`
 
-Access via LocalStack UI: https://app.localstack.cloud
+Access via AWS Console: https://console.aws.amazon.com/cloudwatch
 
 ## Known Issues and Limitations
 
@@ -188,6 +206,7 @@ Access via LocalStack UI: https://app.localstack.cloud
 **Workaround**: Currently, all tasks use the default queue. Queue routing is planned for Phase 2 completion.
 
 **Verification**:
+
 - Set a queue tag on a step: `@op(tags={"dagster-taskiq/queue": "custom-queue"})`
 - Submit job and check logs - task will still go to default queue
 - Check SQS queue - all messages appear in the same queue
@@ -201,6 +220,7 @@ Access via LocalStack UI: https://app.localstack.cloud
 **Workaround**: Use environment variables or direct configuration parameters instead of `config_source`.
 
 **Verification**:
+
 - Set `config_source` in executor config
 - Check that custom settings are not applied
 - Verify hard-coded defaults are used instead
@@ -216,6 +236,7 @@ Access via LocalStack UI: https://app.localstack.cloud
 **Workaround**: Use Dagster's built-in run cancellation, which may not propagate to TaskIQ workers.
 
 **Verification**:
+
 - Attempt to terminate a running job via Dagster UI
 - Check logs - termination request may not reach workers
 - Workers may continue processing until completion
@@ -229,11 +250,13 @@ Access via LocalStack UI: https://app.localstack.cloud
 **Reason**: No result backend status is read to determine actual worker health.
 
 **Workaround**: Check ECS service status directly:
+
 ```bash
 mise run ecs:status SERVICE_NAME=taskiq-worker
 ```
 
 **Verification**:
+
 - Check worker health via Dagster API
 - Should return `UNKNOWN` status
 - Use ECS status checks instead for accurate health
@@ -261,21 +284,24 @@ uv run python -m dagster_taskiq_demo.load_simulator.cli worker-failure --failure
 ### Monitoring During Load Tests
 
 1. **Queue Depth**: Watch queue depth during load:
+
    ```bash
    watch -n 1 'mise run queue:depth'
    ```
 
-2. **Worker Logs**: Monitor worker processing:
+1. **Worker Logs**: Monitor worker processing:
+
    ```bash
    mise run logs:taskiq-worker
    ```
 
-3. **Auto-Scaling**: Check if workers scale up:
+1. **Auto-Scaling**: Check if workers scale up:
+
    ```bash
    mise run ecs:status SERVICE_NAME=taskiq-worker
    ```
 
-4. **Dagster UI**: Monitor job runs in UI (http://localhost:3000)
+1. **Dagster UI**: Monitor job runs in UI (http://localhost:3000)
 
 ### Verification After Load Tests
 
@@ -300,7 +326,7 @@ mise run logs:<service-name>
 
 # Check ECS task logs directly
 TASK_ARN=$(mise run aws:tasks | jq -r '.taskArns[0]')
-awslocal ecs describe-tasks --cluster <cluster> --tasks $TASK_ARN --region us-east-1
+aws ecs describe-tasks --cluster <cluster> --tasks $TASK_ARN --region us-east-1
 ```
 
 ### Queue Not Processing
@@ -317,7 +343,7 @@ mise run ecs:status SERVICE_NAME=taskiq-worker
 
 # Check queue attributes
 QUEUE_URL=$(cd deploy && uv run pulumi stack output queueUrl --stack local)
-awslocal sqs get-queue-attributes --queue-url "$QUEUE_URL" --attribute-names All
+aws sqs get-queue-attributes --queue-url "$QUEUE_URL" --attribute-names All
 ```
 
 ### Database Connection Issues
@@ -344,7 +370,7 @@ cd deploy && mise run pulumi:up
 
 ## End-to-End Verification Checklist
 
-- [ ] LocalStack running and healthy
+- [ ] AWS credentials configured
 - [ ] Infrastructure deployed (Pulumi stack up)
 - [ ] Images built and pushed to ECR
 - [ ] ECS services running (all show ACTIVE status)
@@ -362,9 +388,8 @@ cd deploy && mise run pulumi:up
 ## Next Steps
 
 1. **Phase 2 Completion**: Complete queue routing tag support
-2. **Phase 3**: Implement full cancellation support
-3. **Health Check Enhancement**: Integrate result backend status for accurate health checks
-4. **Config Source**: Wire `config_source` through to broker creation
+1. **Phase 3**: Implement full cancellation support
+1. **Health Check Enhancement**: Integrate result backend status for accurate health checks
+1. **Config Source**: Wire `config_source` through to broker creation
 
 Refer to `dagster-taskiq/IMPLEMENTATION_PROGRESS.md` for current status and roadmap.
-

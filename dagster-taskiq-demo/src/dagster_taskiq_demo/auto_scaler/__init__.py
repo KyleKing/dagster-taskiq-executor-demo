@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import random  # noqa: S311
 import time
 from dataclasses import dataclass
@@ -49,21 +50,17 @@ class AutoScalerService:
         self.last_scale_time = 0.0
         self.current_worker_count = settings.autoscaler_min_workers
 
-        # Create AWS clients
-        self.sqs_client = aioboto3.client(  # type: ignore[attr-defined]
-            "sqs",
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
-        self.ecs_client = aioboto3.client(  # type: ignore[attr-defined]
-            "ecs",
-            endpoint_url=settings.aws_endpoint_url,
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
+        # Create AWS clients (endpoint_url only set for custom endpoints like testing)
+        client_kwargs = {"region_name": settings.aws_region}
+        if settings.aws_endpoint_url:
+            client_kwargs["endpoint_url"] = settings.aws_endpoint_url
+        if settings.aws_access_key_id:
+            client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+        if settings.aws_secret_access_key:
+            client_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+
+        self.sqs_client = aioboto3.client("sqs", **client_kwargs)  # type: ignore[attr-defined]
+        self.ecs_client = aioboto3.client("ecs", **client_kwargs)  # type: ignore[attr-defined]
 
     async def startup(self) -> None:
         """Start the auto-scaler service."""
@@ -282,8 +279,8 @@ class AutoScalerService:
         try:
             self.logger.info("Simulating network partition: pausing message processing")
 
-            # For LocalStack simulation, we'll just pause the control loop briefly
-            # In a real AWS environment, this might involve security group changes
+            # Simulate network partition by pausing the control loop
+            # In production, this might involve security group changes
             await asyncio.sleep(60)  # Simulate 1 minute partition
 
             self.logger.info("Network partition simulation completed")
@@ -365,7 +362,12 @@ class AutoScalerService:
         Returns:
             The full SQS queue URL
         """
-        return f"{self.settings.aws_endpoint_url}/000000000000/{self.settings.taskiq_queue_name}"
+        if env_url := os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL"):
+            return env_url
+        if self.settings.aws_endpoint_url:
+            return f"{self.settings.aws_endpoint_url}/000000000000/{self.settings.taskiq_queue_name}"
+        account_id = os.getenv("AWS_ACCOUNT_ID", "123456789012")
+        return f"https://sqs.{self.settings.aws_region}.amazonaws.com/{account_id}/{self.settings.taskiq_queue_name}"
 
     def run_service(self) -> None:
         """Run the auto-scaler service."""

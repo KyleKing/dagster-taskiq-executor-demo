@@ -1,4 +1,4 @@
-"""Pulumi program that provisions the Dagster + TaskIQ LocalStack infrastructure."""
+"""Pulumi program that provisions the Dagster + TaskIQ AWS infrastructure."""
 
 import json
 
@@ -10,7 +10,7 @@ from components.aurora_postgres import create_postgres_database
 from components.ecr_repository import create_ecr_repository
 from components.ecs_cluster import create_ecs_cluster
 from components.network import fetch_default_network
-from components.provider import LocalStackProviderConfig, create_localstack_provider
+from components.provider import AwsProviderConfig, create_aws_provider
 from config import StackSettings
 from modules.auto_scaler import create_auto_scaler_infrastructure
 from modules.dagster import create_dagster_infrastructure
@@ -19,13 +19,13 @@ from modules.taskiq_demo import create_taskiq_demo_infrastructure
 
 
 def main() -> None:
-    """Provision the Dagster TaskIQ infrastructure on LocalStack."""
+    """Provision the Dagster TaskIQ infrastructure on AWS."""
     settings = StackSettings.load()
 
-    # Create LocalStack provider
-    provider = create_localstack_provider(
-        "localstack",
-        LocalStackProviderConfig(
+    # Create AWS provider (uses custom endpoint if configured, otherwise standard AWS)
+    provider = create_aws_provider(
+        "aws-provider",
+        AwsProviderConfig(
             region=settings.aws.region,
             endpoint=settings.aws.endpoint,
             access_key=settings.aws.access_key,
@@ -96,7 +96,7 @@ def main() -> None:
         to_port=5432,
         protocol="tcp",
         cidr_blocks=["10.0.0.0/8"],
-        description="PostgreSQL access from LocalStack network",
+        description="PostgreSQL access from VPC network",
         opts=pulumi.ResourceOptions(provider=provider, parent=db_security_group),
     )
 
@@ -223,7 +223,7 @@ def main() -> None:
         to_port=5432,
         protocol="tcp",
         cidr_blocks=["10.0.0.0/8"],
-        description="PostgreSQL access from LocalStack network",
+        description="PostgreSQL access from VPC network",
         opts=pulumi.ResourceOptions(provider=provider, parent=db_security_group),
     )
 

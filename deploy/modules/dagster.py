@@ -64,7 +64,7 @@ def create_dagster_infrastructure(
         vpc_id: VPC ID for resources
         subnet_ids: Subnet IDs for load balancer
         container_image: Docker image for Dagster services
-        aws_endpoint_url: AWS endpoint URL (for LocalStack)
+        aws_endpoint_url: AWS endpoint URL (optional, for custom endpoints)
         database_endpoint: PostgreSQL database endpoint
         queue_url: TaskIQ queue URL
         cluster_name: ECS cluster name
@@ -102,7 +102,7 @@ def create_dagster_infrastructure(
         to_port=5432,
         protocol="tcp",
         cidr_blocks=["10.0.0.0/8"],
-        description="PostgreSQL access from LocalStack network",
+        description="PostgreSQL access from VPC network",
         opts=pulumi.ResourceOptions(provider=provider, parent=security_group),
     )
 

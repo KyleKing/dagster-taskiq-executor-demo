@@ -31,25 +31,8 @@ def find_free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def localstack():
-    """Provide moto-backed AWS endpoints for tests expecting LocalStack."""
-    endpoint_override = os.getenv("DAGSTER_TASKIQ_SQS_ENDPOINT_URL")
-    queue_override = os.getenv("DAGSTER_TASKIQ_SQS_QUEUE_URL")
-
-    if endpoint_override and queue_override:
-        env_vars = {
-            "DAGSTER_TASKIQ_SQS_QUEUE_URL": queue_override,
-            "DAGSTER_TASKIQ_SQS_ENDPOINT_URL": endpoint_override,
-            "DAGSTER_TASKIQ_S3_ENDPOINT_URL": os.getenv("DAGSTER_TASKIQ_S3_ENDPOINT_URL", endpoint_override),
-            "DAGSTER_TASKIQ_S3_BUCKET_NAME": os.getenv("DAGSTER_TASKIQ_S3_BUCKET_NAME", "dagster-taskiq-results"),
-            "AWS_DEFAULT_REGION": os.getenv("AWS_DEFAULT_REGION", AWS_TEST_REGION),
-            "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", AWS_TEST_ACCESS_KEY),
-            "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", AWS_TEST_SECRET_KEY),
-        }
-        with environ(env_vars):
-            yield queue_override
-        return
-
+def aws_mock():
+    """Provide moto-backed AWS endpoints for testing."""
     # Temporarily remove any global endpoint configuration for moto
     removed_vars = {}
     for var_name in ["AWS_ENDPOINT_URL", "AWS_SQS_ENDPOINT_URL", "AWS_S3_ENDPOINT_URL"]:
@@ -154,7 +137,7 @@ def instance(tempdir):
 
 
 @pytest.fixture
-def dagster_taskiq_worker(localstack, instance: DagsterInstance) -> Iterator[None]:
+def dagster_taskiq_worker(aws_mock, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker():
         yield
 
