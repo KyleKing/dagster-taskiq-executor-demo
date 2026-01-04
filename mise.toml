@@ -4,6 +4,10 @@ experimental_monorepo_root = true
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
 MISE_EXPERIMENTAL = "1"
+# Project configuration (matches Pulumi config defaults)
+PROJECT_NAME = "dagster-taskiq-demo"
+# ECS cluster name (derived from Pulumi: {project_name}-{environment})
+ECS_CLUSTER_NAME = "dagster-taskiq-demo-local"
 _.file = {path = ".env"}
 
 [tasks."aws:clusters"]
@@ -176,5 +180,5 @@ node = "latest" # Why do I need node?
 "pipx:awscli-local" = "latest"
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
-python = "3.13"
+python = "3.14"
 "pipx:commitizen" = "latest"

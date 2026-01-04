@@ -1,5 +1,5 @@
 [[tools."asdf:postgres"]]
-version = "18.0"
+version = "18.1"
 backend = "asdf:postgres"
 
 [[tools.hadolint]]
@@ -16,15 +16,20 @@ version = "1.20.0"
 backend = "aqua:jdx/hk"
 
 [[tools.node]]
-version = "25.1.0"
+version = "25.2.1"
 backend = "core:node"
+
+[tools.node.platforms.macos-arm64]
+checksum = "sha256:be87e21bd235a451fad02c89e5bf7cb17e206e4cd89dd5664f20d19e7dfde6f9"
+size = 52637633
+url = "https://nodejs.org/dist/v25.2.1/node-v25.2.1-darwin-arm64.tar.gz"
 
 [[tools."pipx:awscli-local"]]
 version = "0.22.2"
 backend = "pipx:awscli-local"
 
 [[tools."pipx:commitizen"]]
-version = "4.9.1"
+version = "4.10.0"
 backend = "pipx:commitizen"
 
 [[tools."pipx:mdformat"]]
@@ -45,5 +50,5 @@ size = 97035920
 url = "https://github.com/apple/pkl/releases/download/0.30.0/pkl-macos-aarch64"
 
 [[tools.python]]
-version = "3.13.9"
+version = "3.14.0"
 backend = "core:python"
