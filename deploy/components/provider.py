@@ -65,16 +65,19 @@ def create_aws_provider(name: str, config: AwsProviderConfig) -> aws.Provider:
         )
 
     # Standard AWS provider (uses default credentials from environment/IAM)
-    provider_args = {"region": config.region}
-    if config.access_key:
-        provider_args["access_key"] = config.access_key
-    if config.secret_key:
-        provider_args["secret_key"] = config.secret_key
+    if config.access_key and config.secret_key:
+        return aws.Provider(
+            name,
+            region=config.region,
+            access_key=config.access_key,
+            secret_key=config.secret_key,
+            opts=pulumi.ResourceOptions(),
+        )
 
     return aws.Provider(
         name,
+        region=config.region,
         opts=pulumi.ResourceOptions(),
-        **provider_args,
     )
 
 

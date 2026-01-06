@@ -36,11 +36,6 @@ run = "docker buildx bake dagster-taskiq-demo"
 sources = ["dagster-taskiq-demo/**/*", "docker-bake.hcl", "dagster-taskiq-demo/Dockerfile"]
 outputs = ["docker image ls dagster-taskiq-demo:latest -q"]
 
-[tasks."build:taskiq-demo"]
-description = "Build TaskIQ demo image with docker bake"
-run = "docker buildx bake taskiq-demo"
-sources = ["taskiq-demo/**/*", "docker-bake.hcl", "taskiq-demo/Dockerfile"]
-
 [tasks."dashboard:start"]
 description = "Start TaskIQ dashboard (requires dev dependencies)"
 run = "./scripts/run-dashboard.sh"
@@ -68,10 +63,6 @@ fi
 description = "Build and push Docker image to ECR"
 depends = ["build"]
 run = "./scripts/build-and-push.sh"
-
-[tasks."ecr:push:taskiq-demo"]
-description = "Build and push TaskIQ demo image to ECR"
-run = "BAKE_TARGET=taskiq-demo IMAGE_TAG=${TASKIQ_DEMO_IMAGE_TAG:-taskiq-demo} ./scripts/build-and-push.sh"
 
 [tasks."ecs:status"]
 description = "Check ECS service status (requires SERVICE_NAME env var)"
@@ -152,5 +143,5 @@ hadolint = "latest"
 node = "latest" # Why do I need node?
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
-python = "3.14"
+python = "3.13"
 "pipx:commitizen" = "latest"

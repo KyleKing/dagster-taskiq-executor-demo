@@ -224,7 +224,7 @@ class TaskiqExecutor(Executor):
         """
         return self._retries
 
-    def execute(self, plan_context: "PlanOrchestrationContext", execution_plan: "ExecutionPlan") -> Any:  # noqa: PLR6301
+    def execute(self, plan_context: "PlanOrchestrationContext", execution_plan: "ExecutionPlan") -> Any:
         """Execute the plan using Taskiq.
 
         Args:

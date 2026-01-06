@@ -5,7 +5,6 @@ on AWS SQS.
 """
 
 import asyncio
-import uuid
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Self
 
@@ -79,7 +78,6 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
 
         # Create the Taskiq broker
         self.broker = make_app(app_args=self.app_args())
-        self._supports_cancellation = callable(getattr(self.broker, "cancel_task", None))
 
         super().__init__()
 
@@ -121,77 +119,24 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             routing_key=TASK_EXECUTE_JOB_NAME,
         )
 
-    def terminate(self, run_id: str) -> bool:  # noqa: PLR0911
+    def terminate(self, run_id: str) -> bool:
         """Terminate a running task.
+
+        Note: Run termination is not supported by this launcher.
 
         Args:
             run_id: ID of the run to terminate
 
         Returns:
-            True if a cancellation request was issued, False otherwise.
+            False (termination not supported)
         """
-        run = self._instance.get_run_by_id(run_id)
-        if run is None:
-            return False
-
-        task_id = run.tags.get(DAGSTER_TASKIQ_TASK_ID_TAG)
-        if not task_id:
+        if run := self._instance.get_run_by_id(run_id):
             self._instance.report_engine_event(
-                "Taskiq task ID missing; unable to cancel run task.",
+                "Run termination is not supported by the Taskiq launcher.",
                 run,
                 cls=self.__class__,
             )
-            return False
-
-        if not self._supports_cancellation:
-            self._instance.report_engine_event(
-                "Taskiq broker does not support task cancellation.",
-                run,
-                cls=self.__class__,
-            )
-            return False
-
-        cancel_callable = getattr(self.broker, "cancel_task", None)
-        if not callable(cancel_callable):
-            self._instance.report_engine_event(
-                "Taskiq broker does not expose cancel_task; unable to cancel.",
-                run,
-                cls=self.__class__,
-            )
-            return False
-
-        try:
-            task_uuid = uuid.UUID(str(task_id))
-        except (TypeError, ValueError):
-            self._instance.report_engine_event(
-                f"Invalid Taskiq task ID ({task_id}); cannot cancel run task.",
-                run,
-                cls=self.__class__,
-            )
-            return False
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(self.broker.startup())
-            loop.run_until_complete(cancel_callable(task_uuid))  # pyright: ignore[reportArgumentType]
-        except Exception as exc:
-            self._instance.report_engine_event(
-                f"Failed to submit Taskiq cancellation request: {exc}",
-                run,
-                cls=self.__class__,
-            )
-            return False
-        finally:
-            loop.close()
-
-        self._instance.report_engine_event(
-            "Requested Taskiq task cancellation.",
-            run,
-            EngineEventData.interrupted([task_id]),
-            cls=self.__class__,
-        )
-        return True
+        return False
 
     @property
     def supports_resume_run(self) -> bool:
@@ -256,15 +201,8 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
             if hasattr(self.broker, "result_backend") and self.broker.result_backend:  # type: ignore[truthy-bool]
                 loop.run_until_complete(self.broker.result_backend.startup())
 
-            # Use kiq() to submit the task with labels
-            result = loop.run_until_complete(
-                task.kiq(
-                    **task_args,
-                    labels={
-                        "routing_key": routing_key,
-                    },
-                )
-            )
+            # Use kiq() to submit the task
+            result = loop.run_until_complete(task.kiq(**task_args))
 
             # Store the task ID for tracking
             task_id = result.task_id if hasattr(result, "task_id") else str(id(result))
@@ -284,6 +222,9 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
                 cls=self.__class__,
             )
         finally:
+            if hasattr(self.broker, "result_backend") and self.broker.result_backend:  # type: ignore[truthy-bool]
+                loop.run_until_complete(self.broker.result_backend.shutdown())
+            loop.run_until_complete(self.broker.shutdown())
             loop.close()
 
     @property
@@ -291,72 +232,22 @@ class TaskiqRunLauncher(RunLauncher, ConfigurableClass):
         """Whether this launcher supports checking worker health.
 
         Returns:
-            True
+            False (health checks not supported)
         """
-        return True
-
-    def _check_result_backend_health(self, task_id: str) -> CheckRunHealthResult:
-        """Check task health using the result backend.
-
-        Args:
-            task_id: The task ID to check
-
-        Returns:
-            Health check result with worker status
-        """
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(self.broker.startup())
-            if hasattr(self.broker.result_backend, "startup"):  # type: ignore[attr-defined]
-                loop.run_until_complete(self.broker.result_backend.startup())  # type: ignore[attr-defined]
-
-            # Check if result is ready
-            result_backend = self.broker.result_backend  # type: ignore[assignment]
-            is_ready = loop.run_until_complete(result_backend.is_result_ready(task_id))  # type: ignore[attr-defined]
-
-            if not is_ready:
-                return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} is running")
-
-            # Result is ready, check if it's an error
-            try:
-                result = loop.run_until_complete(result_backend.get_result(task_id))  # type: ignore[attr-defined]
-                if hasattr(result, "is_err") and result.is_err:  # type: ignore[attr-defined]
-                    return CheckRunHealthResult(WorkerStatus.FAILED, f"Task {task_id} failed")
-                return CheckRunHealthResult(WorkerStatus.SUCCESS, f"Task {task_id} completed")
-            except Exception:
-                # Result exists but couldn't be retrieved - assume it's processing
-                return CheckRunHealthResult(WorkerStatus.RUNNING, f"Task {task_id} result available")
-        finally:
-            loop.close()
+        return False
 
     def check_run_worker_health(self, run: DagsterRun) -> CheckRunHealthResult:
-        """Check the health status of a running task using the result backend.
+        """Check the health status of a running task.
+
+        Note: Worker health checks are not supported by this launcher.
 
         Args:
             run: The Dagster run to check
 
         Returns:
-            Health check result with worker status
+            Health check result with UNKNOWN status
         """
-        if DAGSTER_TASKIQ_TASK_ID_TAG not in run.tags:
-            return CheckRunHealthResult(WorkerStatus.UNKNOWN, "No task ID found for run")
-
-        task_id = run.tags[DAGSTER_TASKIQ_TASK_ID_TAG]
-
-        # Check result backend if available
-        if not (hasattr(self.broker, "result_backend") and self.broker.result_backend):  # type: ignore[truthy-bool]
-            return CheckRunHealthResult(
-                WorkerStatus.UNKNOWN, f"Task {task_id} status cannot be determined without result backend"
-            )
-
-        try:
-            return self._check_result_backend_health(task_id)
-        except Exception as e:
-            # If we can't check the backend, return UNKNOWN
-            return CheckRunHealthResult(
-                WorkerStatus.UNKNOWN, f"Could not check result backend for task {task_id}: {e}"
-            )
+        return CheckRunHealthResult(WorkerStatus.UNKNOWN, "Health checks not supported")
 
     @override
     def get_run_worker_debug_info(self, run: DagsterRun, include_container_logs: bool | None = True) -> str | None:

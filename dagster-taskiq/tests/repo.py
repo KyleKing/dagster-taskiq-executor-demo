@@ -1,6 +1,6 @@
 import time
 
-from dagster import Int, Output, RetryRequested, job
+from dagster import Int, OpExecutionContext, Output, RetryRequested, job
 from dagster._core.definitions.decorators import op
 from dagster._core.definitions.output import Out
 from dagster._core.test_utils import nesting_graph
@@ -11,12 +11,12 @@ from dagster_taskiq import taskiq_executor
 
 
 @op
-def simple(_):
+def simple(_) -> int:
     return 1
 
 
 @op
-def add_one(_, num):
+def add_one(_, num: int) -> int:
     return num + 1
 
 
@@ -31,13 +31,13 @@ def test_serial_job():
 
 
 @op(out={"value_one": Out(), "value_two": Out()})
-def emit_values(_context):
+def emit_values(_context: OpExecutionContext):
     yield Output(1, "value_one")
     yield Output(2, "value_two")
 
 
 @op
-def subtract(num_one, num_two):
+def subtract(num_one: int, num_two: int) -> int:
     return num_one - num_two
 
 
@@ -73,7 +73,7 @@ def foo(_):
 
 
 @op
-def bar(_, input_arg):
+def bar(_, input_arg: int) -> int:
     return input_arg
 
 
@@ -90,12 +90,12 @@ class TestFailureError(Exception):
 
 
 @op
-def fails():
+def fails() -> None:
     raise TestFailureError("argjhgjh")
 
 
 @op
-def should_never_execute(foo):
+def should_never_execute(foo) -> None:  # type: ignore[no-untyped-def]
     raise AssertionError  # should never execute
 
 
@@ -105,7 +105,7 @@ def test_fails():
 
 
 @op
-def retry_request():
+def retry_request() -> None:
     raise RetryRequested
 
 
@@ -115,7 +115,7 @@ def test_retries():
 
 
 @op(config_schema=str)
-def destroy(context, x):
+def destroy(context: OpExecutionContext, x: int) -> None:
     raise ValueError
 
 
@@ -135,7 +135,7 @@ def engine_error():
         }
     }
 )
-def resource_req_op(context):
+def resource_req_op(context: OpExecutionContext) -> None:
     context.log.info("running")
 
 
@@ -145,7 +145,7 @@ def test_resources_limit():
 
 
 @op
-def sleep_op(_):
+def sleep_op(_) -> bool:
     time.sleep(0.5)
     return True
 
@@ -157,5 +157,5 @@ def interrupt_job():
 
 
 @op
-def bar_solid():
+def bar_solid() -> str:
     return "bar"

@@ -3,6 +3,7 @@ dev = [
   "mypy>=1.18.2",
   "pyright>=1.1.407",
   "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
   "pytest-mock>=3.14.0",
   "ruff>=0.14.3",
 ]
@@ -71,6 +72,9 @@ ignore = [
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
   "TRY003", # Avoid specifying long messages outside the exception class
+  "DOC201", # Return not documented (acceptable for infrastructure modules)
+  "PLR0914", # Too many local variables (Pulumi requires verbose definitions)
+  "PLR0915" # Too many statements (acceptable for main infrastructure script)
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -81,12 +85,15 @@ unfixable = ["ERA001"] # Commented-out code
   "ANN001", # Missing type annotation for function argument
   "ANN201", # Missing return type annotation for public function
   "ANN202", # Missing return type annotation for private function
+  "C901", # Too complex (acceptable in parametrized tests)
   "D100", # Missing docstring in public module
   "D101", # Missing docstring in public class
   "D102", # Missing docstring in public method
   "D103", # Missing docstring in public function
   "D104", # Missing docstring in public package
+  "D107", # Missing docstring in __init__
   "PLR2004", # Magic value used in comparison
+  "PLR6301", # Method could be static (Pulumi mock classes)
   "S101", # Use of assert detected
   "S105", # Possible hardcoded password
   "S106", # Possible hardcoded password
@@ -98,6 +105,10 @@ unfixable = ["ERA001"] # Commented-out code
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 
 [tool.uv]
 package = false

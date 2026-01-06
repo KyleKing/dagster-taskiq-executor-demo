@@ -4,6 +4,8 @@ This module provides CLI commands for running Taskiq workers and managing
 Taskiq-based Dagster execution.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import pathlib
@@ -20,14 +22,6 @@ from dagster._utils import mkdir_p  # noqa: PLC2701
 from dagster_shared.yaml_utils import load_yaml_from_path
 
 from dagster_taskiq.executor import taskiq_executor
-
-
-def _coerce_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
-    return bool(value)
 
 
 def create_worker_parser(subparsers: argparse._SubParsersAction[Any]) -> argparse.ArgumentParser:  # pyright: ignore[reportPrivateUsage]
@@ -223,7 +217,7 @@ def launch_background_worker(subprocess_args: list[str], env: dict[str, str] | N
     return subprocess.Popen(subprocess_args, stdout=None, stderr=None, env=env)  # noqa: S603
 
 
-def worker_start_command(args: argparse.Namespace) -> int | None:  # noqa: C901
+def worker_start_command(args: argparse.Namespace) -> int | None:
     """Start a Taskiq worker.
 
     This wraps the taskiq CLI and adds Dagster-specific configuration.
@@ -257,16 +251,6 @@ def worker_start_command(args: argparse.Namespace) -> int | None:  # noqa: C901
     env = os.environ.copy()
     validated_config: Mapping[str, Any] = get_validated_config(args.config_yaml) if args.config_yaml else {}
 
-    config_source = validated_config.get("config_source")
-    enable_cancellation = True
-    if isinstance(config_source, Mapping) and "enable_cancellation" in config_source:
-        enable_cancellation = _coerce_bool(config_source["enable_cancellation"])
-
-    env_override = env.get("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
-    if env_override is not None:
-        enable_cancellation = _coerce_bool(env_override)
-    env["DAGSTER_TASKIQ_ENABLE_CANCELLATION"] = "1" if enable_cancellation else "0"
-
     # If config YAML provided, extract and set environment variables
     if args.config_yaml:
         if validated_config.get("queue_url"):
@@ -285,10 +269,6 @@ def worker_start_command(args: argparse.Namespace) -> int | None:  # noqa: C901
             if existing_pythonpath and not existing_pythonpath.endswith(os.pathsep):
                 existing_pythonpath += os.pathsep
             env["PYTHONPATH"] = f"{existing_pythonpath}{config_dir}{os.pathsep}"
-
-    has_receiver_override = any(arg == "--receiver" or arg.startswith("--receiver=") for arg in args.additional_args)
-    if enable_cancellation and not has_receiver_override:
-        subprocess_args.extend(["--receiver", "dagster_taskiq.cancellable_receiver:CancellableReceiver"])
 
     # Add any additional args
     subprocess_args.extend(args.additional_args)

@@ -17,7 +17,6 @@ from dagster._core.events import EngineEventData  # noqa: PLC2701
 from dagster._core.execution.api import create_execution_plan, execute_plan_iterator  # noqa: PLC2701
 from dagster._grpc.types import ExecuteRunArgs, ExecuteStepArgs, ResumeRunArgs  # noqa: PLC2701
 from dagster._serdes import serialize_value, unpack_value  # noqa: PLC2701
-from dagster_shared.serdes.serdes import JsonSerializableValue
 from taskiq import AsyncBroker
 
 from dagster_taskiq.config import (
@@ -134,7 +133,7 @@ def create_execute_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
     """
 
     @broker.task(task_name=TASK_EXECUTE_JOB_NAME, **task_kwargs)
-    def _execute_job(execute_job_args_packed: JsonSerializableValue) -> int:
+    def _execute_job(execute_job_args_packed: Any) -> int:
         """Execute a full Dagster job run.
 
         Args:
@@ -148,7 +147,7 @@ def create_execute_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
             as_type=ExecuteRunArgs,
         )
 
-        with DagsterInstance.get() as instance:
+        with DagsterInstance.from_ref(args.instance_ref) as instance:  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
             return _execute_run_command_body(
                 instance=instance,
                 run_id=args.run_id,
@@ -173,7 +172,7 @@ def create_resume_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
     """
 
     @broker.task(task_name=TASK_RESUME_JOB_NAME, **task_kwargs)
-    def _resume_job(resume_job_args_packed: JsonSerializableValue) -> int:
+    def _resume_job(resume_job_args_packed: Any) -> int:
         """Resume a Dagster job run.
 
         Args:
@@ -187,7 +186,7 @@ def create_resume_job_task(broker: AsyncBroker, **task_kwargs: Any) -> Any:
             as_type=ResumeRunArgs,
         )
 
-        with DagsterInstance.get() as instance:
+        with DagsterInstance.from_ref(args.instance_ref) as instance:  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
             return _resume_run_command_body(
                 instance=instance,
                 run_id=args.run_id,

@@ -11,7 +11,7 @@ from dagster_taskiq.defaults import (
     worker_max_messages,
 )
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, Any] = {
     "wait_time_seconds": wait_time_seconds,
     "max_number_of_messages": worker_max_messages,
     "worker_max_messages": worker_max_messages,

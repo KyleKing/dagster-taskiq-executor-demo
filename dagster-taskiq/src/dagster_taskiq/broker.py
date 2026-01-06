@@ -1,7 +1,7 @@
 """Helpers for constructing Taskiq SQS brokers."""
 
 import warnings
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from taskiq_aio_sqs import SQSBroker as TaskiqSQSBroker
@@ -54,7 +54,7 @@ class SqsBrokerConfig(BaseModel):
         return v.strip()
 
     @model_validator(mode="after")
-    def validate_fair_queue_config(self) -> SqsBrokerConfig:
+    def validate_fair_queue_config(self) -> Self:
         """Warn if fair queue is enabled but queue URL is not FIFO.
 
         Returns:

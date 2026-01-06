@@ -2,6 +2,7 @@
 
 import time
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -228,8 +229,8 @@ class TestMetricsEmission:
         auto_scaler_service._emit_metrics(metrics)
 
         # Check that metrics log was called on the mock logger
-        auto_scaler_service.logger.info.assert_called()
-        call_args = auto_scaler_service.logger.info.call_args
+        cast("Mock", auto_scaler_service.logger.info).assert_called()
+        call_args = cast("Mock", auto_scaler_service.logger.info).call_args
         format_str = call_args[0][0]
         values = call_args[0][1:]
         assert "METRICS" in format_str
@@ -242,8 +243,8 @@ class TestMetricsEmission:
 
         auto_scaler_service._emit_metrics(metrics)
 
-        auto_scaler_service.logger.warning.assert_called_once()
-        call_args = auto_scaler_service.logger.warning.call_args
+        cast("Mock", auto_scaler_service.logger.warning).assert_called_once()
+        call_args = cast("Mock", auto_scaler_service.logger.warning).call_args
         format_str = call_args[0][0]
         values = call_args[0][1:]
         assert "ALERT" in format_str

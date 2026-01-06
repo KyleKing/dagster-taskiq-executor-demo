@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -18,6 +20,22 @@ from config import (
     StackSettings,
     TaskiqDemoSettings,
 )
+
+
+@pytest.fixture(scope="session")
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
+    """Create a session-wide event loop for Pulumi tests.
+
+    Required for Pulumi mocks which use asyncio.Future internally in Python 3.10+.
+
+    Yields:
+        Event loop instance for async operations.
+    """
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ from dagster_shared.libraries import DagsterLibraryRegistry
 from dagster_taskiq.executor import taskiq_executor
 from dagster_taskiq.launcher import TaskiqRunLauncher
 
-__verion__ = "0.0.0"
+__version__ = "0.0.0"
 
 DagsterLibraryRegistry.register("dagster-taskiq", __version__)
 

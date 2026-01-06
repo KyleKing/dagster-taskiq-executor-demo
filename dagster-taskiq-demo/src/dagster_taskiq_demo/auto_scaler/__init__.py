@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import os
-import random  # noqa: S311
+import random
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -102,7 +102,11 @@ class AutoScalerService:
                 return
 
             parts = request_line.decode().strip().split()
-            if len(parts) >= HTTP_REQUEST_MIN_PARTS and parts[0] == "GET" and parts[1] in {"/health", "/health/", "/healthz", "/healthz/"}:
+            if (
+                len(parts) >= HTTP_REQUEST_MIN_PARTS
+                and parts[0] == "GET"
+                and parts[1] in {"/health", "/health/", "/healthz", "/healthz/"}
+            ):
                 response = json.dumps({"status": "healthy", "service": "auto-scaler"}).encode()
                 writer.write(b"HTTP/1.0 200 OK\r\n")
                 writer.write(b"Content-Type: application/json\r\n")
@@ -231,7 +235,7 @@ class AutoScalerService:
                 return
 
             # Pick a random task to stop
-            task_to_stop = random.choice(tasks)  # noqa: S311
+            task_to_stop = random.choice(tasks)
             self.logger.info("Simulating worker crash: stopping task %s", task_to_stop)
 
             await self.ecs_client.stop_task(
@@ -291,7 +295,7 @@ class AutoScalerService:
     async def simulate_failure(self) -> None:
         """Simulate a random failure for testing."""
         failure_types = ["worker_crash", "drain_restart", "network_partition"]
-        failure_type = random.choice(failure_types)  # noqa: S311
+        failure_type = random.choice(failure_types)
 
         self.logger.info("Simulating random failure: %s", failure_type)
 
@@ -328,7 +332,7 @@ class AutoScalerService:
 
                 # Simulate failures periodically (configurable)
                 # TODO: Add settings for failure simulation enable/disable and probability
-                if random.random() < FAILURE_SIMULATION_PROBABILITY:  # noqa: S311
+                if random.random() < FAILURE_SIMULATION_PROBABILITY:
                     await self.simulate_failure()
 
                 # Wait for next cycle

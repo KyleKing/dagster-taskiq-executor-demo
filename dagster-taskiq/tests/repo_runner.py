@@ -59,17 +59,17 @@ def return_one(_):
 
 
 @op
-def multiply_by_2(_, num):
+def multiply_by_2(_, num: int) -> int:
     return num * 2
 
 
 @op
-def multiply_by_3(_, num):
+def multiply_by_3(_, num: int) -> int:
     return num * 3
 
 
 @op
-def add(_, num1, num2):
+def add(_, num1: int, num2: int) -> int:
     return num1 + num2
 
 

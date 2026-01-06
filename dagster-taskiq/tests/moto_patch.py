@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 try:
-    from moto.aiobotocore import patch as aiobotocore_patch
+    from moto.aiobotocore import patch as aiobotocore_patch  # type: ignore[import-not-found]
 except ImportError:
     # Fallback to custom patch if moto's aiobotocore patch is not available
     from unittest.mock import MagicMock
@@ -22,11 +23,11 @@ except ImportError:
             self.raw = _MockHttpClientResponse(response)
 
         @property
-        def content(self) -> bytes:
+        def content(self) -> bytes:  # type: ignore[override]
             return self._moto_response.content
 
         @property
-        def text(self) -> str:
+        def text(self) -> str:  # type: ignore[override]
             return self._moto_response.text
 
         @property
@@ -44,7 +45,7 @@ except ImportError:
             self.content.read = _read  # type: ignore[assignment]
 
         @property
-        def raw_headers(self) -> aiohttp.typedefs.RawHeaders:
+        def raw_headers(self) -> aiohttp.typedefs.RawHeaders:  # type: ignore[override]
             return tuple(
                 (str(key).encode("utf-8"), str(value).encode("utf-8")) for key, value in self.response.headers.items()
             )
@@ -53,11 +54,11 @@ except ImportError:
         """Patch aiobotocore to operate against moto-backed AWS stubs."""
         original_convert = aiobotocore.endpoint.convert_to_response_dict
 
-        def _patched_convert(
+        async def _patched_convert(
             http_response: aiobotocore.awsrequest.AWSResponse,
-            operation_model,
-        ):
-            return original_convert(_MockAWSResponse(http_response), operation_model)
+            operation_model: Any,
+        ) -> dict[str, Any]:
+            return await original_convert(_MockAWSResponse(http_response), operation_model)
 
         aiobotocore.endpoint.convert_to_response_dict = _patched_convert
 

@@ -134,7 +134,11 @@ ignore = [
   "TD001", # Invalid TODO tag: `FIXME`
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
-  "TRY003" # Avoid specifying long messages outside the exception class
+  "TRY003", # Avoid specifying long messages outside the exception class
+  "ARG002", # Unused method argument (required for Dagster interface compliance)
+  "C901", # Too complex (acceptable for core execution loop)
+  "DOC201", # Return not documented (acceptable for internal functions)
+  "PLR6301" # Method could be static (required for Dagster interface compliance)
 ]
 unfixable = ["ERA001"] # Commented-out code
 

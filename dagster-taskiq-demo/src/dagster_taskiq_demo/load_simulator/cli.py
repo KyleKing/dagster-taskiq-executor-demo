@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import sys
-from pathlib import Path
 
 import click
 import structlog
@@ -16,7 +15,6 @@ from dagster_taskiq_demo.load_simulator import (
     run_steady_load,
     run_worker_failure,
 )
-from dagster_taskiq_demo.load_simulator.verification import ExactlyOnceVerifier
 
 
 @click.group()
@@ -256,51 +254,6 @@ def network_partition(ctx: click.Context, max_burst_size: int, duration: int) ->
 
     except Exception as exc:
         click.echo(f"Error running scenario: {exc}", err=True)
-        sys.exit(1)
-
-
-@cli.command()
-@click.option(
-    "--scenario-tag",
-    default=None,
-    help="Optional scenario tag to filter verification",
-)
-@click.option(
-    "--output",
-    default=None,
-    type=click.Path(),
-    help="Output file path for verification report",
-)
-@click.option(
-    "--format",
-    default="json",
-    type=click.Choice(["json", "csv"]),
-    help="Output format for verification report",
-)
-@click.pass_context
-def verify(_ctx: click.Context, scenario_tag: str | None, output: str | None, output_format: str) -> None:
-    """Verify exactly-once execution semantics."""
-    click.echo("Running exactly-once verification...")
-
-    try:
-        verifier = ExactlyOnceVerifier(settings)
-        result = verifier.verify_idempotency_records(scenario_tag)
-
-        click.echo("Verification Results:")
-        click.echo(f"  Total runs: {result.total_runs}")
-        click.echo(f"  Completed runs: {result.completed_runs}")
-        click.echo(f"  Failed runs: {result.failed_runs}")
-        click.echo(f"  Pending runs: {result.pending_runs}")
-        click.echo(f"  Duplicate executions: {result.duplicate_executions}")
-        click.echo(f"  Missing executions: {result.missing_executions}")
-
-        if output:
-            output_path = Path(output)
-            verifier.export_report(result, output_path, output_format)
-            click.echo(f"Report exported to {output_path}")
-
-    except Exception as exc:
-        click.echo(f"Error running verification: {exc}", err=True)
         sys.exit(1)
 
 

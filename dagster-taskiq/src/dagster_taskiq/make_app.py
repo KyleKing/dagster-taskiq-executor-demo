@@ -12,7 +12,6 @@ from taskiq import AsyncBroker
 
 from dagster_taskiq import defaults
 from dagster_taskiq.broker import SqsBrokerConfig
-from dagster_taskiq.cancellable_broker import CancellableSQSBroker
 
 
 def _dict_from_source(config_source: Any) -> dict[str, Any]:
@@ -110,15 +109,6 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
     wait_time_raw = _resolve_value(config, source_overrides, "wait_time_seconds", defaults.wait_time_seconds)
     use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)  # noqa: FBT003
     extra_options_raw = _resolve_value(config, source_overrides, "extra_options", {}, "broker_transport_options")
-    env_enable_cancellation = os.getenv("DAGSTER_TASKIQ_ENABLE_CANCELLATION")
-    default_enable_cancellation: str | bool | None = env_enable_cancellation
-    if default_enable_cancellation is None:
-        # Disable cancellation by default until fully implemented (see IMPLEMENTATION_PROGRESS.md Phase 3)
-        default_enable_cancellation = False
-    enable_cancellation_raw = _resolve_value(
-        config, source_overrides, "enable_cancellation", default_enable_cancellation
-    )
-    enable_cancellation = _coerce_bool(enable_cancellation_raw)
 
     # Create S3 result backend
     try:
@@ -185,8 +175,5 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
         s3_extended_bucket_name=s3_bucket,
         extra_options=extra_options,
     )
-
-    if enable_cancellation:
-        return CancellableSQSBroker(broker_config, result_backend=result_backend)
 
     return broker_config.create_broker(result_backend=result_backend)  # type: ignore[no-any-return]

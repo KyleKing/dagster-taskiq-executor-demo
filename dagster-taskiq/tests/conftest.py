@@ -31,11 +31,17 @@ def find_free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def aws_mock():
+def aws_mock() -> Iterator[str]:
     """Provide moto-backed AWS endpoints for testing."""
     # Temporarily remove any global endpoint configuration for moto
     removed_vars = {}
-    for var_name in ["AWS_ENDPOINT_URL", "AWS_SQS_ENDPOINT_URL", "AWS_S3_ENDPOINT_URL"]:
+    for var_name in [
+        "AWS_ENDPOINT_URL",
+        "AWS_SQS_ENDPOINT_URL",
+        "AWS_S3_ENDPOINT_URL",
+        "AWS_PROFILE",
+        "AWS_SDK_LOAD_CONFIG",
+    ]:
         if var_name in os.environ:
             removed_vars[var_name] = os.environ.pop(var_name)
 
@@ -125,19 +131,19 @@ def aws_mock():
 
 
 @pytest.fixture
-def tempdir():
+def tempdir() -> Iterator[str]:
     with tempfile.TemporaryDirectory() as the_dir:
         yield the_dir
 
 
 @pytest.fixture
-def instance(tempdir):
+def instance(tempdir: str) -> Iterator[DagsterInstance]:
     with instance_for_test(temp_dir=tempdir) as test_instance:
         yield test_instance
 
 
 @pytest.fixture
-def dagster_taskiq_worker(aws_mock, instance: DagsterInstance) -> Iterator[None]:
+def dagster_taskiq_worker(aws_mock: str, instance: DagsterInstance) -> Iterator[None]:
     with start_taskiq_worker():
         yield
 

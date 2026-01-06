@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import Any
 
 import pytest
 from taskiq.result import TaskiqResult
@@ -23,11 +24,11 @@ def test_make_app_fair_queue_detection(
     override: bool | None,  # noqa: FBT001
     expected: bool,  # noqa: FBT001
     expect_warning: bool,  # noqa: FBT001
-    monkeypatch,
+    monkeypatch: Any,
 ) -> None:
-    recorded = {}
+    recorded: dict[str, Any] = {}
 
-    def _capture_broker(self, *, result_backend=None):
+    def _capture_broker(self: Any, *, result_backend: Any = None) -> Any:
         recorded["is_fair_queue"] = self.is_fair_queue
 
         class _DummyBroker:
@@ -43,7 +44,7 @@ def test_make_app_fair_queue_detection(
 
     monkeypatch.setattr("dagster_taskiq.broker.SqsBrokerConfig.create_broker", _capture_broker)
 
-    config = {"queue_url": queue_url}
+    config: dict[str, Any] = {"queue_url": queue_url}
     if override is not None:
         config["config_source"] = {"is_fair_queue": override}
 
@@ -56,7 +57,7 @@ def test_make_app_fair_queue_detection(
     assert recorded["is_fair_queue"] is expected
 
 
-def test_s3_extended_payload_smoke(aws_mock):
+def test_s3_extended_payload_smoke(aws_mock: str) -> None:
     async def _exercise() -> None:
         backend = S3Backend(
             bucket_name=os.environ["DAGSTER_TASKIQ_S3_BUCKET_NAME"],

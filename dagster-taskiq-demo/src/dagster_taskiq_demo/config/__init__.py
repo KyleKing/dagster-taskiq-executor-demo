@@ -1,4 +1,4 @@
-"""Configuration package for Dagster TaskIQ LocalStack demo."""
+"""Configuration package for Dagster TaskIQ demo."""
 
 from __future__ import annotations
 
@@ -7,22 +7,19 @@ from typing import TYPE_CHECKING, Any
 
 from .settings import Settings, settings
 
-if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+if TYPE_CHECKING:
     from .database import (
         DatabaseConnectionManager,
         create_dagster_instance_with_retry,
         get_database_manager,
         wait_for_database_ready,
     )
-    from .metrics import MetricsCollector, get_metrics_collector
 
 __all__ = [
     "DatabaseConnectionManager",
-    "MetricsCollector",
     "Settings",
     "create_dagster_instance_with_retry",
     "get_database_manager",
-    "get_metrics_collector",
     "settings",
     "wait_for_database_ready",
 ]
@@ -33,8 +30,6 @@ _LAZY_IMPORTS = {
     "create_dagster_instance_with_retry": ("database", "create_dagster_instance_with_retry"),
     "get_database_manager": ("database", "get_database_manager"),
     "wait_for_database_ready": ("database", "wait_for_database_ready"),
-    "MetricsCollector": ("metrics", "MetricsCollector"),
-    "get_metrics_collector": ("metrics", "get_metrics_collector"),
 }
 
 

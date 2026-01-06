@@ -71,7 +71,7 @@ def test_load_with_defaults(mock_get_stack: MagicMock) -> None:
         assert settings.project.name == "dagster-taskiq-demo"
         assert settings.project.environment == "local"
         assert settings.aws.region == "us-east-1"
-        assert settings.aws.endpoint == "http://localhost:4566"
+        assert settings.aws.endpoint is None  # None uses default AWS endpoints
         assert settings.queue.message_retention_seconds == 14 * 24 * 60 * 60  # 14 days
         assert settings.queue.visibility_timeout == 15 * 60  # 15 minutes
         assert settings.queue.dlq_visibility_timeout == 60

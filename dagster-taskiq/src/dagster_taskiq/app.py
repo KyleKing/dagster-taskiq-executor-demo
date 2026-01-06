@@ -23,6 +23,9 @@ try:
     if hasattr(broker, "result_backend") and broker.result_backend:  # type: ignore[truthy-bool]
         loop.run_until_complete(broker.result_backend.startup())
 finally:
+    if hasattr(broker, "result_backend") and broker.result_backend:  # type: ignore[truthy-bool]
+        loop.run_until_complete(broker.result_backend.shutdown())
+    loop.run_until_complete(broker.shutdown())
     loop.close()
 
 execute_plan = create_task(broker)

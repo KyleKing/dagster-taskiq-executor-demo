@@ -22,7 +22,7 @@ dependencies = [
   "dagster-webserver>=1.5.0",
   "dagster-postgres>=0.21.0",
   "dagster-graphql>=0.21.0",
-  "pydantic-settings>=2.0.0",
+  "pydantic-settings>=2.12.0",
   "aioboto3>=13.0.0",
   "sqlalchemy>=2.0.0",
   "structlog>=25.5.0"
@@ -108,7 +108,6 @@ ignore = [
   "DOC501", # Raised exception missing from docstring
   "E501", # Line too long (handled by formatter)
   "EM101", # Exception must not use a string literal, assign to variable first
-  "F100", # Fixes (auto-fixable issues)
   "FIX001", # Line contains FIXME
   "FIX002", # Line contains TODO
   "FIX004", # Line contains HACK
@@ -122,7 +121,7 @@ ignore = [
   "TD002", # Missing author in TODO
   "TD003", # Missing issue link on the line following this TODO
   "TRY003", # Avoid specifying long messages outside the exception class
-  "Y300" # Consider using typing.Yield (acceptable for fixtures)
+  "TRY300" # Consider moving statement to else block (acceptable pattern)
 ]
 unfixable = ["ERA001"] # Commented-out code
 

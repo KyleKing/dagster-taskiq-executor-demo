@@ -74,7 +74,7 @@ class TestLoadSimulator:
     @pytest.mark.asyncio
     async def test_submit_run_failure(self, mock_client_class: Mock, simulator: LoadSimulator) -> None:
         """Test run submission failure."""
-        from dagster_graphql import DagsterGraphQLClientError  # noqa: PLC0415
+        from dagster_graphql import DagsterGraphQLClientError
 
         mock_client = Mock()
         mock_client.submit_job_execution.side_effect = DagsterGraphQLClientError("Test error")
