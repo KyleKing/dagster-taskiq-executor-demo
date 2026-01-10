@@ -43,6 +43,13 @@ reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportUnknownVariableType = false
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+filterwarnings = [
+  "ignore:aws.ec2/encryptioncontrol.EncryptionControl has been deprecated:DeprecationWarning:pulumi_aws.ec2.encryption_control",
+]
+
 [tool.ruff]
 line-length = 120
 target-version = "py313"
@@ -74,7 +81,7 @@ ignore = [
   "TRY003", # Avoid specifying long messages outside the exception class
   "DOC201", # Return not documented (acceptable for infrastructure modules)
   "PLR0914", # Too many local variables (Pulumi requires verbose definitions)
-  "PLR0915" # Too many statements (acceptable for main infrastructure script)
+  "PLR0915", # Too many statements (acceptable for main infrastructure script)
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -105,10 +112,6 @@ unfixable = ["ERA001"] # Commented-out code
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
 
 [tool.uv]
 package = false

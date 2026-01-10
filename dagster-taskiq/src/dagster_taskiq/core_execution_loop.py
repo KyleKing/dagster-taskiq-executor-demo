@@ -5,6 +5,7 @@ result retrieval, and event handling for Dagster runs executed via Taskiq.
 """
 
 import asyncio
+import contextlib
 import sys
 from collections.abc import AsyncGenerator, Callable
 from typing import Any, cast
@@ -20,7 +21,7 @@ from dagster_shared.serdes import deserialize_value
 
 from dagster_taskiq.make_app import make_app
 
-TICK_SECONDS = 1
+TICK_SECONDS = 0.25
 DELEGATE_MARKER = "taskiq_queue_wait"
 
 
@@ -57,6 +58,12 @@ async def core_taskiq_execution_loop(  # noqa: PLR0912, PLR0915
     from dagster_taskiq.executor import TaskiqExecutor  # noqa: PLC0415
 
     broker = make_app(cast("TaskiqExecutor", job_context.executor).app_args())
+    has_backend = hasattr(broker, "result_backend") and bool(broker.result_backend)
+    job_context.log.info(
+        "Created broker: %s, has result_backend: %s",
+        type(broker).__name__,
+        has_backend,
+    )
 
     step_results: dict[str, dict[str, Any]] = {}  # {'result': AsyncTaskiqTask, 'task_id': str, 'waiter': asyncio.Task}
     step_errors = {}
@@ -71,7 +78,8 @@ async def core_taskiq_execution_loop(  # noqa: PLR0912, PLR0915
 
         for waiter in waiters:
             if waiter is not None and not waiter.done():
-                waiter.cancel()
+                with contextlib.suppress(RuntimeError):
+                    waiter.cancel()
 
         filtered_waiters = [w for w in waiters if w is not None]
         await asyncio.gather(*filtered_waiters, return_exceptions=True)
@@ -184,7 +192,7 @@ async def core_taskiq_execution_loop(  # noqa: PLR0912, PLR0915
                             step_key_for_wait = step.key
 
                             async def _wait_for_result() -> Any:
-                                """Wait for task result, using S3 backend if wait_result() fails."""
+                                """Wait for task result, using result backend if wait_result() fails."""
                                 captured_result_handle = result_handle  # noqa: B023
                                 captured_task_id = task_id  # noqa: B023
                                 captured_step_key = step_key_for_wait  # noqa: B023
@@ -192,7 +200,17 @@ async def core_taskiq_execution_loop(  # noqa: PLR0912, PLR0915
                                 try:
                                     wait_result_fn = getattr(captured_result_handle, "wait_result", None)
                                     if wait_result_fn:
+                                        job_context.log.debug(
+                                            "Calling wait_result() for step %s, task %s",
+                                            captured_step_key,
+                                            captured_task_id,
+                                        )
                                         result = await wait_result_fn()
+                                        job_context.log.debug(
+                                            "wait_result() returned %s for step %s",
+                                            "None" if result is None else type(result).__name__,
+                                            captured_step_key,
+                                        )
                                         if result is not None:
                                             return result
 

@@ -8,7 +8,11 @@ import os
 import warnings
 from typing import Any
 
-from taskiq import AsyncBroker
+from taskiq import (
+    AsyncBroker,
+    InMemoryBroker,
+)
+from taskiq_aio_sqs import S3Backend
 
 from dagster_taskiq import defaults
 from dagster_taskiq.broker import SqsBrokerConfig
@@ -94,6 +98,10 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
     region_name = config.get("region_name", defaults.aws_region_name)
     source_overrides = _dict_from_source(config.get("config_source"))
 
+    # Check for eager execution mode
+    if _resolve_value(config, source_overrides, "task_always_eager", default=False):
+        return InMemoryBroker()
+
     # Get S3 configuration
     s3_bucket = _resolve_value(config, source_overrides, "s3_bucket_name", defaults.s3_bucket_name)
     s3_endpoint = _resolve_value(config, source_overrides, "s3_endpoint_url", defaults.s3_endpoint_url)
@@ -107,13 +115,11 @@ def make_app(app_args: dict[str, Any] | None = None) -> AsyncBroker:  # noqa: PL
         config, source_overrides, "max_number_of_messages", defaults.worker_max_messages, "worker_max_messages"
     )
     wait_time_raw = _resolve_value(config, source_overrides, "wait_time_seconds", defaults.wait_time_seconds)
-    use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", False)  # noqa: FBT003
+    use_task_id_for_dedup = _resolve_value(config, source_overrides, "use_task_id_for_deduplication", default=False)
     extra_options_raw = _resolve_value(config, source_overrides, "extra_options", {}, "broker_transport_options")
 
     # Create S3 result backend
     try:
-        from taskiq_aio_sqs import S3Backend  # noqa: PLC0415
-
         result_backend: Any = S3Backend(
             bucket_name=s3_bucket,
             endpoint_url=s3_endpoint,

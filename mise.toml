@@ -1,5 +1,8 @@
 experimental_monorepo_root = true
 
+[settings]
+task_timeout = "600s"
+
 [env]
 AWS_DEFAULT_REGION = "us-east-1"
 ENVIRONMENT = "local"
@@ -143,5 +146,6 @@ hadolint = "latest"
 node = "latest" # Why do I need node?
 "pipx:mdformat" = "latest"
 "pipx:toml-sort" = "latest"
+pulumi = "latest"
 python = "3.13"
 "pipx:commitizen" = "latest"

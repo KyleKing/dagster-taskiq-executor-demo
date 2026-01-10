@@ -62,26 +62,22 @@ disable_error_code = ["attr-defined"]
 pythonVersion = "3.13"
 include = ["src", "tests"]
 typeCheckingMode = "strict"
-reportMissingTypeStubs = false
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
-reportPrivateUsage = false
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportPrivateUsage = "none"
 
-[[tool.pyright.overrides]]
-include = ["tests/**/*.py"]
-reportPrivateUsage = false
-reportAttributeAccessIssue = false
-reportIncompatibleMethodOverride = false
-reportUnknownMemberType = false
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = "none"
+reportAttributeAccessIssue = "none"
+reportIncompatibleMethodOverride = "none"
+reportUnknownMemberType = "none"
 
-[[tool.pyright.overrides]]
-include = ["**/load_simulator/cli.py"]
-reportAttributeAccessIssue = false
-
-[[tool.pyright.overrides]]
-include = ["src/dagster_taskiq_demo/load_simulator/verification.py"]
-reportAttributeAccessIssue = false
+[[tool.pyright.executionEnvironments]]
+root = "src/dagster_taskiq_demo/load_simulator"
+reportAttributeAccessIssue = "none"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

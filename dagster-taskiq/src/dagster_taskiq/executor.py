@@ -168,9 +168,16 @@ async def _submit_task_async(
     task = create_task(broker)
 
     # Submit task to queue
+    plan_context.log.debug("Calling task.kiq() for step '%s'", step.key)
     task_result = await task.kiq(
         execute_step_args_packed=pack_value(execute_step_args),
         executable_dict=plan_context.reconstructable_job.to_dict(),
+    )
+    plan_context.log.debug(
+        "task.kiq() returned for step '%s': type=%s, task_id=%s",
+        step.key,
+        type(task_result).__name__,
+        task_result.task_id if hasattr(task_result, "task_id") else "N/A",
     )
 
     # Verify task result has access to result backend
@@ -239,6 +246,7 @@ class TaskiqExecutor(Executor):
         # Run the async generator in a new event loop and yield synchronously
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        async_gen = None
         try:
             async_gen = core_taskiq_execution_loop(plan_context, execution_plan, step_execution_fn=_submit_task_async)
             while True:
@@ -248,6 +256,8 @@ class TaskiqExecutor(Executor):
                 except StopAsyncIteration:
                     break
         finally:
+            if async_gen is not None:
+                loop.run_until_complete(async_gen.aclose())
             loop.close()
 
     @staticmethod

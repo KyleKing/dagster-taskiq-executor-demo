@@ -68,7 +68,7 @@ def aws_mock() -> Iterator[str]:
             aws_secret_access_key=AWS_TEST_SECRET_KEY,
         )
 
-        unique_suffix = int(time.time())
+        unique_suffix = f"{int(time.time())}-{os.getpid()}"
         queue_name = f"dagster-tasks-test-{unique_suffix}"
         queue_url = sqs.create_queue(QueueName=queue_name)["QueueUrl"]
         cancel_queue_name = f"{queue_name}-cancels"

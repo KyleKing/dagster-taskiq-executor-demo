@@ -45,6 +45,11 @@ version = "0.30.0"
 backend = "aqua:apple/pkl"
 "platforms.macos-arm64" = { checksum = "sha256:923a636f2c858029d9bf93f35aeae58ebd9783fbe0209f4787c4eed950142212", url = "https://github.com/apple/pkl/releases/download/0.30.0/pkl-macos-aarch64"}
 
+[[tools.pulumi]]
+version = "3.214.1"
+backend = "aqua:pulumi/pulumi"
+"platforms.macos-arm64" = { checksum = "sha256:ee1bb9fc3a89af777aa1c825b1d0be0e0eaca3d655285bfbce94e9bf5e9d7dca", url = "https://github.com/pulumi/pulumi/releases/download/v3.214.1/pulumi-v3.214.1-darwin-arm64.tar.gz"}
+
 [[tools.python]]
 version = "3.13.7"
 backend = "core:python"

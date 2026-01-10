@@ -1,5 +1,4 @@
 import os
-import time
 from collections.abc import Iterator, Mapping
 from typing import Any
 
@@ -141,9 +140,8 @@ def test_exity_run(
     assert failed_run.run_id == run_id
 
     poll_for_step_start(instance, run_id, timeout=5)
-    time.sleep(5)
 
-    failed_run = poll_for_finished_run(instance, run_id, timeout=5)
+    failed_run = poll_for_finished_run(instance, run_id, timeout=10)
     assert failed_run.status == DagsterRunStatus.FAILURE
 
     event_records = instance.all_logs(run_id)

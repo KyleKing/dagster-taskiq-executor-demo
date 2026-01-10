@@ -139,7 +139,7 @@ def start_taskiq_worker(queue: str | None = None) -> Iterator[None]:
     # Give the worker a moment to start
     import time
 
-    time.sleep(2)
+    time.sleep(0.2)
 
     try:
         yield

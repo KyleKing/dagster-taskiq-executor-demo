@@ -10,8 +10,9 @@ dev = [
   "mypy>=1.18.2",
   "pytest>=8.4.2",
   "moto[s3,sqs,server]>=5.0.0",
-  "taskiq-dashboard>=0.2.0",
-  "docker>=7.1.0" # Find alternative
+  "taskiq-dashboard>=0.2.0", # Find alternative
+  "docker>=7.1.0",
+  "pytest-xdist>=3.8.0",
 ]
 
 [project]
@@ -21,7 +22,7 @@ description = "Package for using Taskiq as Dagster's execution engine."
 requires-python = ">=3.11.11"
 license = "Apache-2.0"
 authors = [
-  {name = "Kyle King", email = "dev.act.kyle@gmail.com"}
+  {name = "Kyle King", email = "dev.act.kyle@gmail.com"},
 ]
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
@@ -33,7 +34,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
-  "Operating System :: OS Independent"
+  "Operating System :: OS Independent",
 ]
 dependencies = [
   "aioboto3>=13.0.0",
@@ -41,7 +42,7 @@ dependencies = [
   "taskiq>=0.11.0",
   "taskiq-aio-sqs>=0.4.0",
   "pydantic>=2.10.0,<=2.11.0", # FYI: issues with dependencies
-  "pytest-timeout>=2.4.0"
+  "pytest-timeout>=2.4.0",
 ]
 
 [project.scripts]
@@ -81,30 +82,29 @@ disable_error_code = ["attr-defined"]
 pythonVersion = "3.11"
 include = ["src", "tests"]
 typeCheckingMode = "strict"
-reportMissingTypeStubs = false
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
 
-[[tool.pyright.overrides]]
-include = ["tests/**/*.py"]
-reportUnknownParameterType = false
-reportMissingParameterType = false
-reportUnknownReturnType = false
-reportPrivateUsage = false
-reportIncompatibleMethodOverride = false
-reportIncompatibleVariableOverride = false
-reportMissingImports = false
-reportReturnType = false
-reportArgumentType = false
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportUnknownParameterType = "none"
+reportMissingParameterType = "none"
+reportPrivateUsage = "none"
+reportIncompatibleMethodOverride = "none"
+reportIncompatibleVariableOverride = "none"
+reportMissingImports = "none"
+reportReturnType = "none"
+reportArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-timeout = 300
+timeout = 60
 
 [tool.ruff]
 line-length = 120
@@ -138,7 +138,7 @@ ignore = [
   "ARG002", # Unused method argument (required for Dagster interface compliance)
   "C901", # Too complex (acceptable for core execution loop)
   "DOC201", # Return not documented (acceptable for internal functions)
-  "PLR6301" # Method could be static (required for Dagster interface compliance)
+  "PLR6301", # Method could be static (required for Dagster interface compliance)
 ]
 unfixable = ["ERA001"] # Commented-out code
 
@@ -170,7 +170,7 @@ known-first-party = ["dagster_taskiq"]
   "ERA001", # Commented-out code (often intentional in tests)
   "PLC0415", # Import at top level (intentional for lazy loading in conftest)
   "PGH003", # Use specific rule codes (often acceptable in tests)
-  "PLR0915" # Too many statements (acceptable for complex test fixtures)
+  "PLR0915", # Too many statements (acceptable for complex test fixtures)
 ]
 
 [tool.ruff.lint.pydocstyle]
