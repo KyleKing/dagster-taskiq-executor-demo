@@ -1,5 +1,8 @@
 # Dagster TaskIQ Executor
 
+> [!WARNING]
+> This was a really insightful and interesting side-project to get a better understanding of Dagster and TaskIQ, but [Hatchet](https://hatchet.run) is the all around better choice and what we ultimately went with. This repo is now archived and is unlikely to be functional other than a point-in-time reference to an architecture I was exploring
+
 A TaskIQ-based executor for Dagster using AWS SQS for distributed task execution.
 
 ## Overview
